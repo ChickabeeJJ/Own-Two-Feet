@@ -61,8 +61,8 @@ export const BIOMES = [
   },
   {
     id: 'hollow', name: 'The Hollow Below', sub: 'a sky made of stone',
-    sky: ['#06060d', '#1a1736', '#3b3263'], fog: '#2c274e', sun: [0.7, 0.66, 1.0], amb: [0.07, 0.06, 0.14], sunCol: '#b7a8ff',
-    grass: '#695e9c', grassHi: '#b9aaff', dirt: '#29223f', stone: '#342f4f', deep: '#1b172f', leaf: '#7b6ad5', log: '#3f3760', moss: '#4b4380',
+    sky: ['#0b0a1a', '#2a2350', '#5d4e94'], fog: '#3e3668', sun: [0.8, 0.74, 1.0], amb: [0.1, 0.09, 0.18], sunCol: '#c9bcff',
+    grass: '#7a6fb2', grassHi: '#c9bcff', dirt: '#352c52', stone: '#40395f', deep: '#231d3b', leaf: '#7b6ad5', log: '#3f3760', moss: '#4b4380',
     accent: '#c4b5ff', amp: 14, freq: 0.03, rough: 0.6, trees: 0.1, tree: 'shroom', parts: 'spores', grade: [0.97, 0.95, 1.06],
     flower: ['#c4b5ff', '#9d8cff', '#e6deff'],
   },
@@ -76,7 +76,7 @@ export const BIOMES = [
   {
     id: 'frost', name: 'The Frost Spires', sub: 'silence, sharpened',
     sky: ['#34547f', '#98b4d4', '#e7f1fa'], fog: '#cddff0', sun: [0.95, 0.98, 1.0], amb: [0.08, 0.1, 0.14], sunCol: '#ffffff',
-    grass: '#e8f0f6', grassHi: '#ffffff', dirt: '#6b7a8e', stone: '#7b89a1', deep: '#4b576f', leaf: '#5d7f8f', log: '#4c4a50', moss: '#8fa7b5',
+    grass: '#e8f0f6', grassHi: '#ffffff', dirt: '#6b7a8e', stone: '#7b89a1', deep: '#4b576f', leaf: '#7f9fae', log: '#4c4a50', moss: '#8fa7b5',
     accent: '#dff6ff', amp: 16, freq: 0.02, rough: 0.55, trees: 0.13, tree: 'pine', parts: 'snow', grade: [0.97, 1.0, 1.05],
     flower: ['#ffffff', '#dff6ff', '#c9e6ff'],
   },

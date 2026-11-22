@@ -28,7 +28,8 @@ export class Cape {
     for (let i = 1; i < n; i++) {
       const vx = (this.x[i] - this.ox[i]) * 0.965, vy = (this.y[i] - this.oy[i]) * 0.965;
       this.ox[i] = this.x[i]; this.oy[i] = this.y[i];
-      this.x[i] += vx + wind * dt * dt * 60 * (i / n);
+      // a little stiffness: the cloth flares back from the shoulders instead of hanging flat
+      this.x[i] += vx + (wind - facing * 20) * dt * dt * 60 * (i / n);
       this.y[i] += vy + g;
     }
     for (let it = 0; it < 4; it++) {

@@ -164,8 +164,12 @@ export class Player {
     if (target) {
       const t = W.get(target.tx, target.ty);
       // line of sight: can't dig through a wall to reach a tile behind it
+      // reach only faces you can see: the tile must touch open space, and nothing solid may stand
+      // between you and it (a neighbour of the target catching the ray is fine)
       const hit = W.raycast(cx, cy, target.tx * TILE + 16, target.ty * TILE + 16);
-      const blocked = hit && (hit.tx !== target.tx || hit.ty !== target.ty);
+      const sol = (x, y) => TILES[W.get(x, y)].solid;
+      const exposed = !sol(target.tx + 1, target.ty) || !sol(target.tx - 1, target.ty) || !sol(target.tx, target.ty + 1) || !sol(target.tx, target.ty - 1);
+      const blocked = (hit && Math.max(Math.abs(hit.tx - target.tx), Math.abs(hit.ty - target.ty)) > 1) || (TILES[t].solid && !exposed);
       target.solid = TILES[t].solid || (t !== T.AIR);
       target.tile = t;
       target.blocked = blocked;

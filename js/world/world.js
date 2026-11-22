@@ -132,7 +132,7 @@ export class World {
     const dirtDepth = 3 + Math.floor(hash2(tx, 3, s) * 3);
     let fg, wall;
     if (d === 0) fg = B.id === 'frost' ? T.SNOW : T.GRASS;
-    else if (d < dirtDepth) fg = B.id === 'frost' && d < 2 ? T.SNOW : B.id === 'ember' && d < 2 ? T.SAND : T.DIRT;
+    else if (d < dirtDepth) fg = B.id === 'frost' && d < 2 ? T.SNOW : T.DIRT;
     else if (d > 55 + fbm1(tx * 0.05, s + 3) * 8) fg = T.DEEP;
     else fg = T.STONE;
     wall = d >= 2 ? (fg === T.DEEP ? T.DEEP : d < dirtDepth + 2 ? T.DIRT : T.STONE) : 0;
@@ -148,7 +148,9 @@ export class World {
       const blob = fbm2(tx * 0.022, ty * 0.034, s + 43, 3);
       if (worm < 0.075 + depthK * 0.0003 || blob > 0.36 - depthK * 0.0009) return [T.AIR, wall || T.STONE];
     }
-    if (fg === T.STONE || fg === T.DEEP) {
+    // pockets of pale sand in the upper soil (glass is made from it)
+    if (d >= 2 && d < 16 && fbm2(tx * 0.09, ty * 0.12, s + 29, 2) > 0.42) fg = T.SAND;
+    else if (fg === T.STONE || fg === T.DEEP) {
       const o = hash2(tx, ty, s + 77);
       const vein = noise2(tx * 0.12, ty * 0.12, s + 13);
       if (vein > 0.5 + Math.max(0, 0.15 - d * 0.004) && o < 0.45) fg = T.CRYSTAL;

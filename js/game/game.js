@@ -58,7 +58,7 @@ export class Game {
     this.pxRatio = pw / w;
     // base zoom: a 720px tall view shows ~22 tiles; small screens see a bit more
     const base = h / 640;
-    this.baseZoom = clamp(base * (h < 500 ? 0.82 : 1), 0.45, 2.2);
+    this.baseZoom = clamp(base * (h < 500 ? 1.02 : 1), 0.5, 2.2);
   }
 
   // ------------------------------------------------------------ feel helpers
@@ -81,6 +81,7 @@ export class Game {
       let dt = (now - last) / 1000; last = now;
       if (dt > 0.1) dt = 0.1;
       this.frameDt = dt;
+      this.autoQuality(dt);
       Input.poll();
       if (Input.pressed('mute')) { Input.consume('mute'); Audio.setMuted(!Audio.muted); if (this.ui) this.ui.toast(Audio.muted ? 'Sound off' : 'Sound on'); }
       if (this.ui) this.ui.input(dt);
@@ -106,6 +107,22 @@ export class Game {
     requestAnimationFrame(loop);
   }
 
+  // keep it smooth on weak devices: step quality down if frames stay slow
+  autoQuality(dt) {
+    if (this.settings.qualityLocked || this.paused || !this.player) return;
+    this.aqT = (this.aqT || 0) + dt;
+    this.aqAvg = this.aqAvg === undefined ? dt : this.aqAvg * 0.97 + dt * 0.03;
+    if (this.aqT < 5) return;
+    if (this.aqAvg > 0.027) {
+      const q = this.settings.quality;
+      const next = q === 'high' ? 'medium' : q === 'medium' ? 'low' : null;
+      if (!next) { this.settings.qualityLocked = true; return; }
+      this.settings.quality = next;
+      if (next === 'low' && this.post.setEnabled) { this.post.setEnabled(false); this.settings.post = false; }
+      this.resize();
+      this.aqT = 0; this.aqAvg = undefined;
+    }
+  }
   step(dt) {
     this.time += dt; this.tick++;
     this.wind = Math.sin(this.time * 0.23) * 0.6 + Math.sin(this.time * 0.71) * 0.3;
@@ -135,7 +152,7 @@ export class Game {
       const ahead = clamp(a.c.vx * 0.35, -140, 140) + a.facing * 40;
       c.lookX = damp(c.lookX, ahead, 2.2, dt);
       tx = a.c.x + c.lookX;
-      ty = a.c.y - 70 + clamp(a.c.vy * 0.12, -40, 120);
+      ty = a.c.y - lerp(135, 60, this.depthK || 0) + clamp(a.c.vy * 0.12, -40, 120);
       if (c.focus) { tx = lerp(tx, c.focus.x, c.focus.k); ty = lerp(ty, c.focus.y, c.focus.k); }
     }
     const tm = c.override ? (c.override.t || 0.9) : 0.22;
@@ -156,6 +173,9 @@ export class Game {
 
   // ------------------------------------------------------------ render
   render(a) {
+    const PR = window.__prof;
+    let pt = PR ? performance.now() : 0;
+    const mark = PR ? (k) => { const n = performance.now(); PR[k] = (PR[k] || 0) + n - pt; pt = n; } : () => {};
     const ctx = this.ctx, W = this.W, H = this.H, c = this.cam;
     if (!this.world) { ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H); return; }
     const scale = this.baseZoom * c.zoom * this.pxRatio;
@@ -173,18 +193,21 @@ export class Game {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalCompositeOperation = 'source-over';
     ctx.globalAlpha = 1;
-    this.wr.drawSky(ctx, W, H, c.rx, c.ry - surf, scale, this.time, bl, depth, tierDark);
+    this.wr.drawSky(ctx, W, H, c.rx, c.ry - surf, scale, this.time, bl, depth, tierDark, this.teaseInfo(c.rx, depth));
     const shafts = (A.id === 'hollow' ? 0.2 : 1) * (1 - depth) * (1 - tierDark);
     this.wr.drawShafts(ctx, W, H, this.time, shafts, k > 0.5 ? B.sunCol : A.sunCol);
+    mark('sky');
     // 2. world space
     ctx.setTransform(scale, 0, 0, scale, W / 2 - c.rx * scale, H / 2 - c.ry * scale);
     if (c.rot) { ctx.translate(c.rx, c.ry); ctx.rotate(c.rot); ctx.translate(-c.rx, -c.ry); }
     this.wr.drawTiles(ctx, v);
+    mark('tiles');
     const decorActors = [];
     if (this.player) decorActors.push(this.player.actor.c);
     for (const ac of this.actors) if (Math.abs(ac.c.x - c.x) < 1200) decorActors.push(ac.c);
     this.wr.drawDecor(ctx, v, this.time, decorActors, 0.6 + this.wind * 0.4);
     // systems behind actors (shrines, pickups, telegraphs)
+    mark('decor');
     for (const s of this.systems) if (s.draw) s.draw(ctx, a, 'back');
     const glows = [];
     for (const ac of this.actors) {
@@ -196,6 +219,7 @@ export class Game {
     for (const p of this.projectiles) p.draw(ctx, a);
     for (const s of this.systems) if (s.draw) s.draw(ctx, a, 'mid');
     this.fx.draw(ctx, false);
+    mark('actors');
     // 3. lighting
     this.dynLights.length = 0;
     if (this.player) {
@@ -208,7 +232,9 @@ export class Game {
     const sun = (k > 0 ? [lerp(A.sun[0], B.sun[0], k), lerp(A.sun[1], B.sun[1], k), lerp(A.sun[2], B.sun[2], k)] : A.sun).map(x => x * sunK);
     const amb = k > 0 ? [lerp(A.amb[0], B.amb[0], k), lerp(A.amb[1], B.amb[1], k), lerp(A.amb[2], B.amb[2], k)] : A.amb;
     if ((this.frame & 1) === 0 || !this.light.R) this.light.compute(v, this.dynLights, sun, amb, 1);
+    mark('lightc');
     this.light.draw(ctx);
+    mark('lightd');
     // 4. additive glows (after light so they shine in the dark)
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
@@ -224,6 +250,7 @@ export class Game {
     ctx.restore();
     this.fx.draw(ctx, true);
     for (const s of this.systems) if (s.draw) s.draw(ctx, a, 'front');
+    mark('glow');
     // 5. screen-space overlays drawn by systems (cursor, hints)
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     for (const s of this.systems) if (s.draw) s.draw(ctx, a, 'screen');
@@ -234,8 +261,24 @@ export class Game {
     P.desat = damp(P.desat, this.player && this.player.lowHp ? 0.35 : this.timeScale < 0.6 ? 0.25 : 0, 4, this.frameDt || 0.016);
     P.vig = 0.4 + depth * 0.15 + tierDark * 0.1;
     this.post.render(this.time);
+    mark('post');
+    if (PR) PR.frames = (PR.frames || 0) + 1;
   }
 
+  // the next undefeated warden, looming on the horizon as you get close
+  teaseInfo(camX, depth) {
+    if (!this.bosses || !this.save || (this.bosses.active)) return null;
+    const ctx = Math.floor(camX / TILE);
+    const gi = gateNear(ctx);
+    if (this.bosses.defeated(gi.k)) return null;
+    const d = Math.abs(gi.gx - ctx);
+    if (d > 150 || d < 34) return null;
+    const B = biomeOf(gi.guard);
+    const arch = { meadow: 'warden', ember: 'warden', glass: 'wraith', frost: 'wraith', hollow: 'golem' }[B.id];
+    const eye = { meadow: '#ffb36b', ember: '#ff7a3a', glass: '#8ff7ff', frost: '#dff6ff', hollow: '#c4b5ff' }[B.id];
+    const k = Math.min(1, (150 - d) / 60) * Math.min(1, (d - 34) / 20) * (1 - depth);
+    return { x: gi.gx * TILE, k, arch, eye, col: mix(B.fog, B.deep, 0.55) };
+  }
   // helpers for systems
   biomeAt(x) { return biomeOf(biomeIndexAt(Math.floor(x / TILE))); }
   gateInfo(x) { const g = gateNear(Math.floor(x / TILE)); return Object.assign(g, { gxw: g.gx * TILE, half: ARENA_HALF * TILE }); }

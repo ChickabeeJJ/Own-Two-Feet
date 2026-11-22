@@ -53,7 +53,7 @@ export function createPostFX(src) {
   try { gl = out.getContext('webgl', { premultipliedAlpha: false, antialias: false, alpha: false, preserveDrawingBuffer: false }); } catch (e) { gl = null; }
   if (!gl) return { P, ok: false, render() {}, resize() {}, set(o) { Object.assign(P, o); } };
   src.parentNode.insertBefore(out, src.nextSibling);
-  src.style.visibility = 'hidden';
+  src.style.opacity = '0';
 
   const sh = (type, s) => { const o = gl.createShader(type); gl.shaderSource(o, s); gl.compileShader(o); if (!gl.getShaderParameter(o, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(o)); return o; };
   const prog = fs => {
@@ -66,7 +66,7 @@ export function createPostFX(src) {
   };
   let pb, pbl, pf;
   try { pb = prog(FS_BRIGHT); pbl = prog(FS_BLUR); pf = prog(FS_FINAL); }
-  catch (e) { out.remove(); src.style.visibility = ''; return { P, ok: false, render() {}, resize() {}, set(o) { Object.assign(P, o); } }; }
+  catch (e) { out.remove(); src.style.opacity = ''; return { P, ok: false, render() {}, resize() {}, set(o) { Object.assign(P, o); } }; }
   const buf = gl.createBuffer();
   gl.bindBuffer(gl.ARRAY_BUFFER, buf);
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
@@ -126,7 +126,7 @@ export function createPostFX(src) {
   function setEnabled(on) {
     P.enabled = on;
     out.style.display = on ? '' : 'none';
-    src.style.visibility = on ? 'hidden' : '';
+    src.style.opacity = on ? '0' : '';
   }
   return { P, ok: true, render, resize, canvas: out, setEnabled, set(o) { Object.assign(P, o); } };
 }

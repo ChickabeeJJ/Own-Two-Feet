@@ -4,7 +4,7 @@
 import { TILE, TILES } from './tiles.js';
 import { clamp } from '../core/util.js';
 
-const DECAY_AIR = 0.066, DECAY_SOLID = 0.19;
+const DECAY_AIR = 0.066, DECAY_SOLID = 0.155;
 const glowCache = new Map();
 export function glowSprite(col) {
   let c = glowCache.get(col);

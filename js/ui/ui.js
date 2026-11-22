@@ -208,7 +208,7 @@ export class UI {
     if (tab) this.menuTab = tab;
     $('#menu').classList.remove('hidden');
     const mp = this.game.net && this.game.net.active;
-    if (!mp) { this.game.paused = true; }
+    if (!mp) { this.game.paused = true; Platform.gameplayStop(); }
     Audio.play('blip');
     this.renderMenu();
   }
@@ -216,6 +216,7 @@ export class UI {
     this.modal = null;
     $('#menu').classList.add('hidden');
     this.game.paused = false;
+    if (this.game.story && this.game.story.stage >= 5) Platform.gameplayStart();
     this.preview = null;
     this.game.saveNow && this.game.saveNow();
   }
@@ -319,9 +320,9 @@ export class UI {
   }
   startPreview(cv) {
     const look = lookFromSave(this.sv);
-    const b = new Body({ scale: 2.6, x: 240, y: 330, facing: 1 });
+    const b = new Body({ scale: 3.5, x: 230, y: 330, facing: 1 });
     const an = new Animator(b);
-    const cape = look.cape ? new Cape(7, look.cape.len * 2.6) : null;
+    const cape = look.cape ? new Cape(7, look.cape.len * 3.5) : null;
     this.preview = { cv, b, an, cape, look, t: 0 };
   }
   tickPreview(dt) {
@@ -329,17 +330,17 @@ export class UI {
     p.t += dt;
     const steps = Math.min(8, Math.ceil(dt / (1 / 120)));
     for (let i = 0; i < steps; i++) {
-      p.an.update(1 / 120, { mode: 'ground', x: 240, gy: 510, py: 400, vx: 0, vy: 0, runMax: 300, look: { x: 240 + Math.sin(p.t * 0.7) * 300, y: 200 } }, null);
+      p.an.update(1 / 120, { mode: 'ground', x: 230, gy: 512, py: 400, vx: 0, vy: 0, runMax: 300, look: { x: 240 + Math.sin(p.t * 0.7) * 300, y: 200 } }, null);
       p.b.step(1 / 120, null);
-      p.b.y[P.FOOT_F] = Math.min(p.b.y[P.FOOT_F], 510 - 9); p.b.y[P.FOOT_B] = Math.min(p.b.y[P.FOOT_B], 510 - 9);
-      if (p.cape) p.cape.step(1 / 120, p.b.x[P.NECK] - 5, p.b.y[P.NECK] + 6, Math.sin(p.t * 1.3) * 20, 1);
+      p.b.y[P.FOOT_F] = Math.min(p.b.y[P.FOOT_F], 512 - 12); p.b.y[P.FOOT_B] = Math.min(p.b.y[P.FOOT_B], 512 - 12);
+      if (p.cape) p.cape.step(1 / 120, (p.b.x[P.NECK] + p.b.x[P.CHEST]) / 2 - 7, (p.b.y[P.NECK] + p.b.y[P.CHEST]) / 2, Math.sin(p.t * 1.3) * 25 - 10, 1);
     }
     const g = p.cv.getContext('2d');
     g.setTransform(1, 0, 0, 1, 0, 0);
     g.clearRect(0, 0, 480, 560);
-    const grd = g.createRadialGradient(240, 500, 10, 240, 500, 180);
+    const grd = g.createRadialGradient(230, 510, 10, 230, 510, 180);
     grd.addColorStop(0, 'rgba(0,0,0,.35)'); grd.addColorStop(1, 'rgba(0,0,0,0)');
-    g.fillStyle = grd; g.beginPath(); g.ellipse(240, 512, 150, 26, 0, 0, TAU); g.fill();
+    g.fillStyle = grd; g.beginPath(); g.ellipse(230, 514, 150, 26, 0, 0, TAU); g.fill();
     drawBody(g, p.b, p.look, 1, { cape: p.cape, blade: this.sv.hasBlade, time: p.t, glows: [] });
   }
   tab_craft(body) {
@@ -439,7 +440,7 @@ export class UI {
     const q = el('div', 'slider', '<span style="width:70px">Quality</span>');
     for (const lv of ['low', 'medium', 'high']) {
       const b = el('button', 'mini-btn', lv); if (st.quality === lv) b.style.borderColor = '#ffd9a0';
-      b.onclick = () => { st.quality = lv; g.resize(); this.renderMenu(); };
+      b.onclick = () => { st.quality = lv; st.qualityLocked = true; if (lv !== 'low' && st.post === false) { st.post = true; g.post.setEnabled && g.post.setEnabled(true); } g.resize(); this.renderMenu(); };
       q.appendChild(b);
     }
     c2.appendChild(q);

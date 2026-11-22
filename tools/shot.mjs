@@ -28,7 +28,8 @@ await new Promise(r => server.listen(0, r));
 const port = server.address().port;
 
 const browser = await chromium.launch({ args: ['--use-gl=swiftshader', '--enable-webgl', '--ignore-gpu-blocklist'] });
-const page = await browser.newPage({ viewport: { width: W, height: H }, deviceScaleFactor: 1 });
+const mobile = args.includes('--mobile');
+const page = await browser.newPage({ viewport: { width: W, height: H }, deviceScaleFactor: 1, hasTouch: mobile, isMobile: mobile });
 const problems = [];
 page.on('pageerror', e => problems.push('pageerror: ' + e.message + '\n' + (e.stack || '').split('\n').slice(0, 4).join('\n')));
 page.on('console', m => { if (m.type() === 'error' && !m.text().includes('ERR_FAILED')) problems.push('console.error: ' + m.text()); else if (m.type() === 'log' || (m.type() === 'warning' && !m.text().includes('GL Driver'))) console.log('[page]', m.text()); });

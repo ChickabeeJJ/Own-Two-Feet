@@ -177,7 +177,7 @@ export class Story {
   updateHints(dt) {
     const g = this.game, p = g.player, ui = this.ui, a = p.actor;
     if (!ui) return;
-    if (g.cinematic || (g.bosses && g.bosses.active)) { ui.hint(null); return; }
+    if (g.cinematic || ui.modal || (g.bosses && g.bosses.active)) { ui.hint(null); return; }
     const touch = !!g.touch;
     const H = {
       move: touch ? 'Drag the left stick to walk' : '<kbd>A</kbd><kbd>D</kbd> walk',

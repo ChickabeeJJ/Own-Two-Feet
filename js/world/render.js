@@ -77,7 +77,7 @@ export class WorldRenderer {
   drawLeaves(g, tx, ty, x, y, pass) {
     const W = this.world, p = paletteAt(tx);
     const kind = p.id;
-    const col = kind === 'glass' ? '#6fdccb' : kind === 'frost' ? '#4f7283' : p.leaf;
+    const col = kind === 'glass' ? '#6fdccb' : p.leaf;
     const h = hash2(tx, ty, 1), h2 = hash2(tx, ty, 2);
     const up = W.get(tx, ty - 1) === T.LEAVES, dn = W.get(tx, ty + 1) === T.LEAVES;
     const ox = (h - 0.5) * 8, oy = (h2 - 0.5) * 6;
@@ -393,7 +393,7 @@ export class WorldRenderer {
     return L;
   }
   // screen-space background. depth: 0 at surface, 1 deep underground
-  drawSky(ctx, W, H, camX, camY, zoom, time, blend, depth, tierDark) {
+  drawSky(ctx, W, H, camX, camY, zoom, time, blend, depth, tierDark, tease) {
     const { A, B, k } = blend;
     const sky = i => k > 0 ? mix(A.sky[i], B.sky[i], k) : A.sky[i];
     const g = ctx.createLinearGradient(0, 0, 0, H);
@@ -439,6 +439,7 @@ export class WorldRenderer {
       };
       drawL(LA, 1);
       if (LB) drawL(LB, k);
+      if (i === 1 && tease) this.drawTease(ctx, W, H, camX, camY, zoom, time, tease);
     }
     // underground: the sky fades into cave dark
     if (depth > 0) {
@@ -446,6 +447,48 @@ export class WorldRenderer {
       ctx.fillStyle = rgba(cave, clamp(depth, 0, 1));
       ctx.fillRect(0, 0, W, H);
     }
+  }
+  // a giant shape on the horizon where the next warden waits
+  drawTease(ctx, W, H, camX, camY, scale, time, tease) {
+    if (!tease || tease.k <= 0.01) return;
+    const f = 0.16;
+    const sx = W / 2 + (tease.x - camX) * f * scale * 1.0;
+    const baseY = H * 0.62 + (-camY * f * scale) * 0.55 + 0.1 * H;
+    if (sx < -W * 0.5 || sx > W * 1.5) return;
+    const h = H * 0.62;
+    ctx.save();
+    ctx.globalAlpha = tease.k * 0.85;
+    ctx.translate(sx, baseY);
+    ctx.fillStyle = tease.col;
+    const u = h / 100;
+    const breathe = Math.sin(time * 0.8) * u * 0.6;
+    if (tease.arch === 'warden') {
+      ctx.beginPath(); ctx.ellipse(0, -50 * u + breathe, 15 * u, 26 * u, 0, 0, TAU); ctx.fill();
+      ctx.beginPath(); ctx.roundRect(-7 * u, -88 * u + breathe, 14 * u, 15 * u, 5 * u); ctx.fill();
+      for (const sd of [-1, 1]) {
+        ctx.beginPath(); ctx.moveTo(sd * 4 * u, -86 * u + breathe); ctx.quadraticCurveTo(sd * 14 * u, -96 * u, sd * 10 * u, -108 * u); ctx.quadraticCurveTo(sd * 9 * u, -97 * u, sd * 1 * u, -88 * u); ctx.fill();
+        ctx.fillRect(sd * 6 * u - 3 * u, -28 * u, 6 * u, 30 * u);
+      }
+      ctx.save(); ctx.translate(16 * u, -60 * u); ctx.rotate(0.25); ctx.fillRect(-1.5 * u, -2 * u, 3 * u, 60 * u); ctx.restore();
+    } else if (tease.arch === 'wraith') {
+      const fl = Math.sin(time * 0.6) * 4 * u;
+      ctx.beginPath(); ctx.moveTo(0, -100 * u + fl); ctx.quadraticCurveTo(26 * u, -70 * u + fl, 30 * u, -10 * u); ctx.lineTo(10 * u, -20 * u); ctx.lineTo(0, -4 * u); ctx.lineTo(-10 * u, -18 * u); ctx.lineTo(-30 * u, -8 * u); ctx.quadraticCurveTo(-26 * u, -70 * u + fl, 0, -100 * u + fl); ctx.fill();
+      ctx.beginPath(); ctx.roundRect(-7 * u, -106 * u + fl, 14 * u, 15 * u, 5 * u); ctx.fill();
+    } else {
+      ctx.beginPath(); ctx.arc(0, -60 * u, 14 * u, 0, TAU); ctx.fill();
+      for (let i = 0; i < 10; i++) { const a = i / 10 * TAU + time * 0.15; ctx.beginPath(); ctx.roundRect(Math.cos(a) * 28 * u - 5 * u, -60 * u + Math.sin(a) * 22 * u - 5 * u, 10 * u, 10 * u, 2 * u); ctx.fill(); }
+    }
+    // eyes that notice you
+    const blink = (Math.sin(time * 0.9) > -0.97) ? 1 : 0.1;
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = tease.k * blink;
+    ctx.fillStyle = tease.eye;
+    const ey = tease.arch === 'warden' ? -82 * u + breathe : tease.arch === 'wraith' ? -100 * u : -62 * u;
+    ctx.beginPath(); ctx.ellipse(-3 * u, ey, 1.4 * u, 0.7 * u, 0, 0, TAU); ctx.ellipse(3 * u, ey, 1.4 * u, 0.7 * u, 0, 0, TAU); ctx.fill();
+    const g = ctx.createRadialGradient(0, ey, 0, 0, ey, 8 * u);
+    g.addColorStop(0, rgba(tease.eye, 0.22)); g.addColorStop(1, rgba(tease.eye, 0));
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, ey, 8 * u, 0, TAU); ctx.fill();
+    ctx.restore();
   }
   drawShafts(ctx, W, H, time, strength, col) {
     if (strength <= 0.01) return;
