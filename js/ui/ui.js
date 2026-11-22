@@ -1,0 +1,549 @@
+// DOM UI: HUD, cinematic cards, letterbox, dialog with typewriter, menus (journey, look, craft, together,
+// settings, controls), character editor with a live ragdoll preview and a generated sigil.
+import { Audio } from '../core/audio.js';
+import { Input } from '../core/input.js';
+import { TILE, T, TILES, biomeOf, gateNear } from '../world/tiles.js';
+import { Body, P } from '../physics/body.js';
+import { Animator } from '../physics/pose.js';
+import { Cape, drawBody } from '../physics/skin.js';
+import { COSMETICS, SLOTS, SLOT_NAMES, RECIPES, cosmetic, lookFromSave, Save, genName } from '../game/progress.js';
+import { TYPES as BOSS_TYPES } from '../game/bosses.js';
+import { mulberry, hashStr, TAU, clamp, shade } from '../core/util.js';
+import { Platform } from '../platform.js';
+
+const $ = s => document.querySelector(s);
+const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html !== undefined) e.innerHTML = html; return e; };
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+export function tileIcon(t, size = 26) {
+  const c = document.createElement('canvas');
+  const d = Math.min(2, devicePixelRatio || 1);
+  c.width = c.height = size * d;
+  c.style.width = c.style.height = size + 'px';
+  const g = c.getContext('2d');
+  g.scale(d, d);
+  const k = TILES[t].k;
+  const col = k && k[0] === '#' ? k : { dirt: '#6b5850', stone: '#6e7486', deep: '#454858', log: '#7a6050', leaf: '#7da48a', moss: '#5f7a63' }[k] || '#888';
+  g.fillStyle = shade(col, -0.18); g.beginPath(); g.roundRect(2, 3, size - 4, size - 4, 5); g.fill();
+  g.fillStyle = col; g.beginPath(); g.roundRect(2, 2, size - 4, size - 5, 5); g.fill();
+  g.fillStyle = 'rgba(255,255,255,.22)'; g.fillRect(5, 3, size - 10, 2);
+  if (t === T.GRASS) { g.fillStyle = '#9cbd8c'; g.beginPath(); g.roundRect(2, 2, size - 4, 7, [5, 5, 0, 0]); g.fill(); }
+  if (t === T.LANTERN || t === T.HEARTH || t === T.CRYSTAL || t === T.EMBER) { g.fillStyle = '#fff3d8'; g.beginPath(); g.arc(size / 2, size / 2, size * 0.14, 0, TAU); g.fill(); }
+  if (t === T.PLANK) { g.fillStyle = 'rgba(0,0,0,.18)'; g.fillRect(2, size * 0.36, size - 4, 1.5); g.fillRect(2, size * 0.66, size - 4, 1.5); }
+  if (t === T.BRICK || t === T.RUIN) { g.fillStyle = 'rgba(0,0,0,.18)'; g.fillRect(2, size / 2, size - 4, 1.5); g.fillRect(size / 2, 2, 1.5, size / 2); }
+  return c;
+}
+
+export function drawSigil(canvas, seed) {
+  const g = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  g.clearRect(0, 0, W, H);
+  const r = mulberry(seed >>> 0);
+  const n = 3 + ((r() * 4) | 0);
+  g.translate(W / 2, H / 2);
+  g.strokeStyle = '#f3ece0'; g.lineCap = 'round'; g.lineWidth = W * 0.035;
+  g.globalAlpha = 0.9;
+  g.beginPath(); g.arc(0, 0, W * 0.42, 0, TAU); g.stroke();
+  g.lineWidth = W * 0.045;
+  const a0 = r() * TAU, len = 0.15 + r() * 0.2, bend = r() - 0.5;
+  for (let i = 0; i < n; i++) {
+    const a = a0 + i * TAU / n;
+    g.beginPath();
+    g.moveTo(Math.cos(a) * W * 0.08, Math.sin(a) * W * 0.08);
+    g.quadraticCurveTo(Math.cos(a + bend) * W * 0.3, Math.sin(a + bend) * W * 0.3, Math.cos(a) * W * (0.2 + len), Math.sin(a) * W * (0.2 + len));
+    g.stroke();
+  }
+  if (r() < 0.6) { g.fillStyle = '#f3ece0'; g.beginPath(); g.arc(0, 0, W * 0.05, 0, TAU); g.fill(); }
+  g.setTransform(1, 0, 0, 1, 0, 0);
+}
+
+export class UI {
+  constructor(game) {
+    this.game = game;
+    this.modal = null;          // 'dialog' | 'menu' | null
+    this.hotbarDirty = true;
+    this.cardTimer = null;
+    this.lastHp = -1; this.lastMax = -1;
+    this.menuTab = 'journey';
+    this.dlg = null;
+    this.tailorMode = false;
+    $('#btn-menu').addEventListener('click', () => this.toggleMenu());
+    $('#btn-together').addEventListener('click', () => this.openMenu('together'));
+    $('#dialog').addEventListener('click', e => { if (e.target.classList.contains('opt')) return; this.advanceDialog(); });
+  }
+  get sv() { return this.game.save; }
+
+  // ------------------------------------------------------------ cinematic pieces
+  hud(show) { $('#hud').classList.toggle('hidden', false); $('#hud').classList.toggle('dim', !show); this.hudOn = show; }
+  letterbox(on) { $('#letterbox').classList.toggle('on', on); $('#hud').classList.toggle('dim', on || !this.hudOn); }
+  fade(v, dur = 0.9) { const f = $('#fade'); f.style.transition = `opacity ${dur}s cubic-bezier(.2,.8,.2,1)`; f.style.opacity = v; }
+  press(text) { const p = $('#press'); if (!text) { p.classList.add('hidden'); return; } p.textContent = text; p.classList.remove('hidden'); }
+  hint(html) {
+    const h = $('#hint');
+    if (!html) { h.classList.remove('show'); return; }
+    if (h.dataset.h !== html) { h.innerHTML = html; h.dataset.h = html; }
+    h.classList.remove('hidden'); h.classList.add('show');
+  }
+  card(title, sub, cls = '', dur = 3.2) {
+    const c = $('#card');
+    c.className = cls;
+    c.querySelector('.title').textContent = title;
+    c.querySelector('.sub').textContent = sub || '';
+    c.classList.remove('hidden');
+    void c.offsetWidth;
+    c.classList.add('show');
+    clearTimeout(this.cardTimer);
+    this.cardTimer = setTimeout(() => { c.classList.remove('show'); }, dur * 1000);
+  }
+  toast(msg) {
+    const t = el('div', 'toast', esc(msg));
+    $('#toasts').appendChild(t);
+    while ($('#toasts').children.length > 3) $('#toasts').firstChild.remove();
+    setTimeout(() => { t.classList.add('out'); setTimeout(() => t.remove(), 600); }, 2600);
+  }
+  pickup(tile, n) {
+    const box = $('#pickups');
+    const last = box.lastChild;
+    if (last && last.dataset.t == tile && Date.now() - last.dataset.ts < 1500) {
+      last.dataset.n = +last.dataset.n + n; last.dataset.ts = Date.now();
+      last.querySelector('span').textContent = `+${last.dataset.n} ${TILES[tile].name}`;
+      return;
+    }
+    const k = TILES[tile].k;
+    const d = el('div', 'pk', `<i style="background:${k && k[0] === '#' ? k : '#8a7f78'}"></i><span>+${n} ${esc(TILES[tile].name)}</span>`);
+    d.dataset.t = tile; d.dataset.n = n; d.dataset.ts = Date.now();
+    box.appendChild(d);
+    while (box.children.length > 4) box.firstChild.remove();
+    setTimeout(() => { d.style.transition = 'opacity .6s'; d.style.opacity = 0; setTimeout(() => d.remove(), 700); }, 2200);
+  }
+  glimmerBump() { const g = $('#glimmer'); g.classList.remove('bump'); void g.offsetWidth; g.classList.add('bump'); }
+  deathCard(show = true) {
+    if (show) { this.letterbox(true); this.card('The body forgets', 'but you remember', 'boss', 2.6); }
+    else this.letterbox(false);
+  }
+  bossBar(B) {
+    const bb = $('#bossbar');
+    if (!B || this.game.cinematic && B.state === 'intro') { bb.classList.add('hidden'); return; }
+    bb.classList.remove('hidden');
+    bb.querySelector('.bname').textContent = B.name;
+    const w = (B.hpK * 100).toFixed(1) + '%';
+    bb.querySelector('.bfill').style.width = w;
+    bb.querySelector('.bghost').style.width = w;
+  }
+
+  // ------------------------------------------------------------ dialog
+  dialog(name, lines, opts) {
+    this.modal = 'dialog';
+    this.dlg = { name, lines, opts, i: 0, shown: 0, t: 0, focus: 0 };
+    $('#dialog').classList.remove('hidden');
+    $('#dialog .who').textContent = name;
+    $('#dialog .opts').innerHTML = '';
+    this.letterbox(true);
+  }
+  advanceDialog() {
+    const d = this.dlg; if (!d) return;
+    const line = d.lines[d.i] || '';
+    if (d.shown < line.length) { d.shown = line.length; return; }
+    if (d.i < d.lines.length - 1) { d.i++; d.shown = 0; Audio.play('blip', { pitch: 1.2 }); return; }
+  }
+  showOpts() {
+    const d = this.dlg, box = $('#dialog .opts');
+    if (box.childElementCount) return;
+    d.opts.forEach((o, i) => {
+      const b = el('button', 'opt', esc(o.label) + (o.cost ? ` <small>${o.cost.glimmer}&#9670;${(o.cost.items || []).map(([t, n]) => ` + ${n} ${esc(TILES[t].name)}`).join('')}</small>` : ''));
+      b.addEventListener('click', () => this.pickOpt(i));
+      box.appendChild(b);
+    });
+    this.focusOpt(0);
+  }
+  focusOpt(i) { const bs = [...$('#dialog .opts').children]; if (!bs.length) return; this.dlg.focus = (i + bs.length) % bs.length; bs.forEach((b, k) => b.classList.toggle('focus', k === this.dlg.focus)); }
+  pickOpt(i) {
+    const d = this.dlg; if (!d) return;
+    const o = d.opts[i];
+    Audio.play('confirm');
+    const keep = o.label !== 'Farewell' && o.label !== 'Trade' && !o.label.startsWith('Change');
+    if (o.act) o.act();
+    if (!keep || !this.dlg) { if (this.dlg === d) this.closeDialog(); return; }
+    // refresh costs after a purchase
+    $('#dialog .opts').innerHTML = '';
+    const g = this.game;
+    if (g.shrines && d.kindRef) {}
+    this.showOpts();
+  }
+  closeDialog() {
+    this.dlg = null; this.modal = null;
+    $('#dialog').classList.add('hidden');
+    this.letterbox(false);
+  }
+  updateDialog(dt) {
+    const d = this.dlg; if (!d) return;
+    const line = d.lines[d.i] || '';
+    d.t += dt;
+    if (d.shown < line.length) { d.shown = Math.min(line.length, d.shown + dt * 52); if ((d.t * 30 | 0) % 3 === 0) Audio.play('talk', { gap: 0.06, vol: 0.5 }); }
+    $('#dialog .text').textContent = line.slice(0, Math.floor(d.shown));
+    const last = d.i >= d.lines.length - 1 && d.shown >= line.length;
+    if (last) this.showOpts();
+    if (Input.pressed('interact') || Input.pressed('jump') || Input.pressed('attack')) {
+      Input.consume('interact'); Input.consume('jump'); Input.consume('attack');
+      if (last) this.pickOpt(d.focus); else this.advanceDialog();
+    }
+    if (last) {
+      if (Input.pressed('left') || Input.pressed('up')) this.focusOpt(d.focus - 1);
+      if (Input.pressed('right') || Input.pressed('down')) this.focusOpt(d.focus + 1);
+      for (let i = 1; i <= 6; i++) if (Input.pressed('slot' + i) && i - 1 < d.opts.length) this.pickOpt(i - 1);
+    }
+    if (Input.pressed('menu')) { Input.consume('menu'); this.closeDialog(); }
+  }
+  shop(name, items) {
+    this.dialog(name, ['Have a look. Everything is honest, mostly.'], items.map(it => ({ label: it.label, cost: it.cost, act: it.act })).concat([{ label: 'Farewell' }]));
+    this.dlg.shown = 999;
+  }
+
+  // ------------------------------------------------------------ menu
+  toggleMenu() { if (this.modal === 'menu') this.closeMenu(); else this.openMenu(); }
+  openMenu(tab) {
+    if (this.dlg) this.closeDialog();
+    this.tailorMode = tab === 'look' && this.game.player && this.nearTailor();
+    this.modal = 'menu';
+    if (tab) this.menuTab = tab;
+    $('#menu').classList.remove('hidden');
+    const mp = this.game.net && this.game.net.active;
+    if (!mp) { this.game.paused = true; }
+    Audio.play('blip');
+    this.renderMenu();
+  }
+  closeMenu() {
+    this.modal = null;
+    $('#menu').classList.add('hidden');
+    this.game.paused = false;
+    this.preview = null;
+    this.game.saveNow && this.game.saveNow();
+  }
+  nearTailor() {
+    const g = this.game;
+    return g.actors.some(a => a.npcKind === 'tailor' && Math.abs(a.c.x - g.player.x) < 260);
+  }
+  renderMenu() {
+    const tabs = [['journey', 'Journey'], ['look', 'Look'], ['craft', 'Craft'], ['together', 'Together'], ['settings', 'Settings'], ['controls', 'Controls']];
+    const th = $('#menu .tabs'); th.innerHTML = '';
+    for (const [id, name] of tabs) {
+      const b = el('button', 'tab' + (id === this.menuTab ? ' on' : ''), name);
+      b.addEventListener('click', () => { this.menuTab = id; Audio.play('blip'); this.renderMenu(); });
+      th.appendChild(b);
+    }
+    const body = $('#menu .menu-body'); body.innerHTML = '';
+    this['tab_' + this.menuTab](body);
+  }
+  tab_journey(body) {
+    const sv = this.sv, g = this.game;
+    const row = el('div', 'row');
+    const c1 = el('div', 'col');
+    const resume = el('button', 'big-btn primary', '<b>Continue</b><span>Back on your feet</span>');
+    resume.onclick = () => this.closeMenu();
+    c1.appendChild(resume);
+    const look = el('button', 'big-btn', '<b>Your Look</b><span>Make this body yours</span>');
+    look.onclick = () => { this.menuTab = 'look'; this.renderMenu(); };
+    c1.appendChild(look);
+    const tog = el('button', 'big-btn', '<b>Play Together</b><span>Invite a friend or wander the open world</span>');
+    tog.onclick = () => { this.menuTab = 'together'; this.renderMenu(); };
+    c1.appendChild(tog);
+    row.appendChild(c1);
+    const c2 = el('div', 'col');
+    c2.appendChild(el('div', 'h', 'The story so far'));
+    const st = sv.stats;
+    const relics = Object.entries(sv.abil).filter(([, v]) => v).length;
+    const stats = [['Name', esc(this.displayName())], ['Gates fallen', Object.keys(sv.bosses).length], ['Relics', relics], ['Vessels', sv.maxHp], ['Furthest step', `${st.far} m`], ['Foes undone', st.kills], ['Blocks broken', st.blocks], ['Blocks placed', st.placed], ['People met', Object.keys(sv.met).length], ['Home', sv.home ? 'Yes' : 'Not yet'], ['Falls', st.deaths]];
+    for (const [k, v] of stats) c2.appendChild(el('div', 'stat', `<span>${k}</span><b>${v}</b>`));
+    row.appendChild(c2);
+    body.appendChild(row);
+  }
+  displayName() { return Platform.username || this.sv.name; }
+  tab_look(body) {
+    const sv = this.sv;
+    const wrap = el('div', 'editor');
+    const pv = el('div', 'preview');
+    const cv = document.createElement('canvas'); cv.width = 480; cv.height = 560;
+    pv.appendChild(cv);
+    const nm = el('div', 'name', esc(this.displayName()));
+    pv.appendChild(nm);
+    const sg = document.createElement('canvas'); sg.width = sg.height = 108; sg.className = 'sigil';
+    drawSigil(sg, hashStr(this.displayName() + JSON.stringify(sv.look) + sv.marks.join('')));
+    pv.appendChild(sg);
+    pv.appendChild(el('div', 'note', 'Your sigil changes with every choice. No one else carries this one.'));
+    const rn = el('button', 'mini-btn', 'New name');
+    rn.onclick = () => { sv.name = genName((Math.random() * 1e9) | 0); this.renderMenu(); };
+    if (!Platform.username) pv.appendChild(rn);
+    wrap.appendChild(pv);
+    const right = el('div', 'col');
+    const slots = el('div', 'slots');
+    this.lookSlot = this.lookSlot || 'color';
+    for (const s of SLOTS) {
+      const b = el('button', 'tab' + (s === this.lookSlot ? ' on' : ''), SLOT_NAMES[s]);
+      b.onclick = () => { this.lookSlot = s; this.renderMenu(); };
+      slots.appendChild(b);
+    }
+    right.appendChild(slots);
+    if (!this.tailorMode) right.appendChild(el('div', 'note', 'Priced looks can be bought from a tailor. Talk to one, then choose “Change my look”.'));
+    const grid = el('div', 'grid');
+    for (const c of COSMETICS.filter(c => c.slot === this.lookSlot)) {
+      const owned = sv.unlocked.includes(c.id);
+      const on = sv.look[c.slot] === c.id;
+      const it = el('div', 'item' + (on ? ' on' : '') + (owned ? '' : ' locked'));
+      let sw = '#444';
+      if (c.slot === 'color') sw = c.v[0];
+      else if (c.slot === 'cape') sw = c.v ? c.v.col : 'transparent';
+      else if (c.slot === 'eyes') sw = c.v[0];
+      else if (c.slot === 'blade') sw = c.v.glow;
+      else if (c.slot === 'mat') sw = { cloth: '#d9d2c4', porcelain: 'linear-gradient(135deg,#fff,#cfc8bd)', metal: 'linear-gradient(135deg,#e9c48a,#7a5a33)', glow: 'radial-gradient(#9ff3ff,#1c3a40)', shadow: '#1d1a24' }[c.v];
+      else sw = 'rgba(255,255,255,.12)';
+      it.innerHTML = `<div class="sw" style="background:${sw}"></div>${esc(c.name)}${owned ? '' : `<span class="how">${esc(c.how)}</span>`}${!owned && c.cost ? `<span class="cost">${c.cost}&#9670;</span>` : ''}`;
+      it.onclick = () => {
+        if (!owned) {
+          if (c.cost && this.tailorMode) {
+            if (sv.glimmer >= c.cost) { sv.glimmer -= c.cost; Save.unlock(c.id); Audio.play('confirm'); this.toast(`${c.name} is yours`); }
+            else { Audio.play('blip', { pitch: 0.6 }); this.toast('Not enough glimmer'); return; }
+          } else { Audio.play('blip', { pitch: 0.6 }); return; }
+        }
+        sv.look[c.slot] = c.id;
+        Audio.play('blip', { pitch: 1.3 });
+        this.game.player.refreshLook();
+        if (this.game.net) this.game.net.sendLook && this.game.net.sendLook();
+        this.renderMenu();
+      };
+      grid.appendChild(it);
+    }
+    right.appendChild(grid);
+    wrap.appendChild(right);
+    body.appendChild(wrap);
+    this.startPreview(cv);
+  }
+  startPreview(cv) {
+    const look = lookFromSave(this.sv);
+    const b = new Body({ scale: 2.6, x: 240, y: 330, facing: 1 });
+    const an = new Animator(b);
+    const cape = look.cape ? new Cape(7, look.cape.len * 2.6) : null;
+    this.preview = { cv, b, an, cape, look, t: 0 };
+  }
+  tickPreview(dt) {
+    const p = this.preview; if (!p || !p.cv.isConnected) { this.preview = null; return; }
+    p.t += dt;
+    const steps = Math.min(8, Math.ceil(dt / (1 / 120)));
+    for (let i = 0; i < steps; i++) {
+      p.an.update(1 / 120, { mode: 'ground', x: 240, gy: 510, py: 400, vx: 0, vy: 0, runMax: 300, look: { x: 240 + Math.sin(p.t * 0.7) * 300, y: 200 } }, null);
+      p.b.step(1 / 120, null);
+      p.b.y[P.FOOT_F] = Math.min(p.b.y[P.FOOT_F], 510 - 9); p.b.y[P.FOOT_B] = Math.min(p.b.y[P.FOOT_B], 510 - 9);
+      if (p.cape) p.cape.step(1 / 120, p.b.x[P.NECK] - 5, p.b.y[P.NECK] + 6, Math.sin(p.t * 1.3) * 20, 1);
+    }
+    const g = p.cv.getContext('2d');
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.clearRect(0, 0, 480, 560);
+    const grd = g.createRadialGradient(240, 500, 10, 240, 500, 180);
+    grd.addColorStop(0, 'rgba(0,0,0,.35)'); grd.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = grd; g.beginPath(); g.ellipse(240, 512, 150, 26, 0, 0, TAU); g.fill();
+    drawBody(g, p.b, p.look, 1, { cape: p.cape, blade: this.sv.hasBlade, time: p.t, glows: [] });
+  }
+  tab_craft(body) {
+    const sv = this.sv, g = this.game;
+    body.appendChild(el('div', 'h', 'Craft from what you carry'));
+    for (const r of RECIPES) {
+      const can = r.need.every(([t, n]) => (sv.inv[t] || 0) >= n);
+      const row = el('div', 'recipe');
+      const left = el('div', '', `<b>${esc(TILES[r.out].name)} x${r.n}</b><div class="need">${r.need.map(([t, n]) => `${n} ${esc(TILES[t].name)} (${sv.inv[t] || 0})`).join(' + ')}</div>`);
+      left.prepend(tileIcon(r.out, 22));
+      left.style.display = 'flex'; left.style.gap = '12px'; left.style.alignItems = 'center';
+      const btn = el('button', '', 'Craft'); btn.disabled = !can;
+      btn.onclick = () => {
+        for (const [t, n] of r.need) g.player.take(t, n);
+        g.player.give(r.out, r.n);
+        Audio.play('place', { pitch: 1.3 }); Audio.play('confirm');
+        g.story && (g.story.tut.crafted = 1);
+        this.renderMenu();
+      };
+      row.appendChild(left); row.appendChild(btn);
+      body.appendChild(row);
+    }
+    body.appendChild(el('div', 'note', 'Place a Hearth to make a home. People you meet can come to live there.'));
+  }
+  tab_together(body) {
+    const g = this.game, net = g.net;
+    const row = el('div', 'row');
+    const c1 = el('div', 'col');
+    c1.appendChild(el('div', 'h', 'Play together'));
+    if (!net || !net.available) {
+      c1.appendChild(el('div', 'note', 'Multiplayer needs a network connection. It will appear here when one is available.'));
+    } else {
+      const status = el('div', 'note', esc(net.statusText()));
+      c1.appendChild(status);
+      if (!net.active) {
+        const inv = el('button', 'big-btn primary', '<b>Invite a friend</b><span>Open your world and share a link</span>');
+        inv.onclick = async () => { await net.host(); this.renderMenu(); };
+        c1.appendChild(inv);
+        const pub = el('button', 'big-btn', '<b>Wander the open world</b><span>Meet strangers in a shared world</span>');
+        pub.onclick = async () => { this.closeMenu(); await net.joinPublic(); };
+        c1.appendChild(pub);
+      } else {
+        if (net.isHost && net.inviteUrl) {
+          c1.appendChild(el('div', 'h', 'Invite link'));
+          const code = el('div', 'code', esc(net.inviteUrl));
+          c1.appendChild(code);
+          const cp = el('button', 'mini-btn', 'Copy link');
+          cp.onclick = () => { navigator.clipboard && navigator.clipboard.writeText(net.inviteUrl).then(() => this.toast('Link copied')).catch(() => {}); };
+          c1.appendChild(cp);
+        }
+        const lv = el('button', 'big-btn', '<b>Leave</b><span>Return to your own world</span>');
+        lv.style.marginTop = '14px';
+        lv.onclick = () => { net.leave(); this.renderMenu(); };
+        c1.appendChild(lv);
+      }
+    }
+    row.appendChild(c1);
+    const c2 = el('div', 'col');
+    c2.appendChild(el('div', 'h', 'Souls here'));
+    const list = net && net.active ? net.roster() : [];
+    c2.appendChild(el('div', 'stat', `<span>${esc(this.displayName())}</span><b>you</b>`));
+    for (const r of list) c2.appendChild(el('div', 'stat', `<span>${esc(r.name)}</span><b>${r.host ? 'host' : ''}</b>`));
+    c2.appendChild(el('div', 'note', 'Friends share your world, your gates and your fights. Wardens grow stronger for every soul in the arena. Press T to emote.'));
+    row.appendChild(c2);
+    body.appendChild(row);
+  }
+  tab_settings(body) {
+    const g = this.game, st = g.settings;
+    const row = el('div', 'row');
+    const c1 = el('div', 'col');
+    c1.appendChild(el('div', 'h', 'Sound'));
+    for (const [k, name] of [['master', 'Master'], ['music', 'Music'], ['sfx', 'Effects']]) {
+      const s = el('label', 'slider', `<span style="width:70px">${name}</span>`);
+      const inp = document.createElement('input'); inp.type = 'range'; inp.min = 0; inp.max = 1; inp.step = 0.05; inp.value = Audio.vol[k];
+      inp.oninput = () => { Audio.setVolume(k, +inp.value); st['vol_' + k] = +inp.value; };
+      s.appendChild(inp); c1.appendChild(s);
+    }
+    const tg = (name, key, fn) => {
+      const t = el('div', 'toggle' + (st[key] ? ' on' : ''), `<span>${name}</span><i></i>`);
+      t.onclick = () => { st[key] = !st[key]; fn && fn(st[key]); t.classList.toggle('on', st[key]); Audio.play('blip'); };
+      c1.appendChild(t);
+    };
+    tg('Mute', 'muted', v => Audio.setMuted(v));
+    row.appendChild(c1);
+    const c2 = el('div', 'col');
+    c2.appendChild(el('div', 'h', 'Picture'));
+    const tg2 = (name, key, fn) => {
+      const on = key === 'shakeOn' ? st.shake > 0 : st[key];
+      const t = el('div', 'toggle' + (on ? ' on' : ''), `<span>${name}</span><i></i>`);
+      t.onclick = () => { fn(); this.renderMenu(); Audio.play('blip'); };
+      c2.appendChild(t);
+    };
+    tg2('Screen shake', 'shakeOn', () => { st.shake = st.shake > 0 ? 0 : 1; });
+    tg2('Bright flashes', 'flashes', () => { st.flashes = !st.flashes; });
+    tg2('Bloom & grading', 'post', () => { st.post = !st.post; g.post.setEnabled && g.post.setEnabled(st.post); });
+    tg2('Touch controls', 'touchOn', () => { st.touchOn = !st.touchOn; g.touchCtl && g.touchCtl.show(st.touchOn); });
+    const q = el('div', 'slider', '<span style="width:70px">Quality</span>');
+    for (const lv of ['low', 'medium', 'high']) {
+      const b = el('button', 'mini-btn', lv); if (st.quality === lv) b.style.borderColor = '#ffd9a0';
+      b.onclick = () => { st.quality = lv; g.resize(); this.renderMenu(); };
+      q.appendChild(b);
+    }
+    c2.appendChild(q);
+    const wipe = el('button', 'mini-btn', 'Start a new life');
+    wipe.style.marginTop = '20px';
+    wipe.onclick = () => {
+      if (wipe.dataset.sure) { Save.wipe(); location.reload(); }
+      else { wipe.dataset.sure = 1; wipe.textContent = 'Erase everything? Tap again'; }
+    };
+    c2.appendChild(wipe);
+    row.appendChild(c2);
+    body.appendChild(row);
+  }
+  tab_controls(body) {
+    const rows = [
+      ['A / D · ← →', 'Walk'], ['Space · W', 'Jump (again in the air with Second Wind)'], ['Shift · K', 'Dash'],
+      ['J · Left click', 'Strike (hold ↑ / ↓ to aim)'], ['Hold left click', 'Break the block under the cursor'],
+      ['Right click', 'Place the chosen block (Shift: as a back wall)'], ['1-9 · Wheel', 'Choose a block'],
+      ['B', 'Build mode for keyboard / pad (Strike mines, E places)'], ['E', 'Talk · Rest · Take'], ['H (hold)', 'Mend a vessel with breath'],
+      ['Q', 'Craft'], ['T', 'Emote'], ['M', 'Mute'], ['Esc', 'Menu'],
+    ];
+    const box = el('div', 'ctrl-list');
+    for (const [k, v] of rows) { box.appendChild(el('kbd', '', esc(k))); box.appendChild(el('span', '', esc(v))); }
+    body.appendChild(box);
+    body.appendChild(el('div', 'note', 'Gamepad: stick to move, A jump, X strike, B dash, Y talk, LB build mode.'));
+  }
+
+  // ------------------------------------------------------------ per frame
+  // runs right after input is polled, before the simulation consumes edges
+  input(dt) {
+    const g = this.game, p = g.player;
+    if (!p) return;
+    if (this.modal === 'dialog') { this.updateDialog(dt); return; }
+    if (!this.modal && Input.pressed('menu') && !g.cinematic) { Input.consume('menu'); this.openMenu('journey'); }
+    else if (this.modal === 'menu' && Input.pressed('menu')) { Input.consume('menu'); this.closeMenu(); }
+    if (!this.modal && Input.pressed('craft') && !g.cinematic) { Input.consume('craft'); this.openMenu('craft'); }
+    if (!this.modal && Input.pressed('emote') && !g.cinematic) { Input.consume('emote'); this.emote(); }
+  }
+  frame(dt) {
+    const g = this.game, p = g.player;
+    if (this.preview) this.tickPreview(dt);
+    if (!p) return;
+    const sv = this.sv;
+    // vessels
+    if (p.hp !== this.lastHp || sv.maxHp !== this.lastMax) {
+      const box = $('#vessels');
+      if (box.childElementCount !== sv.maxHp) { box.innerHTML = ''; for (let i = 0; i < sv.maxHp; i++) box.appendChild(el('div', 'vessel')); }
+      [...box.children].forEach((v, i) => {
+        const full = i < p.hp;
+        if (!full && v.classList.contains('full')) { v.classList.remove('lost'); void v.offsetWidth; v.classList.add('lost'); }
+        v.classList.toggle('full', full);
+      });
+      this.lastHp = p.hp; this.lastMax = sv.maxHp;
+    }
+    $('#breath-fill').style.width = clamp(sv.breath || 0, 0, 100) + '%';
+    const gl = $('#glimmer-n'); if (gl.textContent != sv.glimmer) gl.textContent = sv.glimmer;
+    // hotbar
+    if (this.hotbarDirty || this.lastSel !== sv.sel) this.renderHotbar();
+    // prompt
+    const pr = $('#prompt');
+    const it = p.interact;
+    if (it && !this.modal && !g.cinematic) {
+      const html = `<kbd>${g.touch ? 'E' : 'E'}</kbd>${esc(it.label)}`;
+      if (pr.dataset.h !== html) { pr.innerHTML = html; pr.dataset.h = html; }
+      pr.classList.remove('hidden');
+    } else pr.classList.add('hidden');
+    // compass toward the next unbeaten gate in the facing direction
+    if ((g.frame % 15) === 0) {
+      const ptx = Math.floor(p.x / TILE);
+      let best = null;
+      for (const d of [p.actor.facing, -p.actor.facing]) {
+        let gi = gateNear(ptx);
+        if ((gi.gx - ptx) * d < 0) gi = gateNear(ptx + d * 340);
+        if ((gi.gx - ptx) * d < 0) continue;
+        if (!sv.bosses['g' + gi.k]) { best = { gi, d }; break; }
+      }
+      const c = $('#compass');
+      if (best && !(g.bosses && g.bosses.active)) {
+        const B = BOSS_TYPES[biomeOf(best.gi.guard).id];
+        const dist = Math.abs(best.gi.gx - ptx);
+        c.innerHTML = `${best.d < 0 ? '&larr; ' : ''}<b>${esc(B.name)}</b> · ${dist} m${best.d > 0 ? ' &rarr;' : ''}`;
+      } else c.innerHTML = '';
+    }
+  }
+  pausedTick(dt) { /* menus animate via CSS; dialog/preview run in frame() */ }
+  renderHotbar() {
+    const sv = this.sv, box = $('#hotbar');
+    box.innerHTML = '';
+    sv.hotbar.forEach((t, i) => {
+      const s = el('div', 'slot' + (i === sv.sel ? ' sel' : ''));
+      s.appendChild(tileIcon(t));
+      s.appendChild(el('span', 'k', i + 1));
+      s.appendChild(el('span', 'n', sv.inv[t] || 0));
+      s.onclick = () => { sv.sel = i; Audio.play('blip'); };
+      box.appendChild(s);
+    });
+    this.hotbarDirty = false; this.lastSel = sv.sel;
+  }
+  emote() {
+    const g = this.game, a = g.player.actor;
+    const list = ['wave', 'cheer', 'bow', 'point'];
+    this.emoteI = ((this.emoteI ?? -1) + 1) % list.length;
+    a.doEmote(list[this.emoteI], 1.8);
+    if (g.net && g.net.active) g.net.sendEmote(list[this.emoteI]);
+  }
+}
+export { esc };
