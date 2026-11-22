@@ -117,6 +117,23 @@ export default ({ page, sleep, key, shot, evalg }) => ({
     console.log('after place', JSON.stringify(r2));
     await sleep(1500); await shot('u1-home');
   },
+  async persist() {
+    await sleep(1200);
+    const before = await evalg(() => { const g = window.__game; g.story.skipBirth(); g.save.hasBlade = true; g.player.actor.blade = true; g.enemies.calm = 999;
+      const tx = 9, ty = g.world.surface(9); g.world.set(tx, ty, 0); g.world.set(tx, ty - 3, 10); g.save.glimmer = 77; g.saveNow(); return { tx, ty, x: g.player.x }; });
+    await evalg(() => sessionStorage.setItem('keep', '1'));
+    await page.reload(); await page.waitForFunction(() => window.__game && window.__game.player);
+    await sleep(2500);
+    const after = await evalg(({ tx, ty }) => { const g = window.__game; return { a: g.world.get(tx, ty), b: g.world.get(tx, ty - 3), glimmer: g.save.glimmer, born: g.save.born, blade: g.save.hasBlade, stage: g.story.stage }; }, before);
+    console.log('persist', JSON.stringify(after));
+    await shot('p0-reload');
+    // death and respawn
+    await evalg(() => { const g = window.__game; g.player.hp = 1; g.player.actor.inv = 0; g.player.takeHit(1, g.player.x + 30, g.player.y - 40); });
+    await sleep(1500); await shot('p1-dead');
+    await sleep(4500);
+    console.log('respawn', JSON.stringify(await evalg(() => { const g = window.__game; return { dead: g.player.dead, hp: g.player.hp, mode: g.player.actor.mode }; })));
+    await shot('p2-respawn');
+  },
   async swing() {
     await sleep(2200);
     await evalg(() => { const g = window.__game; g.cam.zoomT = 2.6; g.player.sv.hasBlade = true; g.player.actor.blade = true; });
