@@ -68,14 +68,14 @@ function posed(look, scale, spec) {
     else an.update(dt, st, fakeWorld);
     if (spec.bodyFx) spec.bodyFx(b, i);
     b.step(dt, fakeWorld);
-    if (cape) cape.step(dt, (b.x[P.NECK] + b.x[P.CHEST]) / 2 - 2 * scale, (b.y[P.NECK] + b.y[P.CHEST]) / 2, spec.wind ?? -20, 1);
+    if (cape) cape.step(dt, (b.x[P.NECK] + b.x[P.CHEST]) / 2 - 2 * scale, (b.y[P.NECK] + b.y[P.CHEST]) / 2, spec.wind ?? -6 - (spec.st && spec.st.vx || 0) * 0.15, 1);
   }
   return { b, cape };
 }
 function drawFigure(g, x, y, look, scale, spec, o = {}) {
   const { b, cape } = posed(look, scale, spec);
-  g.save(); g.translate(x, y);
-  floorGlow(g, 0, 0, 60 * scale);
+  g.save(); g.translate(x - (spec.center ? b.x[P.PELVIS] : 0), y);
+  floorGlow(g, spec.center ? b.x[P.PELVIS] : 0, 0, 60 * scale);
   drawShadow(g, b.x[P.PELVIS], 0, 22 * scale, 1);
   const glows = [];
   drawDoll(g, b, look, 1, { cape, blade: o.blade !== false && !!look.blade, glows, time: 1.3, vx: spec.st && spec.st.vx || 0 });
@@ -101,9 +101,9 @@ function characters() {
     ['Wind-up', '', { attack: 'side', at: 0.18, ticks: 70 }],
     ['Strike', '', { attack: 'side', at0: 0.2, at1: 0.5, ticks: 40 }],
     ['Dash', '', { st: { mode: 'dash', vx: 700 }, ticks: 50 }],
-    ['Knocked down', '', { limp: true, ticks: 200, bodyFx: (b, i) => { if (i === 21) b.impulseAll(-40, -150); } }],
+    ['Knocked down', '', { limp: true, center: true, ticks: 200, bodyFx: (b, i) => { if (i === 21) b.impulseAll(-40, -150); } }],
   ];
-  poses.forEach(([n, sub, spec], i) => { const x = 160 + i * 255 + (i === 8 ? -30 : 0); drawFigure(g, x, y1, doll, S, spec); label(g, x, y1 + 50, n, sub); });
+  poses.forEach(([n, sub, spec], i) => { const x = 160 + i * 255 + (i === 8 ? 20 : 0); drawFigure(g, x, y1, doll, S, spec); label(g, x, y1 + 50, n, sub); });
 
   section(g, 60, 600, 'Make it yours · body, material, head, cape, eyes, blade, warden marks');
   const variants = [
