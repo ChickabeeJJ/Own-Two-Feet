@@ -50,11 +50,13 @@ export function makeLayers(B) {
       fillRidge(g, pts, top, bottom, B.sunCol, rimA);
       if (B.id === 'frost' || B.id === 'meadow') snowCaps(g, pts, B.id === 'frost' ? base - 110 : base - 170);
     } else if (i === 1) {
-      fillRidge(g, ridgePath(g, seed, 130, 0.0048, base + 20, 4), top, bottom, B.sunCol, rimA);
-      features(g, B, i, base + 10, col, seed);
+      const pts = ridgePath(g, seed, 130, 0.0048, base + 20, 4);
+      features(g, B, i, pts, col, seed);
+      fillRidge(g, pts, top, bottom, B.sunCol, rimA);
     } else {
-      fillRidge(g, ridgePath(g, seed, 70 + i * 12, 0.008 + i * 0.002, base + 40, 3), top, bottom, B.sunCol, rimA);
-      features(g, B, i, base + 30, col, seed);
+      const pts = ridgePath(g, seed, 70 + i * 12, 0.008 + i * 0.002, base + 40, 3);
+      features(g, B, i, pts, col, seed);
+      fillRidge(g, pts, top, bottom, B.sunCol, rimA);
     }
     // haze at the foot of every flat
     g.globalCompositeOperation = 'source-atop';
@@ -80,35 +82,42 @@ function snowCaps(g, pts, line) {
 
 function tree(g, x, y, s, col, kind) {
   if (kind === 'pine') {
-    g.fillRect(x - 2 * s, y - 20 * s, 4 * s, 20 * s);
+    g.fillRect(x - 2 * s, y - 20 * s, 4 * s, 20 * s + 30);
     for (let k = 0; k < 4; k++) { const w = (22 - k * 4) * s, yy = y - 14 * s - k * 14 * s; g.beginPath(); g.moveTo(x - w, yy); g.lineTo(x, yy - 22 * s); g.lineTo(x + w, yy); g.closePath(); g.fill(); }
     return;
   }
-  g.fillRect(x - 2.5 * s, y - 40 * s, 5 * s, 40 * s);
+  g.fillRect(x - 2.5 * s, y - 40 * s, 5 * s, 40 * s + 30);
   for (const [dx, dy, r] of [[0, -58, 22], [-16, -44, 15], [16, -46, 16], [-6, -70, 14], [10, -64, 14]]) { g.beginPath(); g.arc(x + dx * s, y + dy * s, r * s, 0, TAU); g.fill(); }
 }
-function features(g, B, layer, base, col, seed) {
+// features stand on the ridge itself: each one is planted at the ridge height under it and drawn before
+// the ridge, so the hill covers its foot and nothing floats or hangs off the skyline
+function features(g, B, layer, pts, col, seed) {
   const R = rng(seed * 7 + 3);
+  const ridgeY = (x, hw) => {   // lowest ridge point across the footprint, so both feet are buried
+    let y = -1e9;
+    for (let d = -hw; d <= hw; d += 5) { const u = ((x + d) % LW + LW) % LW; const p = pts[Math.min(pts.length - 1, Math.round(u / 5))]; y = Math.max(y, p[1]); }
+    return y;
+  };
+  let base = 0;
   const count = (layer === 1 ? 7 : 13) * (B.id === 'glass' || B.id === 'frost' ? 0.5 : 1) | 0;
   const drawAt = (x, s, k) => {
     g.save(); g.fillStyle = col; g.strokeStyle = col;
     switch (B.id) {
       case 'meadow': {
         if (k % 6 === 0) {
-          // ruined arch with a fallen keystone
+          // ruined arch, one solid piece with its pillars sunk into the hill
           g.lineWidth = 20 * s; g.lineCap = 'butt';
-          g.beginPath(); g.moveTo(x - 38 * s, base); g.lineTo(x - 38 * s, base - 70 * s); g.arc(x, base - 70 * s, 38 * s, Math.PI, TAU); g.lineTo(x + 38 * s, base); g.stroke();
-          g.fillRect(x - 52 * s, base - 8 * s, 28 * s, 8 * s);
+          g.beginPath(); g.moveTo(x - 38 * s, base + 40); g.lineTo(x - 38 * s, base - 70 * s); g.arc(x, base - 70 * s, 38 * s, Math.PI, TAU); g.lineTo(x + 38 * s, base + 40); g.stroke();
         } else if (k % 6 === 3) {
           // a tower with a lit window
-          g.fillRect(x - 12 * s, base - 140 * s, 24 * s, 140 * s);
+          g.fillRect(x - 12 * s, base - 140 * s, 24 * s, 140 * s + 40);
           g.beginPath(); g.moveTo(x - 17 * s, base - 140 * s); g.lineTo(x, base - 172 * s); g.lineTo(x + 17 * s, base - 140 * s); g.fill();
           g.fillStyle = rgba('#ffd28a', 0.8); g.fillRect(x - 3 * s, base - 110 * s, 6 * s, 9 * s);
-        } else { for (let t = 0; t < 3; t++) tree(g, x + (t - 1) * 22 * s, base + 2, s * (0.8 + t * 0.15), col, 'round'); }
+        } else { for (let t = 0; t < 3; t++) { const tx = x + (t - 1) * 22 * s; tree(g, tx, ridgeY(tx, 4) + 6, s * (0.8 + t * 0.15), col, 'round'); } }
         break;
       }
       case 'glass': {
-        g.fillRect(x - 5 * s, base - 160 * s, 10 * s, 160 * s);
+        g.fillRect(x - 5 * s, base - 160 * s, 10 * s, 160 * s + 40);
         g.beginPath(); g.moveTo(x, base - 250 * s); g.lineTo(x + 28 * s, base - 160 * s); g.lineTo(x, base - 120 * s); g.lineTo(x - 28 * s, base - 160 * s); g.closePath(); g.fill();
         g.fillStyle = rgba('#bff6ff', layer === 1 ? 0.25 : 0.12);
         g.beginPath(); g.moveTo(x, base - 250 * s); g.lineTo(x + 6 * s, base - 160 * s); g.lineTo(x, base - 130 * s); g.closePath(); g.fill();
@@ -116,22 +125,21 @@ function features(g, B, layer, base, col, seed) {
         break;
       }
       case 'hollow': {
-        g.fillRect(x - 6 * s, base - 90 * s, 12 * s, 90 * s);
+        g.fillRect(x - 6 * s, base - 90 * s, 12 * s, 90 * s + 40);
         g.beginPath(); g.ellipse(x, base - 92 * s, 48 * s, 24 * s, 0, Math.PI, TAU); g.fill();
         g.fillStyle = rgba('#c9bcff', 0.5);
         for (let d = -3; d <= 3; d++) { g.beginPath(); g.arc(x + d * 12 * s, base - 96 * s + Math.abs(d) * 3 * s, 2.2 * s, 0, TAU); g.fill(); }
         break;
       }
       case 'ember': {
-        g.beginPath(); g.moveTo(x - 44 * s, base); g.lineTo(x - 20 * s, base - 130 * s); g.lineTo(x - 6 * s, base - 96 * s); g.lineTo(x + 8 * s, base - 180 * s); g.lineTo(x + 34 * s, base); g.fill();
-        g.fillStyle = rgba('#ff8a3a', 0.25); g.fillRect(x - 40 * s, base - 6 * s, 74 * s, 6 * s);
+        g.beginPath(); g.moveTo(x - 44 * s, base + 40); g.lineTo(x - 20 * s, base - 130 * s); g.lineTo(x - 6 * s, base - 96 * s); g.lineTo(x + 8 * s, base - 180 * s); g.lineTo(x + 34 * s, base + 40); g.fill();
         break;
       }
       case 'frost': {
-        g.beginPath(); g.moveTo(x - 30 * s, base); g.lineTo(x, base - 260 * s); g.lineTo(x + 30 * s, base); g.fill();
+        g.beginPath(); g.moveTo(x - 30 * s, base + 40); g.lineTo(x, base - 260 * s); g.lineTo(x + 30 * s, base + 40); g.fill();
         g.fillStyle = rgba('#ffffff', 0.35); g.beginPath(); g.moveTo(x, base - 260 * s); g.lineTo(x + 8 * s, base - 160 * s); g.lineTo(x, base - 150 * s); g.closePath(); g.fill();
         g.fillStyle = col;
-        for (let t = 0; t < 4; t++) tree(g, x + 40 * s + t * 18 * s, base + 2, s * (0.7 + (t % 2) * 0.2), col, 'pine');
+        for (let t = 0; t < 4; t++) { const tx = x + 40 * s + t * 18 * s; tree(g, tx, ridgeY(tx, 4) + 6, s * (0.7 + (t % 2) * 0.2), col, 'pine'); }
         break;
       }
     }
@@ -139,6 +147,7 @@ function features(g, B, layer, base, col, seed) {
   };
   for (let k = 0; k < count; k++) {
     const x = R() * LW, s = (0.6 + R() * 0.8) * (layer === 1 ? 1.3 : 1);
+    base = ridgeY(x, 44 * s) + 8;
     drawAt(x, s, k);
     if (x > LW - 320) drawAt(x - LW, s, k);
     if (x < 320) drawAt(x + LW, s, k);

@@ -7,7 +7,7 @@
 import { Audio } from '../core/audio.js';
 import { Actor } from './actor.js';
 import { P } from '../physics/body.js';
-import { TILE, T, TILES, gateNear } from '../world/tiles.js';
+import { TILE, T, TILES, gateNear, BIOME_W } from '../world/tiles.js';
 import { ARENA_HALF } from '../world/world.js';
 import { hash2, rand, clamp, lerp, sign, TAU, rgba } from '../core/util.js';
 import { drawGlow } from '../world/light.js';
@@ -32,7 +32,7 @@ export const LORE = [
   'Thread is not a moth. Thread is the last thing she said.',
   'If you are reading this, you were made with care. Keep walking.',
 ];
-export const gateReq = (tier) => 4 + tier * 3;
+export const gateReq = (tier) => 10 + tier * 5;
 
 const near = (a, b, d) => Math.abs(a - b) < d;
 
@@ -53,13 +53,13 @@ export class Content {
   }
   // deterministic sites in [a, b] tiles
   sites(kind, a, b) {
-    const spec = { doll: [58, 37, 1], chest: [73, 51, 2], stitch: [91, 17, 3], nest: [150, 75, 4] }[kind];
+    const spec = { doll: [36, 21, 1], chest: [52, 31, 2], stitch: [47, 17, 3], nest: [110, 75, 4] }[kind];
     const [step, off, salt] = spec;
     const out = [];
     for (let k = Math.floor((a - off) / step) - 1; k <= Math.ceil((b - off) / step) + 1; k++) {
       const x = k * step + off + Math.floor(hash2(k, salt, this.game.world.seed) * 16);
       if (x < a || x > b || !this.ok(x)) continue;
-      if (kind === 'nest' && Math.abs(x) < 70) continue;
+      if (kind === 'nest' && Math.abs(x) < 130) continue;   // the first stretch is for learning
       out.push(x);
     }
     return out;
@@ -108,7 +108,7 @@ export class Content {
       const e = n.ent;
       if (e.mode === 'dead') continue;
       n.t -= dt;
-      if (n.t <= 0 && Math.abs(p.x - e.c.x) < 620 && !g.cinematic) {
+      if (n.t <= 0 && Math.abs(p.x - e.c.x) < 620 && !g.cinematic && this.sv.tutDone) {
         n.t = 7;
         n.kids = n.kids.filter(k => !k.removed && k.mode !== 'dead');
         if (n.kids.length < 2) {
@@ -252,19 +252,27 @@ export class Content {
   }
 
   // ------------------------------------------------------------ queries for goals and Thread
+  // the stretch of world the player can actually walk: out to the nearest gate on each side that is still
+  // sealed (a gate whose warden fell stays open)
+  reach(px) {
+    const g = this.game, ptx = Math.floor(px / TILE);
+    const kL = Math.floor((ptx + BIOME_W / 2) / BIOME_W), kR = kL + 1;   // boundary k sits at k*W - W/2
+    let l = kL, r = kR;
+    const open = (k) => g.bosses && g.bosses.defeated(k);
+    for (let i = 0; i < 3 && open(l); i++) l--;
+    for (let i = 0; i < 3 && open(r); i++) r++;
+    return [l * BIOME_W - BIOME_W / 2 + ARENA_HALF + 2, r * BIOME_W - BIOME_W / 2 - ARENA_HALF - 2];
+  }
+  // where Thread leads for light: the nearest unfinished doll, stitch or nest that can be reached. Loaded
+  // ones report their real position (a stitch may hang high or sit in a cave); others the ground above them.
   nearestActivity(px) {
+    const [a, b] = this.reach(px);
     let best = null, bd = 1e9;
     const consider = (x, y, kind) => { const d = Math.abs(x - px); if (d < bd) { bd = d; best = { x, y, kind }; } };
-    for (const [x, d] of this.dolls) if (d.state === 'lying') consider(d.actor.c.x, d.actor.c.y - 40, 'doll');
-    for (const [x, s] of this.stitches) if (!s.got) consider(s.px, s.py, 'stitch');
-    for (const [x, n] of this.nests) consider(n.ent.c.x, n.ent.c.y, 'nest');
-    if (!best) {
-      // look further ahead along the road
-      const ptx = Math.floor(px / TILE);
-      for (const kind of ['doll', 'stitch', 'nest']) for (const x of this.sites(kind, ptx - 200, ptx + 200)) {
-        const done = kind === 'doll' ? this.sv.rescued[x] : kind === 'stitch' ? this.sv.stitches[x] : this.sv.nests[x];
-        if (!done) consider(x * TILE + 16, this.game.world.surface(x) * TILE - 40, kind);
-      }
+    for (const kind of ['doll', 'stitch', 'nest']) for (const x of this.sites(kind, a, b)) {
+      if (kind === 'doll') { if (this.sv.rescued[x]) continue; const d = this.dolls.get(x); if (d && d.state !== 'lying') continue; consider(d ? d.actor.c.x : x * TILE + 16, d ? d.actor.c.y - 40 : this.game.world.surface(x) * TILE - 40, kind); }
+      else if (kind === 'stitch') { if (this.sv.stitches[x]) continue; const s = this.stitches.get(x); if (s && s.got) continue; consider(s ? s.px : x * TILE + 16, s ? s.py : this.game.world.surface(x) * TILE - 40, kind); }
+      else { if (this.sv.nests[x]) continue; const n = this.nests.get(x); if (n && n.ent.mode === 'dead') continue; consider(n ? n.ent.c.x : x * TILE + 16, n ? n.ent.c.y : this.game.world.surface(x) * TILE - 40, kind); }
     }
     return best;
   }

@@ -222,7 +222,7 @@ export class Actor {
     // drive the animator
     const mode = c.dashT > 0 ? 'dash' : c.ground ? (this.emote && !I.mx && !this.attack ? 'emote' : 'ground') : c.wallSlide ? 'wall' : 'air';
     this.anim.update(dt, {
-      mode, x: c.x, gy: c.y, py: c.y - this.pelvisH, vx: c.vx, vy: c.vy, runMax: this.run, attack: this.attack,
+      mode, x: c.x, gy: c.y, py: c.y - this.pelvisH, vx: c.vx, vy: c.vy, runMax: this.run, attack: this.attack, blade: !!this.blade,
       look: this.look_at, crouch, emote: this.emote, windup: this.telegraph || 0, accel: clamp((I.mx * this.facing), -1, 1) * (c.ground ? 1 : 0),
     }, this.world);
   }
@@ -230,7 +230,7 @@ export class Actor {
     const c = this.c;
     const mode = c.dashT > 0 ? 'dash' : c.ground ? (this.emote ? 'emote' : 'ground') : 'air';
     if (Math.abs(c.vx) > 30 && !this.attack) this.face(sign(c.vx));
-    this.anim.update(dt, { mode, x: c.x, gy: c.y, py: c.y - this.pelvisH, vx: c.vx, vy: c.vy, runMax: this.run, attack: this.attack, emote: this.emote, windup: this.telegraph || 0 }, this.world);
+    this.anim.update(dt, { mode, x: c.x, gy: c.y, py: c.y - this.pelvisH, vx: c.vx, vy: c.vy, runMax: this.run, attack: this.attack, blade: !!this.blade, emote: this.emote, windup: this.telegraph || 0 }, this.world);
   }
   jumped(kind) { if (this.onJump) this.onJump(kind); }
   landed(vy) {

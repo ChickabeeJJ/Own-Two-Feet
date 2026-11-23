@@ -237,3 +237,10 @@ body.touch #tut { top: calc(max(10px, env(safe-area-inset-top)) + 92px); }
 .tt-dots i.cur { background: var(--warm); }
 .tt-skip { position: absolute; top: 10px; right: 12px; background: none; border: none; font-size: 10px; letter-spacing: .16em; text-transform: uppercase; color: var(--dim); cursor: pointer; padding: 4px; }
 .tt-skip:hover { color: var(--text); }
+
+/* direction chevrons drawn with borders (no glyphs) */
+.chev, .chev-after::after { display: inline-block; width: .42em; height: .42em; border: solid currentColor; border-width: 0 2px 2px 0; vertical-align: .08em; margin: 0 .35em; }
+.chev.r, .chev-after.r::after { transform: rotate(-45deg); }
+.chev.l, .chev-after.l::after { transform: rotate(135deg); }
+.chev-after::after { content: ''; }
+.toast.done::before { content: ''; display: inline-block; width: .35em; height: .7em; border: solid #b8f0c8; border-width: 0 2px 2px 0; transform: rotate(45deg); margin: 0 .7em .1em 0; }

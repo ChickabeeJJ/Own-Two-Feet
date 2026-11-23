@@ -126,7 +126,6 @@ export function drawDoll(ctx, b, look, a, o = {}) {
   headBack(ctx, look, hr, s, f, tint);
   sphere(ctx, hr, skin, look.mat, rim, f, s);
   headMid(ctx, look, hr, s, f, tint, o);
-  if (look.eyeStyle !== 'none') eyes(ctx, look, hr, s, f, o, hx, hy, ha);
   headFront(ctx, look, hr, s, f, o.time || 0, o.glows, hx, hy, ha, tint);
   ctx.restore();
 
@@ -142,12 +141,12 @@ export function drawDoll(ctx, b, look, a, o = {}) {
 
 function sphere(g, r, col, mat, rim, f, s) {
   const gr = g.createRadialGradient(-r * 0.38, -r * 0.42, r * 0.08, 0, 0, r * 1.08);
-  gr.addColorStop(0, shade(col, mat === 'metal' ? 0.45 : 0.22));
-  gr.addColorStop(0.45, col);
-  gr.addColorStop(0.85, shade(col, mat === 'metal' ? -0.4 : -0.18));
-  gr.addColorStop(1, shade(col, mat === 'metal' ? -0.55 : -0.3));
+  // matte: broad diffuse falloff, no specular
+  gr.addColorStop(0, shade(col, 0.07));
+  gr.addColorStop(0.5, col);
+  gr.addColorStop(0.88, shade(col, -0.16));
+  gr.addColorStop(1, shade(col, -0.26));
   g.fillStyle = gr; g.beginPath(); g.arc(0, 0, r, 0, TAU); g.fill();
-  if (mat === 'porcelain' || mat === 'metal' || mat === 'glow') { g.fillStyle = rgba('#ffffff', 0.55); g.beginPath(); g.ellipse(-r * 0.4, -r * 0.5, r * 0.26, r * 0.13, -0.6, 0, TAU); g.fill(); }
   if (rim) { g.strokeStyle = rgba(rim, 0.4); g.lineWidth = 1.1 * s; g.beginPath(); g.arc(0, 0, r * 0.97, f > 0 ? 2.2 : 0.2, f > 0 ? 3.4 : 1.0); g.stroke(); }
 }
 function eyes(g, look, r, s, f, o, hx, hy, ha) {
@@ -190,7 +189,6 @@ function headMid(g, look, r, s, f, tint, o) {
     // a pale half mask over the facing side of the face
     g.fillStyle = tint(look.maskCol || '#d8c7a8');
     g.beginPath(); g.arc(0, 0, r * 0.98, -Math.PI / 2, Math.PI / 2, f < 0); g.quadraticCurveTo(r * 0.35 * f, 0, 0, -r * 0.98); g.fill();
-    g.fillStyle = rgba('#ffffff', 0.25); g.beginPath(); g.ellipse(r * 0.4 * f, -r * 0.5, r * 0.2, r * 0.1, 0.4 * f, 0, TAU); g.fill();
   } else if (h === 'ears') {
     // lighter muzzle
     g.fillStyle = tint(shade(look.body, 0.25)); g.beginPath(); g.ellipse(r * 0.35 * f, r * 0.3, r * 0.42, r * 0.32, 0, 0, TAU); g.fill();

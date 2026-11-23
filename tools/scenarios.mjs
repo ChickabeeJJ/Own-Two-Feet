@@ -1,5 +1,31 @@
 // Extra scenarios for tools/shot.mjs
 export default ({ page, sleep, key, shot, evalg }) => ({
+  // deterministic animation filmstrip: freeze the live loop, step the sim by hand at 30 fps, crop around the hero
+  async film() {
+    await page.waitForFunction(() => window.__game && window.__game.story);
+    await evalg(() => { const g = window.__game; g.story.skipBirth(); g.save.hasBlade = true; g.player.actor.blade = true; g.enemies.calm = 999; if (g.story.skipTutorial) g.story.skipTutorial(); });
+    await sleep(1500);
+    await evalg(() => { window.__game.hitstopT = 1e9; });
+    const plan = [];
+    for (let i = 0; i < 6; i++) plan.push([]);
+    for (let i = 0; i < 14; i++) plan.push(['KeyD']);
+    for (let i = 0; i < 2; i++) plan.push(['KeyD', 'Space']);
+    for (let i = 0; i < 14; i++) plan.push(['KeyD']);
+    for (let i = 0; i < 6; i++) plan.push([]);
+    for (let i = 0; i < 8; i++) plan.push(i < 2 ? ['KeyJ'] : []);
+    for (let i = 0; i < 6; i++) plan.push(i < 1 ? ['ShiftLeft'] : []);
+    let f = 0;
+    for (const keys of plan) {
+      await page.evaluate((keys) => {
+        const g = window.__game, I = window.__input;
+        I.keys.clear(); for (const k of keys) I.keys.add(k);
+        for (let s = 0; s < 4; s++) { I.poll(); g.step(1 / 120); I.endTick(); }
+        g.updateCamera(1 / 30); g.render(0);
+        const c = g.cam, sc = g.baseZoom * c.zoom, p = g.player.actor.c;
+        return [(p.x - c.rx) * sc + innerWidth / 2, (p.y - c.ry) * sc + innerHeight / 2, sc];
+      }, keys).then(([x, y, sc]) => page.screenshot({ path: `/tmp/otf-shots/film-${String(f++).padStart(3, '0')}.png`, clip: { x: Math.max(0, x - 70 * sc), y: Math.max(0, y - 95 * sc), width: 140 * sc, height: 120 * sc } }));
+    }
+  },
   async birth() {
     await sleep(400); await shot('b0-open');
     await sleep(1800); await shot('b1-fall');
@@ -38,6 +64,31 @@ export default ({ page, sleep, key, shot, evalg }) => ({
     await key('KeyQ'); await sleep(600); await key('Escape'); await sleep(1500); await shot('t4-done');
     const st = await evalg(() => { const g = window.__game; return { tutDone: g.save.tutDone, tutI: g.story.tutI, dummyHits: g.story.dummyHits, blade: g.save.hasBlade, obj: g.save.obj }; });
     console.log('tut', JSON.stringify(st));
+  },
+  // CrazyGames SDK flow against tools/cg-mock.js (run with --cg)
+  async sdk() {
+    await page.waitForFunction(() => window.__game && window.__game.story && window.__cg);
+    await sleep(800);
+    await evalg(() => { const g = window.__game; g.story.skipBirth(); if (g.story.skipTutorial) g.story.skipTutorial(); g.enemies.calm = 999; });
+    await sleep(600);
+    await evalg(() => window.__game.ui.openMenu()); await sleep(300); await evalg(() => window.__game.ui.closeMenu()); await sleep(300);
+    // die: the rewarded offer appears; take it
+    await evalg(() => { const g = window.__game; window.__dieX = g.player.actor.c.x; g.player.hp = 0; g.player.die(); });
+    await page.waitForSelector('#dialog:not(.hidden) .opt', { timeout: 8000 });
+    await shot('sdk-offer');
+    const pausedDuring = await evalg(async () => { document.querySelector('#dialog .opt').click(); await new Promise(r => setTimeout(r, 150)); return window.__game.paused; });
+    await sleep(1200);
+    const rose = await evalg(() => ({ dead: window.__game.player.dead, dx: Math.round(window.__game.player.actor.c.x - window.__dieX), paused: window.__game.paused }));
+    // die again: wake at the shrine, a due midgame ad plays in the dark
+    await evalg(() => { const g = window.__game; window.__platform.lastAd = -1e9; g.player.hp = 0; g.player.die(); });
+    await page.waitForSelector('#dialog:not(.hidden) .opt', { timeout: 8000 });
+    await evalg(() => document.querySelectorAll('#dialog .opt')[1].click());
+    await sleep(2500);
+    const after = await evalg(() => ({ dead: window.__game.player.dead, paused: window.__game.paused, calls: window.__cg.calls.filter(c => c !== 'data.set'), saves: window.__cg.calls.filter(c => c === 'data.set').length }));
+    console.log('sdk', JSON.stringify({ pausedDuring, rose, after }));
+    const need = ['init', 'loadingStart', 'loadingStop', 'gameplayStart', 'gameplayStop', 'ad:rewarded', 'ad:midgame'];
+    const miss = need.filter(n => !after.calls.includes(n));
+    if (miss.length || !pausedDuring || rose.dead || Math.abs(rose.dx) > 80 || after.dead || after.paused || !after.saves) throw new Error('sdk flow broken: ' + JSON.stringify({ miss, pausedDuring, rose, after }));
   },
   async content() {
     await sleep(900);
@@ -120,6 +171,8 @@ export default ({ page, sleep, key, shot, evalg }) => ({
     await sleep(600);
     const it = await evalg(() => { const p = window.__game.player; return p.interact ? p.interact.label : null; });
     console.log('interact', it);
+    if (it === 'Rest') { await key('KeyE'); await sleep(1200); }   // first visit: rest at the fire, then talk
+    console.log('interact2', await evalg(() => { const p = window.__game.player; return p.interact ? p.interact.label : null; }));
     await key('KeyE'); await sleep(1500); await shot('n1-talk');
     for (let i = 0; i < 4; i++) { await key('KeyE'); await sleep(500); }
     await shot('n2-opts');

@@ -23,7 +23,7 @@ async function boot() {
   void pInit;   // the SDK finishes initialising in the background; the game starts on the first frame
   const sv = Save.load();
   const game = new Game(canvas);
-  window.__game = game;
+  window.__game = game; window.__input = Input; window.__platform = Platform;
   game.save = sv;
   // settings
   const st = Object.assign(game.settings, { shake: 1, flashes: true, post: true, quality: 'high', touchOn: false, muted: false }, sv.settings || {});
@@ -33,6 +33,12 @@ async function boot() {
   if (st.vol_sfx !== undefined) Audio.vol.sfx = st.vol_sfx;
   Audio.muted = !!st.muted || Platform.muted;
   Platform.onSettings(s => Audio.setMuted(!!s.muteAudio || !!st.muted));
+  // ads: freeze the game and silence it for the whole ad, then restore exactly what was there
+  let adPrev = null;
+  Platform.onAd(on => {
+    if (on) { adPrev = { paused: game.paused, muted: Audio.muted }; game.paused = true; Audio.setMuted(true); Platform.gameplayStop(); }
+    else if (adPrev) { game.paused = adPrev.paused; Audio.setMuted(adPrev.muted); if (!game.paused) Platform.gameplayStart(); adPrev = null; }
+  });
   game.resize();
   if (!st.post && game.post.setEnabled) game.post.setEnabled(false);
 

@@ -70,12 +70,12 @@ export function capsule(g, ax, ay, bx, by, ra, rb, base, o = {}) {
   const r = Math.max(ra, rb);
   const mx = (ax + bx) / 2, my = (ay + by) / 2;
   const gr = g.createLinearGradient(mx - nx * r, my - ny * r, mx + nx * r, my + ny * r);
-  const dark = o.dark ?? 0.42, hi = o.hi ?? 0.16;
+  // matte cloth / clay: soft diffuse ramp, the lit edge only slightly brighter, no sheen band
+  const dark = Math.min(o.dark ?? 0.34, 0.36), hi = Math.min(o.hi ?? 0.05, 0.06);
   gr.addColorStop(0, shade(base, -dark));
-  gr.addColorStop(0.28, shade(base, -dark * 0.42));
-  gr.addColorStop(0.62, base);
-  gr.addColorStop(0.84, shade(base, hi));
-  gr.addColorStop(1, shade(base, hi * 0.35));
+  gr.addColorStop(0.35, shade(base, -dark * 0.4));
+  gr.addColorStop(0.7, base);
+  gr.addColorStop(1, shade(base, hi));
   g.fillStyle = gr;
   g.fill();
   if (o.rim) {
@@ -115,9 +115,9 @@ export function hull(g, nodes, base, o = {}) {
   const r = Math.max(...nodes.map(q => q[2]));
   const mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2;
   const gr = g.createLinearGradient(mx - nx * r, my - ny * r, mx + nx * r, my + ny * r);
-  const dark = o.dark ?? 0.4, hi = o.hi ?? 0.15;
-  gr.addColorStop(0, shade(base, -dark)); gr.addColorStop(0.3, shade(base, -dark * 0.4)); gr.addColorStop(0.62, base);
-  gr.addColorStop(0.86, shade(base, hi)); gr.addColorStop(1, shade(base, hi * 0.3));
+  const dark = Math.min(o.dark ?? 0.32, 0.36), hi = Math.min(o.hi ?? 0.05, 0.06);
+  gr.addColorStop(0, shade(base, -dark)); gr.addColorStop(0.35, shade(base, -dark * 0.4)); gr.addColorStop(0.7, base);
+  gr.addColorStop(1, shade(base, hi));
   g.fillStyle = o.fill || gr;
   g.fill();
   return { nx, ny };
@@ -129,7 +129,7 @@ export function softDisc(g, x, y, r, col, a = 1) {
 }
 export function ballShade(g, x, y, r, base, o = {}) {
   const gr = g.createRadialGradient(x + LIGHT.x * r * 0.45, y + LIGHT.y * r * 0.45, r * 0.1, x, y, r);
-  gr.addColorStop(0, shade(base, o.hi ?? 0.22)); gr.addColorStop(0.55, base); gr.addColorStop(1, shade(base, -(o.dark ?? 0.38)));
+  gr.addColorStop(0, shade(base, Math.min(o.hi ?? 0.07, 0.08))); gr.addColorStop(0.55, base); gr.addColorStop(1, shade(base, -Math.min(o.dark ?? 0.32, 0.36)));
   g.fillStyle = gr; g.beginPath(); g.arc(x, y, r, 0, TAU); g.fill();
 }
 export function stitches(g, pts, col, w = 1, len = 2.4, gap = 2.2) {

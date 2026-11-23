@@ -145,7 +145,7 @@ export class Shrines {
   interactables() {
     const g = this.game, out = [];
     for (const s of this.map.values()) {
-      out.push({ x: s.x, y: s.y - 30, r: 70, label: 'Rest', act: () => this.rest(s) });
+      out.push({ x: s.x, y: s.y - 30, r: 70, label: 'Rest', verb: 'Rest', pri: this.sv.met && this.sv.met[s.sx] && !(this.sv.respawn && Math.abs(this.sv.respawn.x - s.x) < 96) ? 45 : 0, act: () => this.rest(s) });
       if (s.npc && !s.npc.removed && s.npc.mode !== 'dead') out.push({ x: s.npc.c.x, y: s.npc.c.y - 30, r: 80, label: 'Talk to ' + s.name, act: () => this.talk(s.kind, s.name, s) });
     }
     if (this.home) {

@@ -6,7 +6,25 @@ import { pattern, grassLip, snowLip } from '../art/tex.js';
 import { drawLantern, drawHearth } from '../art/props.js';
 import { capsule } from '../art/paint.js';
 import { makeLayers, drawClouds, drawSkyFeature } from '../art/bg.js';
-import { texPattern, drawSprite } from '../art/images.js';
+import { texPattern, drawSprite, IMG } from '../art/images.js';
+
+const TREE_SPRITE = { round: 'meadow', crystal: 'glass', shroom: 'hollow', dead: 'ember', pine: 'frost' };
+// x of the trunk's centre as a fraction of the sprite width (read once from the bottom rows of the image)
+const anchors = new Map();
+function treeAnchor(name, im) {
+  let a = anchors.get(name);
+  if (a !== undefined) return a;
+  a = 0.5;
+  try {
+    const c = document.createElement('canvas'); c.width = im.width; c.height = 6;
+    const g = c.getContext('2d'); g.drawImage(im, 0, im.height - 6, im.width, 6, 0, 0, im.width, 6);
+    const d = g.getImageData(0, 0, im.width, 6).data; let sx = 0, n = 0;
+    for (let i = 0; i < d.length; i += 4) if (d[i + 3] > 128) { sx += (i / 4) % im.width; n++; }
+    if (n) a = sx / n / im.width;
+  } catch (e) {}
+  anchors.set(name, a);
+  return a;
+}
 
 // painted texture for a tile in a biome (from the art sheets); null -> procedural fallback
 function texName(t, id) {
@@ -214,13 +232,10 @@ export class WorldRenderer {
     }
     // exposed faces: turf / snow cap on top, lit rim, shade underneath and on the far side
     if (n) {
-      if (t === T.GRASS && painted && p.id !== 'frost') {
+      if (t === T.GRASS && p.id !== 'frost') {
         const lg = g.createLinearGradient(0, y, 0, y + 7);
         lg.addColorStop(0, rgba('#ffffff', 0.28)); lg.addColorStop(1, rgba('#ffffff', 0));
         g.fillStyle = lg; g.fillRect(x + (rNW ? 6 : 0), y, TILE - (rNW ? 6 : 0) - (rNE ? 6 : 0), 7);
-      } else if (t === T.GRASS && p.id !== 'frost') {
-        const lip = grassLip(p.grass, p.grassHi);
-        g.drawImage(lip, ((tx % 4) + 4) % 4 * 32, 0, 32, lip.height, x - 0.3, y - 7, 32.6, lip.height);
       } else if (t === T.SNOW || (p.id === 'frost' && (t === T.GRASS || t === T.STONE || t === T.DIRT))) {
         const lip = snowLip();
         g.drawImage(lip, ((tx % 4) + 4) % 4 * 32, 0, 32, lip.height, x - 0.3, y - 5, 32.6, lip.height);
@@ -234,22 +249,13 @@ export class WorldRenderer {
       const sg = g.createLinearGradient(0, y + TILE - 9, 0, y + TILE);
       sg.addColorStop(0, rgba('#000000', 0)); sg.addColorStop(1, rgba('#000000', 0.38));
       g.fillStyle = sg; g.fillRect(x + (rSW ? 7 : 0), y + TILE - 9, TILE - (rSW ? 7 : 0) - (rSE ? 7 : 0), 9);
-      if ((t === T.DIRT || t === T.GRASS) && h < 0.45) {
-        // roots dangle from soil ceilings
-        g.strokeStyle = rgba(shade(base, -0.4), 0.9); g.lineWidth = 1.3; g.lineCap = 'round';
-        const rx = x + 6 + h * 40, len = 6 + hash2(tx, ty, 7) * 12;
-        g.beginPath(); g.moveTo(rx, y + TILE - 1); g.quadraticCurveTo(rx + 3, y + TILE + len * 0.5, rx - 1, y + TILE + len); g.stroke();
-      }
-      if ((t === T.MOSS || (p.id === 'glass' || p.id === 'meadow') && t === T.STONE) && h > 0.7) {
-        g.fillStyle = rgba('#7fa36b', 0.9);
-        for (let k = 0; k < 3; k++) { const mx = x + 5 + k * 9 + h * 4, ml = 4 + hash2(tx, ty, 80 + k) * 8; g.beginPath(); g.moveTo(mx - 2, y + TILE - 1); g.lineTo(mx + 2, y + TILE - 1); g.lineTo(mx, y + TILE + ml); g.closePath(); g.fill(); }
-      }
     }
     if (w) { const wg = g.createLinearGradient(x, 0, x + 5, 0); wg.addColorStop(0, rgba('#ffffff', 0.1)); wg.addColorStop(1, rgba('#ffffff', 0)); g.fillStyle = wg; g.fillRect(x, y + (rNW ? 7 : 0), 5, TILE - (rNW ? 7 : 0) - (rSW ? 7 : 0)); }
     if (e) { const eg = g.createLinearGradient(x + TILE - 7, 0, x + TILE, 0); eg.addColorStop(0, rgba('#000000', 0)); eg.addColorStop(1, rgba('#000000', 0.26)); g.fillStyle = eg; g.fillRect(x + TILE - 7, y + (rNE ? 7 : 0), 7, TILE - (rNE ? 7 : 0) - (rSE ? 7 : 0)); }
   }
   drawPassable(g, tx, ty, t, x, y, p, base, h) {
     const W = this.world;
+    if ((t === T.LOG || t === T.CAP) && this.inTree(tx, ty)) return;
     if (t === T.LOG) {
       const below = W.get(tx, ty + 1), above = W.get(tx, ty - 1);
       const kind = p.id;
@@ -334,49 +340,41 @@ export class WorldRenderer {
   }
 
   // animated grass, flowers, sprouts on top of exposed natural ground
-  drawDecor(ctx, view, time, actors, wind) {
-    const W = this.world;
-    const tx0 = Math.floor(view.x0 / TILE) - 1, tx1 = Math.floor(view.x1 / TILE) + 1;
-    const ty0 = Math.floor(view.y0 / TILE) - 1, ty1 = Math.floor(view.y1 / TILE) + 1;
-    ctx.lineCap = 'round';
-    for (let tx = tx0; tx <= tx1; tx++) {
-      const p = paletteAt(tx);
-      for (let ty = ty0; ty <= ty1; ty++) {
-        const t = W.get(tx, ty);
-        if (t !== T.GRASS) continue;
-        if (W.get(tx, ty - 1) !== T.AIR && W.get(tx, ty - 1) !== T.LOG) continue;
-        const bx = tx * TILE, by = ty * TILE;
-        // push from nearby actors
-        let push = 0;
-        for (const a of actors) {
-          const dx = bx + 16 - a.x, dy = by - a.y;
-          if (Math.abs(dx) < 34 && dy > -20 && dy < 70) push += Math.sign(dx || 1) * (1 - Math.abs(dx) / 34) * 0.9;
-        }
-        const n = 5;
-        ctx.strokeStyle = p.grass;
-        ctx.lineWidth = 2.2;
-        ctx.beginPath();
-        for (let k = 0; k < n; k++) {
-          const hx = hash2(tx, ty, 100 + k);
-          const x = bx + 2 + (k + hx * 0.8) * (28 / n);
-          const len = 6 + hash2(tx, ty, 110 + k) * 9;
-          const sway = Math.sin(time * 1.6 + x * 0.05) * wind * 3 + push * 7;
-          ctx.moveTo(x, by + 2);
-          ctx.quadraticCurveTo(x + sway * 0.3, by - len * 0.5, x + sway, by - len);
-        }
-        ctx.stroke();
-        const fh = hash2(tx, ty, 120);
-        if (fh < 0.16) {
-          const x = bx + 6 + fh * 120, len = 12 + fh * 40;
-          const sway = Math.sin(time * 1.4 + x * 0.04) * wind * 3 + push * 6;
-          ctx.strokeStyle = shade(p.grass, -0.1); ctx.lineWidth = 1.5;
-          ctx.beginPath(); ctx.moveTo(x, by + 2); ctx.quadraticCurveTo(x, by - len * 0.5, x + sway, by - len); ctx.stroke();
-          ctx.fillStyle = p.flower[(fh * 100 | 0) % p.flower.length];
-          ctx.beginPath(); ctx.arc(x + sway, by - len, 3, 0, TAU); ctx.fill();
-        }
-      }
-    }
+  // a generated tree's trunk blocks are drawn by the tree sprite, not as tiles
+  inTree(tx, ty) {
+    const tr = this.world.treeAt(tx);
+    return !!tr && ty < tr.base && ty >= tr.base - tr.h;
   }
+  // painted trees from the materials sheet, planted on their trunk blocks; felled trees (trunk gone) vanish.
+  // The crown leans with the wind and away from anyone brushing past.
+  drawTrees(ctx, view, time, actors, wind) {
+    const W = this.world;
+    const tx0 = Math.floor(view.x0 / TILE) - 6, tx1 = Math.floor(view.x1 / TILE) + 6;
+    for (let tx = tx0; tx <= tx1; tx++) {
+      const tr = W.treeAt(tx);
+      if (!tr || W.get(tx, tr.base - 1) !== T.LOG) continue;
+      const name = 'trees/' + TREE_SPRITE[tr.kind];
+      const im = IMG[name];
+      if (!im) continue;
+      const ax = treeAnchor(name, im);
+      const h = (tr.h + (tr.kind === 'shroom' ? 0.6 : 1.6)) * TILE * (tr.kind === 'dead' ? 0.92 : 1);
+      const w = im.width * h / im.height;
+      const bx = tx * TILE + 16, by = tr.base * TILE + 3;
+      let push = 0;
+      for (const a of actors) { const dx = bx - a.x; if (Math.abs(dx) < 60 && a.y > by - h && a.y < by + 40) push += Math.sign(dx || 1) * (1 - Math.abs(dx) / 60); }
+      this.treeLean = this.treeLean || new Map();
+      const lean0 = this.treeLean.get(tx) || 0, lean = lean0 + (push * 0.05 - lean0) * 0.08;
+      this.treeLean.set(tx, lean);
+      const sk = (Math.sin(time * 0.9 + tx * 0.7) * 0.6 + Math.sin(time * 2.1 + tx) * 0.25) * 0.018 * (0.5 + wind) + lean;
+      ctx.save();
+      ctx.translate(bx, by);
+      ctx.transform(1, 0, sk, 1, 0, 0);
+      ctx.drawImage(im, -ax * w, -h, w, h);
+      ctx.restore();
+    }
+    if (this.treeLean && this.treeLean.size > 400) this.treeLean.clear();
+  }
+  drawDecor() {}
 
   // ------------------------------------------------------------ sky + parallax
   layerSet(B) {
@@ -478,16 +476,13 @@ export class WorldRenderer {
       ctx.beginPath(); ctx.arc(0, -60 * u, 14 * u, 0, TAU); ctx.fill();
       for (let i = 0; i < 10; i++) { const a = i / 10 * TAU + time * 0.15; ctx.beginPath(); ctx.roundRect(Math.cos(a) * 28 * u - 5 * u, -60 * u + Math.sin(a) * 22 * u - 5 * u, 10 * u, 10 * u, 2 * u); ctx.fill(); }
     }
-    // eyes that notice you
-    const blink = (Math.sin(time * 0.9) > -0.97) ? 1 : 0.1;
+    // a faint glow at its heart, slowly breathing (faces stay blank)
     ctx.globalCompositeOperation = 'lighter';
-    ctx.globalAlpha = tease.k * blink;
-    ctx.fillStyle = tease.eye;
-    const ey = tease.arch === 'warden' ? -82 * u + breathe : tease.arch === 'wraith' ? -100 * u : -62 * u;
-    ctx.beginPath(); ctx.ellipse(-3 * u, ey, 1.4 * u, 0.7 * u, 0, 0, TAU); ctx.ellipse(3 * u, ey, 1.4 * u, 0.7 * u, 0, 0, TAU); ctx.fill();
-    const g = ctx.createRadialGradient(0, ey, 0, 0, ey, 8 * u);
-    g.addColorStop(0, rgba(tease.eye, 0.22)); g.addColorStop(1, rgba(tease.eye, 0));
-    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, ey, 8 * u, 0, TAU); ctx.fill();
+    ctx.globalAlpha = tease.k * (0.6 + Math.sin(time * 0.9) * 0.3);
+    const hy = tease.arch === 'warden' ? -60 * u + breathe : tease.arch === 'wraith' ? -78 * u : -60 * u;
+    const g = ctx.createRadialGradient(0, hy, 0, 0, hy, 12 * u);
+    g.addColorStop(0, rgba(tease.eye, 0.25)); g.addColorStop(1, rgba(tease.eye, 0));
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, hy, 12 * u, 0, TAU); ctx.fill();
     ctx.restore();
   }
   drawShafts(ctx, W, H, time, strength, col) {

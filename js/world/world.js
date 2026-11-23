@@ -172,35 +172,10 @@ export class World {
         const i = ly * CH + lx;
         if (force || fg[i] === T.AIR) fg[i] = t;
       };
-      const top = tr.base - tr.h;
-      if (tr.kind === 'shroom') {
-        for (let y = tr.base - 1; y > top; y--) put(tx, y, T.LOG);
-        const r = 3 + (tr.h > 7 ? 1 : 0);
-        for (let x = -r; x <= r; x++) { put(tx + x, top, T.CAP); if (Math.abs(x) < r) put(tx + x, top - 1, T.CAP); }
-        put(tx, tr.base - 1, T.SHROOM, true);
-      } else if (tr.kind === 'dead') {
-        for (let y = tr.base - 1; y > top; y--) put(tx, y, T.LOG);
-        const by = top + 2;
-        put(tx - 1, by, T.LOG); put(tx - 2, by - 1, T.LOG); put(tx + 1, by + 1, T.LOG); put(tx + 2, by, T.LOG);
-      } else if (tr.kind === 'pine') {
-        for (let y = tr.base - 1; y > top - 1; y--) put(tx, y, T.LOG);
-        for (let k = 0; k < tr.h - 1; k++) {
-          const w = Math.floor((tr.h - 1 - k) * 0.45) + (k % 2 ? 0 : 1);
-          for (let x = -w; x <= w; x++) put(tx + x, top + k, T.LEAVES);
-        }
-        put(tx, top - 1, T.LEAVES);
-      } else {
-        for (let y = tr.base - 1; y > top; y--) put(tx, y, T.LOG);
-        // a cloud-shaped crown: a main dome plus two lower side clumps
-        const big = tr.h > 7 ? 1 : 0;
-        const blobs = tr.kind === 'crystal' ? [[0, -1, 2.1]] : [[0, -1, 2.3 + big * 0.5], [-2 - big, 1, 1.5], [2 + big, 1, 1.5], [0, 1, 1.8]];
-        for (let y = -4; y <= 3; y++) for (let x = -4; x <= 4; x++) {
-          let inside = false;
-          for (const [bx, by, r] of blobs) if (Math.hypot(x - bx, (y - by) * 1.1) <= r + hash2(tx + x, top + y, this.seed) * 0.55) { inside = true; break; }
-          if (inside) put(tx + x, top + y, T.LEAVES);
-        }
-        if (tr.kind === 'crystal' && hash2(tx, 5, this.seed) < 0.5) put(tx, top - 3, T.CRYSTAL);
-      }
+      // the trunk is real (choppable timber); the tree itself is a painted sprite drawn on it
+      const top = tr.base - Math.min(tr.h, 4);
+      for (let y = tr.base - 1; y >= top; y--) put(tx, y, T.LOG);
+      if (tr.kind === 'shroom') put(tx, tr.base - tr.h, T.CAP);
     }
   }
   stampStructures(cx, cy, fg, wall) {

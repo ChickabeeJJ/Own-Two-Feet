@@ -108,7 +108,7 @@ function characters() {
   ];
   poses.forEach(([n, sub, spec], i) => { const x = 160 + i * 255 + (i === 8 ? 20 : 0); drawFigure(g, x, y1, doll, S, spec); label(g, x, y1 + 50, n, sub); });
 
-  section(g, 60, 600, 'Make it yours · body, material, head, cape, eyes, blade, warden marks');
+  section(g, 60, 600, 'Make it yours · body, material, head, cape, glow, blade, warden marks');
   const variants = [
     ['Linen · Sprout', { color: 'c_bone', mat: 'm_cloth', head: 'h_leaf', cape: 'k_scarf', eyes: 'e_amber', blade: 'b_bone' }, []],
     ['Porcelain · Crown', { color: 'c_bone', mat: 'm_porcelain', head: 'h_crown', cape: 'k_white', eyes: 'e_cyan', blade: 'b_steel' }, ['#ffb36b']],

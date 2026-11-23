@@ -137,3 +137,41 @@ def main(p1, p2, p3, outdir):
 
 if __name__ == '__main__':
     main(*sys.argv[1:5])
+
+def tree_sprites(p3, outdir, meta):
+    """the five flora sprites of the materials sheet: keep pixels brighter than the board (drops the cast
+    shadow and dark halo), erode one pixel of fringe, bleed edge colours outward so scaling has no dark rim"""
+    from PIL import ImageFilter
+    img = load(p3)
+    boxes = {'meadow': (1340, 236, 1495, 453), 'glass': (1492, 236, 1634, 456), 'hollow': (1634, 276, 1759, 456),
+             'ember': (1405, 516, 1480, 746), 'frost': (1530, 488, 1672, 746)}
+    os.makedirs(outdir + '/trees', exist_ok=True)
+    for k, (x0, y0, x1, y1) in boxes.items():
+        reg = img[y0:y1, x0:x1]
+        ring = np.concatenate([reg[:3].reshape(-1, 3), reg[:, :3].reshape(-1, 3), reg[:, -3:].reshape(-1, 3)])
+        bg = np.median(ring, axis=0)
+        lum = reg.mean(axis=2) - bg.mean()
+        d = np.sqrt(((reg - bg) ** 2).sum(axis=2))
+        lt = 34 if k == 'hollow' else 6
+        a = np.clip((d - 22) / 30, 0, 1) * np.clip((lum - lt) / 14, 0, 1)
+        # the cast shadow at the foot: below the trunk base keep only the trunk's columns
+        h = a.shape[0]; ref = a[h - 22]
+        cols = np.where(ref > 0.5)[0]
+        if len(cols):
+            keep = np.zeros_like(ref); keep[max(0, cols.min() - 2):cols.max() + 3] = 1
+            a[h - 21:] *= keep
+        am = Image.fromarray((a * 255).astype(np.uint8)).filter(ImageFilter.MinFilter(3)).filter(ImageFilter.GaussianBlur(0.6))
+        a = np.asarray(am).astype(np.float32) / 255
+        col = reg.copy()
+        solid = a > 0.6
+        for _ in range(4):  # bleed solid colours into the fringe
+            sh = [np.roll(col, s, ax) for s in (1, -1) for ax in (0, 1)]
+            ms = [np.roll(solid, s, ax) for s in (1, -1) for ax in (0, 1)]
+            acc = np.zeros_like(col); n = np.zeros(solid.shape, np.float32)
+            for c, m in zip(sh, ms): acc += c * m[..., None]; n += m
+            grow = (~solid) & (n > 0)
+            col[grow] = acc[grow] / n[grow][:, None]; solid = solid | grow
+        ys, xs = np.where(a > 0.05)
+        bx0, bx1, by0, by1 = xs.min(), xs.max() + 1, ys.min(), ys.max() + 1
+        save(col[by0:by1, bx0:bx1], f'{outdir}/trees/{k}.png', a[by0:by1, bx0:bx1])
+        meta['trees/' + k] = (int(bx1 - bx0), int(by1 - by0))

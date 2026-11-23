@@ -32,8 +32,8 @@ Returning players drop straight back where they were. Esc skips the opening.
 | Space, W | Jump. Again in the air once you earn *Second Wind* |
 | Shift, K | Dash |
 | J, left click | Strike. Hold up or down to aim (down in the air bounces off enemies) |
-| Hold left click on a block | Break it (only blocks you can see) |
-| Right click | Place the chosen block (Shift + right click places a back wall) |
+| Hold left click on a block | Break it (only blocks you can see; with an enemy close, a click strikes instead). Cutting a trunk fells the whole tree for timber |
+| Right click | Place the chosen block: a ghost shows where it goes, red when it can't (with the reason on click). Click a block's face to build onto it, hold and drag to lay a line. Shift places a back wall |
 | 1-9, mouse wheel | Choose a block |
 | B | Build mode for keyboard and gamepad (Strike mines, E places) |
 | E | Talk, rest, take |
@@ -43,7 +43,7 @@ Returning players drop straight back where they were. Esc skips the opening.
 | M | Mute |
 | Esc | Menu |
 
-Gamepad and touch are supported. Phones get a floating stick that appears wherever the left thumb lands, large thumb-sized buttons arranged in an arc (Strike biggest, then Jump, Dash, Mend, Build), sized from the screen so they stay comfortable on any phone, haptic ticks, and a contextual action button (Talk, Rest, Open, Wake, Read) that appears only when there is something to use. Build mode: tap a block to break it, tap empty space to place.
+Gamepad and touch are supported. Phones get a floating stick that appears wherever the left thumb lands, large thumb-sized buttons arranged in an arc (Strike biggest, then Jump, Dash, Mend, Build), sized from the screen so they stay comfortable on any phone, haptic ticks, and a contextual action button (Talk, Rest, Open, Wake, Read) that appears only when there is something to use. Build mode: hold a block to dig it, touch open space to place, drag to dig or lay a whole line.
 
 ## The ragdoll: new physics
 
@@ -58,12 +58,12 @@ The character keeps the look of the Rag Toss and Rag Showdown mannequin (cream b
 
 ## The world
 
-- **Endless and seeded** (`js/world/world.js`). Generated per 32x32 chunk, in both directions and downward without end. Caves, floating islands, crystal pillars, ice spikes, ember vents, ore veins, sand pockets, trees per biome. Only your edits are saved; everything else regenerates identically.
+- **Endless and seeded** (`js/world/world.js`). Generated per 32x32 chunk, in both directions and downward without end. Caves, floating islands, crystal pillars, ice spikes, ember vents, ore veins, sand pockets, and each biome's painted tree from the materials sheet (round crowns, glass trees, giant mushrooms, dead trees, pines) leaning in the wind and away from anyone brushing past. Only your edits are saved; everything else regenerates identically.
 - **Five biomes** that cycle with distance and darken with each loop: the Pale Meadow, the Glass Wood, the Hollow Below, the Ember Reach and the Frost Spires. Each has its own palette, parallax silhouettes, ambient particles, colour grade and generative score.
 - **Boss gates.** Every boundary between biomes is an arena held by a warden. Three archetypes with stronger variants: the Hollow Warden and the Pyre Knight (giant ragdolls: slam waves, wall-stunning charges, leaps), the Glass Widow and the Still Queen (flying ragdolls: volleys, dives, summons, rings, icefall), and the Unmade Heart (a core wrapped in torn-up blocks: throws, pound, spin). Tier scales health and adds patterns; a second phase starts at half health.
 - **Shrines** every ~85 tiles. Rest to heal, save and set your respawn. Each is kept by someone: a wanderer (trades blocks), a smith (hones your blade, forges hearths), a sage (more vessels, faster mending) or a tailor (cosmetics). Invite them to live at your hearth.
 - **Things to do between gates** (`js/game/content.js`), all placed by the world seed:
-  - *Threads of Light*: the currency that opens warden gates (4, then 7, 10, ... per gate). You earn them from everything below.
+  - *Threads of Light*: the currency that opens warden gates (10 for the first gate, then 15, 20, ... carried in total). The first stretch holds about 15, so you explore both ways before the first warden; Thread only ever leads to ones you can reach. You earn them from everything below.
   - *Lost dolls* lying limp in the grass. Wake them and they thank you with a Thread.
   - *Chests* with glimmer, blocks and sometimes a cosmetic.
   - *Lost stitches*: glowing scraps that each hold one line of the world's lore, kept in the Journal.
@@ -80,8 +80,9 @@ The painted art comes from hand-made reference sheets, cut up by `tools/extract_
 - `assets/props/`: shrine, campfire, blade in stone, hearth, lantern, gate banner, seed of light, with the sheet background removed.
 - `assets/icons/`: block icons, vessels, glimmer, relic medallions.
 - `assets/fx/`: slash, hit spark, shockwave, soul glimmer, dust, thread trail.
+- `assets/trees/`: the five flora sprites, cut with their cast shadow and halo removed.
 
-`js/art/images.js` loads them (pattern fills for tiles, sprites for props and icons). Characters are drawn in code to match the character reference (`js/art/doll.js`): round heads with dot eyes, scarves, belts and boots, cloaks and hoods, painted with soft shading and no outlines. Anything not on the sheets is still generated in code from the art bible (`js/art/paint.js`): key light from the upper left, rim light from behind.
+`js/art/images.js` loads them (pattern fills for tiles, sprites for props and icons). Characters are drawn in code to match the character reference (`js/art/doll.js`), matte with blank faces: round heads, scarves, belts and boots, cloaks and hoods, painted with soft shading and no outlines. Anything not on the sheets is still generated in code from the art bible (`js/art/paint.js`): key light from the upper left, rim light from behind.
 
 - `js/art/tex.js`, `js/art/props.js`: code-drawn fallbacks used if an image fails to load.
 - `js/art/bg.js`: painted parallax flats with rim light and haze, cloud banks, and one sky set piece per biome (floating isles, glowing crystal spires, a stone sky, a smoking volcano, an aurora).
@@ -97,7 +98,7 @@ The asset sheets in `art/sheets/` are rendered from that same code (so they alwa
 
 ## Making the character yours
 
-Body colour, material (linen, porcelain, bronze, lumen, umbra), head (sprout, hood, pale mask, horns, antlers, top hat, halo, crown), cape or scarf, eyes, and blade. Some are found by reaching biomes, some fall with wardens, some are bought from tailors. Every warden also leaves a kintsugi-like mark on your torso. Your sigil is generated from your name and every choice you make.
+Body colour, material (linen, porcelain, bronze, lumen, umbra), head (sprout, hood, pale mask, horns, antlers, top hat, halo, crown), cape or scarf, the colour of the glowing thread in your chest (also your dash trail), and blade. Some are found by reaching biomes, some fall with wardens, some are bought from tailors. Every warden also leaves a kintsugi-like mark on your torso. Your sigil is generated from your name and every choice you make.
 
 ## Multiplayer
 
@@ -110,7 +111,14 @@ CrazyGames provides invites and rooms, not servers, so play is peer to peer over
 
 ## CrazyGames integration (`js/platform.js`)
 
-SDK v3 loaded async from `sdk.crazygames.com`, initialised with a timeout, and every call is guarded so the game runs the same anywhere. Uses `loadingStart/Stop`, `gameplayStart/Stop` (stopped while the menu is open or the tab is hidden), `happytime` on warden kills, the data module for saves (localStorage fallback), the settings listener for platform mute, the user module for the player's name, and the invite / room APIs above. No ads are requested.
+SDK v3 loaded async from `sdk.crazygames.com`, initialised with a timeout, and every call is guarded so the game runs the same anywhere. Uses `loadingStart/Stop`, `gameplayStart/Stop` (stopped while the menu is open or the tab is hidden), `happytime` on warden kills, the data module for saves (localStorage fallback), the settings listener for platform mute, the user module for the player's name, and the invite / room APIs above. Loading and gameplay events asked for before the SDK finishes initialising are replayed once it is ready.
+
+Ads (`ad.requestAd`):
+- **Rewarded, player's choice.** When you fall, Thread offers *Rise here* (a short ad, then you stand back up where you fell, boss fight and all) or *Wake at the shrine*. The reward is only given when the ad finished.
+- **Midgame, at a natural break.** Only while waking at a shrine after a fall (the screen is already dark), never in the first 3 minutes, at most once every 3 minutes, never while other players share your world.
+- While any ad plays the game is paused and silent, `gameplayStop` is sent, and everything is restored afterwards. A lost callback can't hang the game (90 s guard).
+
+`tools/cg-mock.js` stands in for the SDK in tests (`node tools/shot.mjs sdk --cg` checks the whole flow).
 
 ## Project layout
 
@@ -135,6 +143,14 @@ tools/                  headless test harness, extract_assets.py (sheet cutter)
 ```
 
 ## Testing
+
+`tools/play.mjs` plays the game like a person from the opening fall (keyboard and mouse only, following the tutorial, the objective and Thread) and reports a timeline and anything that goes wrong: soft-locks, stuck spots, errors, falling out of the world.
+
+```bash
+node tools/play.mjs 480        # 8 minutes of play
+node tools/shot.mjs film       # frame-by-frame filmstrip of walk, run, jump, strike, dash
+node tools/shot.mjs sdk --cg   # CrazyGames SDK flow against the mock
+```
 
 The `tools/` folder drives the real game in headless Chromium (Playwright):
 

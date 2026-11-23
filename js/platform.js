@@ -9,7 +9,8 @@ const safe = (fn, fb) => { try { return fn(); } catch (e) { return fb; } };
 
 export const Platform = {
   sdk: null, env: 'standalone', user: null, inGameplay: false,
-  userListeners: [], settingsListeners: [], joinListeners: [],
+  userListeners: [], settingsListeners: [], joinListeners: [], adListeners: [],
+  adActive: false, lastAd: performance.now(), adCount: 0,
   muted: false,
 
   async init() {
@@ -24,6 +25,8 @@ export const Platform = {
       this.env = S.environment || 'crazygames';
       if (this.env === 'disabled') { this.sdk = null; return this; }
     } catch (e) { this.sdk = null; return this; }
+    if (this.loading) { safe(() => this.sdk.game.loadingStart()); if (this.loading === 'stopped') safe(() => this.sdk.game.loadingStop()); }
+    if (this.inGameplay) safe(() => this.sdk.game.gameplayStart());
     safe(() => {
       this.applySettings(this.sdk.game.settings);
       this.sdk.game.addSettingsChangeListener(s => this.applySettings(s));
@@ -51,11 +54,38 @@ export const Platform = {
   authPrompt() { safe(() => this.sdk && this.sdk.user.showAuthPrompt()); },
 
   // ---------------- lifecycle ----------------
-  loadingStart() { safe(() => this.sdk && this.sdk.game.loadingStart()); },
-  loadingStop() { safe(() => this.sdk && this.sdk.game.loadingStop()); },
+  // loading events can be asked for before init finishes; they are replayed once the SDK is ready
+  loadingStart() { this.loading = 'started'; safe(() => this.sdk && this.sdk.game.loadingStart()); },
+  loadingStop() { this.loading = 'stopped'; safe(() => this.sdk && this.sdk.game.loadingStop()); },
   gameplayStart() { if (this.inGameplay) return; this.inGameplay = true; safe(() => this.sdk && this.sdk.game.gameplayStart()); },
   gameplayStop() { if (!this.inGameplay) return; this.inGameplay = false; safe(() => this.sdk && this.sdk.game.gameplayStop()); },
   happytime() { safe(() => this.sdk && this.sdk.game.happytime()); },
+
+  // ---------------- ads ----------------
+  // The game pauses and goes silent for the whole ad (onAd listeners), and gameplay events are stopped.
+  // Midgame ads only at natural breaks (respawn), never in the first 3 minutes and at most every 3 minutes.
+  // Rewarded ads are always the player's choice and only pay out when the ad finished.
+  get adsReady() { return !!(this.sdk && this.sdk.ad && this.sdk.ad.requestAd); },
+  onAd(f) { this.adListeners.push(f); },
+  setAd(on) { this.adActive = on; for (const f of this.adListeners) f(on); },
+  requestAd(type) {
+    return new Promise(res => {
+      if (!this.adsReady || this.adActive) return res(false);
+      let done = false, started = false;
+      const end = (ok) => { if (done) return; done = true; if (started) this.setAd(false); this.lastAd = performance.now(); this.adCount++; res(ok); };
+      const cb = {
+        adStarted: () => { started = true; this.setAd(true); },
+        adFinished: () => end(true),
+        adError: () => end(false),
+      };
+      const fail = safe(() => { this.sdk.ad.requestAd(type, cb); return false; }, true);
+      if (fail) end(false);
+      setTimeout(() => end(false), 90000);   // never hang the game on a lost callback
+    });
+  },
+  midgameDue() { return this.adsReady && performance.now() - this.lastAd > 180000; },
+  midgame() { return this.midgameDue() ? this.requestAd('midgame') : Promise.resolve(false); },
+  rewarded() { return this.requestAd('rewarded'); },
 
   // ---------------- storage ----------------
   getItem(k) {

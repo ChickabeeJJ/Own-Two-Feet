@@ -154,5 +154,25 @@
  "fx/thread": [
   207,
   95
+ ],
+ "trees/meadow": [
+  138,
+  205
+ ],
+ "trees/glass": [
+  131,
+  209
+ ],
+ "trees/hollow": [
+  115,
+  169
+ ],
+ "trees/ember": [
+  44,
+  218
+ ],
+ "trees/frost": [
+  119,
+  246
  ]
 }

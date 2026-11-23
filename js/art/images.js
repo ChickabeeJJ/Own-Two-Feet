@@ -7,13 +7,14 @@ for (const k of ['plank', 'brick', 'stone', 'plaster', 'obsidian', 'lava', 'sand
 const PROPS = ['shrine', 'campfire', 'bladestone', 'hearth', 'lantern', 'banner', 'seed'].map(n => 'props/' + n);
 const ICONS = ['stone', 'deepstone', 'shadowstone', 'sandstone', 'snow', 'earth', 'wood', 'planks', 'brick', 'ice', 'marble', 'obsidian', 'rootcrystal', 'sunstone', 'emberrock', 'rime', 'lantern', 'brazier'].map(n => 'icons/b_' + n)
   .concat(['vessel', 'vessel_empty', 'glimmer', 'r_djump', 'r_wall', 'r_plunge', 'r_surge', 'r_vessel'].map(n => 'icons/' + n));
+const TREES = ['meadow', 'glass', 'hollow', 'ember', 'frost'].map(n => 'trees/' + n);
 const FX = ['slash', 'spark', 'wave', 'souls', 'dust', 'thread'].map(n => 'fx/' + n);
 
 export const IMG = {};
 let base = 'assets/';
 export function setBase(b) { base = b; }
 export function loadImages() {
-  const all = [...TEX, ...PROPS, ...ICONS, ...FX];
+  const all = [...TEX, ...PROPS, ...ICONS, ...FX, ...TREES];
   return Promise.all(all.map(name => new Promise(res => {
     const im = new Image();
     im.onload = () => { IMG[name] = im; res(); };

@@ -200,12 +200,12 @@ export class Game {
     // 2. world space
     ctx.setTransform(scale, 0, 0, scale, W / 2 - c.rx * scale, H / 2 - c.ry * scale);
     if (c.rot) { ctx.translate(c.rx, c.ry); ctx.rotate(c.rot); ctx.translate(-c.rx, -c.ry); }
-    this.wr.drawTiles(ctx, v);
-    mark('tiles');
     const decorActors = [];
     if (this.player) decorActors.push(this.player.actor.c);
     for (const ac of this.actors) if (Math.abs(ac.c.x - c.x) < 1200) decorActors.push(ac.c);
-    this.wr.drawDecor(ctx, v, this.time, decorActors, 0.6 + this.wind * 0.4);
+    this.wr.drawTrees(ctx, v, this.time, decorActors, 0.6 + this.wind * 0.4);
+    this.wr.drawTiles(ctx, v);
+    mark('tiles');
     // systems behind actors (shrines, pickups, telegraphs)
     mark('decor');
     for (const s of this.systems) if (s.draw) s.draw(ctx, a, 'back');

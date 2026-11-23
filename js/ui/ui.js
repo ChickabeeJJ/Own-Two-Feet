@@ -104,7 +104,7 @@ export class UI {
     el.dataset.k = key;
     el.classList.remove('hidden');
     const keys = touch ? `<span class="tt-touch">${esc(st.touch)}</span>` : st.keys.map(k => `<kbd>${esc(k)}</kbd>`).join('<span class="tt-or">or</span>');
-    el.innerHTML = `<div class="tt-step">Tutorial ${i + 1} / ${n}</div><div class="tt-title">${done ? '\u2713 ' : ''}${esc(st.title)}</div><div class="tt-keys">${keys}</div><div class="tt-text">${esc(st.text)}</div><div class="tt-dots">${Array.from({ length: n }, (_, k) => `<i class="${k < i || (k === i && done) ? 'on' : k === i ? 'cur' : ''}"></i>`).join('')}</div><button class="tt-skip">Skip tutorial</button>`;
+    el.innerHTML = `<div class="tt-step">Tutorial ${i + 1} / ${n}</div><div class="tt-title">${esc(st.title)}</div><div class="tt-keys">${keys}</div><div class="tt-text">${esc(st.text)}</div><div class="tt-dots">${Array.from({ length: n }, (_, k) => `<i class="${k < i || (k === i && done) ? 'on' : k === i ? 'cur' : ''}"></i>`).join('')}</div><button class="tt-skip">Skip tutorial</button>`;
     el.classList.toggle('done', done);
     el.querySelector('.tt-skip').onclick = () => { this.game.story.skipTutorial(); Audio.play('blip'); };
   }
@@ -118,7 +118,10 @@ export class UI {
       o.classList.remove('hidden', 'pulse'); void o.offsetWidth; o.classList.add('pulse');
     }
     const d = o.querySelector('.ob-dist');
-    if (d.textContent !== dist) d.textContent = dist;
+    const dir = dist && dist.endsWith('>') ? 'r' : dist && dist.endsWith('<') ? 'l' : '';
+    const txt = dist ? dist.replace(/[<>]$/, '').trim() : '';
+    if (d.textContent !== txt) d.textContent = txt;
+    if (d.dataset.dir !== dir) { d.dataset.dir = dir; d.className = 'ob-dist' + (dir ? ' chev-after ' + dir : ''); }
   }
   card(title, sub, cls = '', dur = 3.2) {
     const c = $('#card');
@@ -131,8 +134,8 @@ export class UI {
     clearTimeout(this.cardTimer);
     this.cardTimer = setTimeout(() => { c.classList.remove('show'); }, dur * 1000);
   }
-  toast(msg) {
-    const t = el('div', 'toast', esc(msg));
+  toast(msg, kind) {
+    const t = el('div', 'toast' + (kind ? ' ' + kind : ''), esc(msg));
     $('#toasts').appendChild(t);
     while ($('#toasts').children.length > 3) $('#toasts').firstChild.remove();
     setTimeout(() => { t.classList.add('out'); setTimeout(() => t.remove(), 600); }, 2600);
@@ -186,7 +189,7 @@ export class UI {
     const d = this.dlg, box = $('#dialog .opts');
     if (box.childElementCount) return;
     d.opts.forEach((o, i) => {
-      const b = el('button', 'opt', esc(o.label) + (o.cost ? ` <small>${o.cost.glimmer}&#9670;${(o.cost.items || []).map(([t, n]) => ` + ${n} ${esc(TILES[t].name)}`).join('')}</small>` : ''));
+      const b = el('button', 'opt', esc(o.label) + (o.cost ? ` <small>${o.cost.glimmer} glimmer${(o.cost.items || []).map(([t, n]) => ` + ${n} ${esc(TILES[t].name)}`).join('')}</small>` : ''));
       b.addEventListener('click', () => this.pickOpt(i));
       box.appendChild(b);
     });
@@ -197,7 +200,7 @@ export class UI {
     const d = this.dlg; if (!d) return;
     const o = d.opts[i];
     Audio.play('confirm');
-    const keep = o.label !== 'Farewell' && o.label !== 'Trade' && !o.label.startsWith('Change');
+    const keep = !o.close && o.label !== 'Farewell' && o.label !== 'Trade' && !o.label.startsWith('Change');
     if (o.act) o.act();
     if (!keep || !this.dlg) { if (this.dlg === d) this.closeDialog(); return; }
     // refresh costs after a purchase
@@ -284,6 +287,12 @@ export class UI {
     const tog = el('button', 'big-btn', '<b>Play Together</b><span>Invite a friend or wander the open world</span>');
     tog.onclick = () => { this.menuTab = 'together'; this.renderMenu(); };
     c1.appendChild(tog);
+    // a way out of any hole: walk back from the last shrine (or home)
+    if (g.player && !g.player.dead && !(g.bosses && g.bosses.active) && g.story && g.story.stage >= 5) {
+      const back = el('button', 'big-btn', '<b>Return to the shrine</b><span>Trapped or lost? Thread pulls you back</span>');
+      back.onclick = () => { this.closeMenu(); g.story.toShrine(true); };
+      c1.appendChild(back);
+    }
     row.appendChild(c1);
     const c2 = el('div', 'col');
     c2.appendChild(el('div', 'h', 'The story so far'));
@@ -359,7 +368,7 @@ export class UI {
       else if (c.slot === 'blade') sw = c.v.glow;
       else if (c.slot === 'mat') sw = { cloth: '#d9d2c4', porcelain: 'linear-gradient(135deg,#fff,#cfc8bd)', metal: 'linear-gradient(135deg,#e9c48a,#7a5a33)', glow: 'radial-gradient(#9ff3ff,#1c3a40)', shadow: '#1d1a24' }[c.v];
       else sw = 'rgba(255,255,255,.12)';
-      it.innerHTML = `<div class="sw" style="background:${sw}"></div>${esc(c.name)}${owned ? '' : `<span class="how">${esc(c.how)}</span>`}${!owned && c.cost ? `<span class="cost">${c.cost}&#9670;</span>` : ''}`;
+      it.innerHTML = `<div class="sw" style="background:${sw}"></div>${esc(c.name)}${owned ? '' : `<span class="how">${esc(c.how)}</span>`}${!owned && c.cost ? `<span class="cost">${c.cost} glimmer</span>` : ''}`;
       it.onclick = () => {
         if (!owned) {
           if (c.cost && this.tailorMode) {
@@ -520,8 +529,8 @@ export class UI {
   }
   tab_controls(body) {
     const rows = [
-      ['A / D · ← →', 'Walk'], ['Space · W', 'Jump (again in the air with Second Wind)'], ['Shift · K', 'Dash'],
-      ['J · Left click', 'Strike (hold ↑ / ↓ to aim)'], ['Hold left click', 'Break the block under the cursor'],
+      ['A / D · Arrow keys', 'Walk'], ['Space · W', 'Jump (again in the air with Second Wind)'], ['Shift · K', 'Dash'],
+      ['J · Left click', 'Strike (hold W or S to aim up or down)'], ['Hold left click', 'Break the block under the cursor'],
       ['Right click', 'Place the chosen block (Shift: as a back wall)'], ['1-9 · Wheel', 'Choose a block'],
       ['B', 'Build mode for keyboard / pad (Strike mines, E places)'], ['E', 'Talk · Rest · Take'], ['H (hold)', 'Mend a vessel with breath'],
       ['Q', 'Craft'], ['T', 'Emote'], ['M', 'Mute'], ['Esc', 'Menu'],
@@ -586,7 +595,7 @@ export class UI {
       if (best && !(g.bosses && g.bosses.active)) {
         const B = BOSS_TYPES[biomeOf(best.gi.guard).id];
         const dist = Math.abs(best.gi.gx - ptx);
-        c.innerHTML = `${best.d < 0 ? '&larr; ' : ''}<b>${esc(B.name)}</b> · ${dist} m${best.d > 0 ? ' &rarr;' : ''}`;
+        c.innerHTML = `${best.d < 0 ? '<i class="chev l"></i>' : ''}<b>${esc(B.name)}</b> · ${dist} m${best.d > 0 ? '<i class="chev r"></i>' : ''}`;
       } else c.innerHTML = '';
     }
   }

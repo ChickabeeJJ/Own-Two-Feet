@@ -72,44 +72,66 @@ export class Animator {
 
     const mode = st.mode;
     if (mode === 'ground') {
-      // distance driven gait
-      const stride = lerp(10, 34, clamp(runK, 0, 1)) * s;
+      // distance-driven gait. One cycle = two steps. Each foot spends a duty fraction of the cycle planted
+      // (long when walking, short when running so there is a flight phase), then swings: toe-off, heel
+      // kick behind, knee drive forward, reach and plant. The pelvis dips at mid-stance and rises in flight.
+      const rk = clamp(runK, 0, 1);
+      const stride = lerp(14, 46, rk) * s;
       if (speed > 8) this.phase += (speed * dt) / (2 * stride);
-      else this.phase = lerp(this.phase, Math.round(this.phase * 2) / 2, 1 - Math.exp(-8 * dt));
+      else this.phase = lerp(this.phase, Math.round(this.phase * 2) / 2, 1 - Math.exp(-6 * dt));
       const ph = this.phase;
-      const moving = clamp((speed - 8) / 60, 0, 1);
-      const bob = Math.abs(Math.sin(ph * TAU)) * (2 + 4 * runK) * s * moving;
+      const moving = smooth(clamp((speed - 8) / 70, 0, 1));
+      const duty = lerp(0.62, 0.4, rk);
       const crouch = st.crouch ? 13 * s : 0;
-      rootY = st.gy - standH + this.squash + crouch + (moving ? 2.5 * s - bob : Math.sin(this.time * 2.1) * 0.6 * s) + 1.5 * s;
-      torso = -HALF_PI + (0.08 + 0.24 * runK) * moving + (st.accel || 0) * 0.08 + (st.crouch ? 0.25 : 0);
+      // weight shift and breathing when standing still
+      const breathe = Math.sin(this.time * 1.9) * 0.7 * s, shift = Math.sin(this.time * 0.55) * 1.6 * s;
+      // vertical bob: two dips per cycle (one per foot strike), deeper and springier when running
+      const dip = Math.max(0, Math.cos(((ph * 2) % 1) * TAU)) * lerp(1.6, 4.5, rk) * s * moving;
+      rootY = st.gy - standH + this.squash + crouch + dip + 1.5 * s + (1 - moving) * breathe - (rk > 0.6 ? lerp(0, 2.5, rk) * s * moving : 0);
+      rootX += shift * (1 - moving) * 0.4;
+      torso = -HALF_PI + lerp(0.06, 0.3, rk) * moving + (st.accel || 0) * 0.08 + (st.crouch ? 0.25 : 0) + Math.sin(ph * TAU * 2) * 0.03 * moving;
       const legs = [];
       for (let i = 0; i < 2; i++) {
         const p = ph + (i ? 0.5 : 0);
         const u = ((p % 1) + 1) % 1;
-        let ox, lift;
-        if (u < 0.5) { const t = u / 0.5; ox = stride * (0.5 - t); lift = 0; }
-        else { const t = (u - 0.5) / 0.5; ox = stride * (smooth(t) - 0.5); lift = Math.sin(t * Math.PI) * (5 + 9 * runK) * s; }
-        // stand pose when idle: feet slightly apart
-        const idleOx = (i ? -5 : 6) * s;
+        let ox, lift, toe;
+        if (u < duty) {
+          // planted: the foot slides back under the body at ground speed; heel rolls to toe at the end
+          const t = u / duty;
+          ox = stride * (0.5 - t);
+          lift = 0;
+          toe = t > 0.7 ? -(t - 0.7) / 0.3 * 0.55 * moving : 0;
+        } else {
+          const t = (u - duty) / (1 - duty);
+          // swing: forward travel eases in and out; early in the swing the heel kicks up behind
+          ox = stride * (smooth(t) - 0.5) - Math.sin(t * Math.PI) * (1 - t) * stride * 0.35 * rk;
+          lift = Math.pow(Math.sin(t * Math.PI), 0.8) * lerp(5, 17, rk) * s + Math.sin(t * Math.PI * 0.9) * (1 - t) * 8 * s * rk;
+          toe = lerp(-0.7, 0.25, smooth(t)) * moving;   // toes trail after push-off, then lift for the heel strike
+        }
+        const idleOx = (i ? -5.5 : 6.5) * s + shift * 0.3;
         ox = lerp(idleOx, ox, moving);
         lift *= moving;
         const fx = rootX + ox * f;
         let gy = ground(fx);
         if (gy === null) gy = st.gy - footR + 6 * s;
-        const toe = lift > 2 ? 0.45 : 0;
         legs.push([fx, gy - lift, toe]);
       }
       fF = legs[0]; fB = legs[1];
       // footstep events at contact
       const half = Math.floor(ph * 2);
       if (half !== this.lastPhaseHalf && moving > 0.5) { this.lastPhaseHalf = half; if (this.onStep) this.onStep(half & 1); }
-      // arms swing against the legs
-      const sw = Math.sin(ph * TAU) * lerp(0.15, 0.95, clamp(runK, 0, 1)) * moving;
-      const bend = lerp(0.3, 1.35, clamp(runK, 0, 1));
-      const idleSway = Math.sin(this.time * 1.3) * 0.05;
-      armF = [HALF_PI - 0.12 - sw + idleSway, HALF_PI - 0.12 - sw - bend * (0.4 + 0.6 * moving)];
-      armB = [HALF_PI + 0.12 + sw + idleSway, HALF_PI + 0.12 + sw - bend * (0.4 + 0.6 * moving)];
-      spine = [Math.sin(this.time * 2.1) * 0.02 - 0.04 * moving, 0.05 * runK];
+      // arms pump against the legs: the shoulder swings, the elbow bends more on the forward swing
+      const swing = Math.sin(ph * TAU);
+      const amp = lerp(0.35, 1.05, rk) * moving;
+      const bend = lerp(0.35, 1.5, rk) * moving;
+      const idleSway = Math.sin(this.time * 1.3) * 0.05 * (1 - moving);
+      const relax = 0.16 * (1 - moving);   // arms hang a little away from the body at rest
+      // the blade hand swings less and keeps the blade low and trailing
+      const ampF = amp * (st.blade ? 0.55 : 1);
+      armF = [HALF_PI - relax + idleSway - swing * ampF + (st.blade ? 0.25 * rk : 0), HALF_PI - relax + idleSway - swing * ampF - bend * (st.blade ? 0.45 : 0.55 + 0.45 * Math.max(0, swing)) - 0.12];
+      armB = [HALF_PI + relax * 0.6 + idleSway + swing * amp, HALF_PI + relax * 0.6 + idleSway + swing * amp - bend * (0.55 + 0.45 * Math.max(0, -swing)) - 0.12];
+      spine = [Math.sin(this.time * 2.1) * 0.02 * (1 - moving) - 0.05 * moving - swing * 0.05 * rk, 0.06 * rk + swing * 0.04 * rk];
+      rate = lerp(20, 34, rk);
       if (st.crouch) { armF = [0.6, -0.3]; armB = [1.2, 0.4]; }
       if (st.windup) {
         // wind-up telegraph: rear back, arms raised
@@ -122,17 +144,18 @@ export class Animator {
     } else if (mode === 'air') {
       const vy = st.vy;
       rootY = null;
-      const rising = vy < 0;
       const k = clamp(vy / 900, -1, 1);
-      // tuck going up, reach down falling
-      const fall = clamp((vy - 100) / 900, 0, 1);
-      fF = [rootX + (8 - 3 * fall) * s * f, st.py + lerp(22, 33, fall) * s, 0.5];
-      fB = [rootX + (-7 + 2 * fall) * s * f, st.py + lerp(27, 31, fall) * s, 0.6];
-      torso = -HALF_PI + 0.05 + (st.vx * f) * 0.0003;
+      // one continuous arc: knees tuck on the way up, arms rise for balance at the apex, legs reach for the
+      // ground on the way down; a long fall turns into a flail
+      const up = clamp(-vy / 700, 0, 1), fall = clamp((vy - 80) / 800, 0, 1);
+      const apex = 1 - Math.max(up, fall);
+      fF = [rootX + lerp(lerp(9, 11, up), 5, fall) * s * f, st.py + lerp(lerp(24, 18, up), 33, fall) * s, lerp(0.5, -0.1, fall)];
+      fB = [rootX + lerp(lerp(-6, -10, up), -4, fall) * s * f, st.py + lerp(lerp(28, 30, up), 31, fall) * s, lerp(0.9, 0.2, fall)];
+      torso = -HALF_PI + 0.06 + up * 0.08 - fall * 0.06 + (st.vx * f) * 0.0003;
       const flail = clamp((vy - 1000) / 600, 0, 1);
       const fl = Math.sin(this.time * 19) * 0.9 * flail, fl2 = Math.cos(this.time * 17) * 0.9 * flail;
-      armF = rising ? [-0.4, -1.0] : [lerp(-0.2, -1.4, fall) + fl, lerp(-0.6, -1.6, fall) + fl];
-      armB = rising ? [2.3, 2.0] : [lerp(2.0, 2.6, fall) + fl2, lerp(1.6, 2.4, fall) + fl2];
+      armF = [lerp(lerp(0.6, -0.35, up), -0.5, fall) - apex * 0.35 + fl, lerp(lerp(0.1, -0.9, up), -1.0, fall) - apex * 0.3 + fl];
+      armB = [lerp(lerp(2.6, 2.9, up), 3.6, fall) + apex * 0.3 + fl2, lerp(lerp(2.1, 2.3, up), 3.4, fall) + fl2];
       spine = [0.08 * k, 0.04];
       rate = 18;
       if (this.spin > 0) {

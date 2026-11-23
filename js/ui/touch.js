@@ -80,7 +80,8 @@ export class Touch {
       const w = this.game.screenToWorld(e.clientX, e.clientY);
       const tx = Math.floor(w.x / TILE), ty = Math.floor(w.y / TILE);
       const t = this.game.world.get(tx, ty);
-      this.game.touchBuild = { tx, ty, mine: t !== 0, place: t === 0, pid: e.pointerId };
+      // touch a block to dig it (hold), touch open space to place; drag to keep digging or lay a line
+      this.game.touchBuild = { tx, ty, mode: t !== 0 ? 'mine' : 'place', tap: t === 0, pid: e.pointerId };
     });
     cv.addEventListener('pointermove', e => {
       const tb = this.game.touchBuild;
@@ -88,7 +89,7 @@ export class Touch {
       const w = this.game.screenToWorld(e.clientX, e.clientY);
       tb.tx = Math.floor(w.x / TILE); tb.ty = Math.floor(w.y / TILE);
     });
-    const tend = e => { const tb = this.game.touchBuild; if (tb && tb.pid === e.pointerId) { tb.mine = false; tb.pid = null; } };
+    const tend = e => { const tb = this.game.touchBuild; if (tb && tb.pid === e.pointerId) tb.pid = null; };
     cv.addEventListener('pointerup', tend); cv.addEventListener('pointercancel', tend);
   }
   // called every frame by the UI: show the contextual action when something can be used
@@ -104,8 +105,8 @@ export class Touch {
   toggleBuild() {
     this.build = !this.build;
     document.querySelector('.tb[data-a="tbuild"]').classList.toggle('active', this.build);
-    this.game.touchBuild = this.build ? { mine: false, place: false } : null;
-    this.game.ui && this.game.ui.toast(this.build ? 'Build: tap a block to break it, tap empty space to place' : 'Build off');
+    this.game.touchBuild = this.build ? { mode: null, tap: false, pid: null } : null;
+    this.game.ui && this.game.ui.toast(this.build ? 'Build: hold a block to dig it, touch open space to place. Drag to build a line.' : 'Build off');
   }
 }
 export { TILES };

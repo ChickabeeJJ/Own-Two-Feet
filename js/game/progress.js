@@ -45,13 +45,13 @@ export const COSMETICS = [
   { id: 'k_royal', slot: 'cape', name: 'Royal Mantle', v: { col: '#5b3f8f', style: 'cape', len: 9 }, src: 'boss2', how: 'Defeat the third warden' },
   { id: 'k_ember', slot: 'cape', name: 'Pyre Cloak', v: { col: '#c2502a', style: 'cape', len: 9 }, src: 'ember', how: 'Reach the Ember Reach' },
   { id: 'k_white', slot: 'cape', name: 'Pale Shroud', v: { col: '#e8e2d6', style: 'cape', len: 10 }, cost: 500, how: 'Tailor' },
-  // eyes
+  // glow: the colour of the thread in your chest and your dash trail
   { id: 'e_cyan', slot: 'eyes', name: 'Soul Cyan', v: ['#9ff3ff', 'dots'], how: 'Born with it' },
   { id: 'e_amber', slot: 'eyes', name: 'Amber', v: ['#ffc56b', 'dots'], how: 'Born with it' },
-  { id: 'e_rose', slot: 'eyes', name: 'Rose Slit', v: ['#ff8fb1', 'slit'], cost: 70, how: 'Tailor' },
-  { id: 'e_visor', slot: 'eyes', name: 'Visor', v: ['#b9ffcf', 'visor'], cost: 150, how: 'Tailor' },
+  { id: 'e_rose', slot: 'eyes', name: 'Rose', v: ['#ff8fb1', 'slit'], cost: 70, how: 'Tailor' },
+  { id: 'e_visor', slot: 'eyes', name: 'Mint', v: ['#b9ffcf', 'visor'], cost: 150, how: 'Tailor' },
   { id: 'e_void', slot: 'eyes', name: 'Void', v: ['#c4b5ff', 'slit'], src: 'hollow', how: 'Reach the Hollow Below' },
-  { id: 'e_none', slot: 'eyes', name: 'Blank', v: ['#ffffff', 'none'], how: 'Born with it' },
+  { id: 'e_none', slot: 'eyes', name: 'Pale', v: ['#ffffff', 'none'], how: 'Born with it' },
   // blades
   { id: 'b_steel', slot: 'blade', name: 'Pale Steel', v: { col: '#e8eef5', glow: '#9ff3ff', len: 30 }, how: 'Born with it' },
   { id: 'b_bone', slot: 'blade', name: 'Bone Edge', v: { col: '#efe6d2', glow: '#ffd9a0', len: 28 }, cost: 100, how: 'Tailor' },
@@ -60,7 +60,7 @@ export const COSMETICS = [
   { id: 'b_void', slot: 'blade', name: 'Night Edge', v: { col: '#3a3150', glow: '#c4b5ff', len: 34 }, cost: 700, how: 'Tailor' },
 ];
 export const SLOTS = ['color', 'mat', 'head', 'cape', 'eyes', 'blade'];
-export const SLOT_NAMES = { color: 'Body', mat: 'Material', head: 'Head', cape: 'Cape', eyes: 'Eyes', blade: 'Blade' };
+export const SLOT_NAMES = { color: 'Body', mat: 'Material', head: 'Head', cape: 'Cape', eyes: 'Glow', blade: 'Blade' };
 export const cosmetic = id => COSMETICS.find(c => c.id === id);
 
 export const RELICS = [
@@ -121,7 +121,7 @@ export function lookFromSave(sv) {
     eyes: eyes[0], eyeStyle: eyes[1], head: (cosmetic(sv.look.head) || cosmetic('h_none')).v,
     cape: cape ? Object.assign({}, cape) : null, blade: Object.assign({}, blade),
     marks: (sv.marks || []).map(c => ({ col: c })), rim: '#ffe2bd', accent: '#f2c86a', trailCol: eyes[0] === '#ffffff' ? '#9ff3ff' : eyes[0],
-    thread: true, threadCol: '#9ff3ff', bootCol: mat === 'shadow' ? '#1a171f' : '#6b4a32',
+    thread: true, threadCol: eyes[0] === '#ffffff' ? '#e8f4ff' : eyes[0], bootCol: mat === 'shadow' ? '#1a171f' : '#6b4a32',
     coat: mat === 'shadow' ? '#2b2633' : mat === 'metal' ? '#d8c9a8' : '#ece6dc', hoodCol: '#5f7a4a',
   };
 }

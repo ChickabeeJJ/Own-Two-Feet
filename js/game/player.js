@@ -8,7 +8,7 @@ import { lookFromSave, Save } from './progress.js';
 import { Cape } from '../physics/skin.js';
 import { clamp, lerp, segPointDist2, rgba, TAU, rand, sign } from '../core/util.js';
 
-const REACH = 5.2 * TILE;
+const REACH = 6 * TILE;
 
 export class Player {
   constructor(game, sv, x, y) {
@@ -148,12 +148,15 @@ export class Player {
     const g = this.game, a = this.actor, W = g.world;
     const cx = a.c.x, cy = a.c.y - 46;
     let target = null;
+    // an enemy close by: clicks strike instead of digging
+    this.foeNear = false;
+    for (const e of g.targets()) if (e.mode !== 'dead' && e.kind !== 'dummy' && e.kind !== 'nest' && !e.removed && Math.abs(e.c.x - cx) < 110 && Math.abs(e.c.y - a.c.y) < 90) { this.foeNear = true; break; }
     if (this.mouseAim && !this.buildMode) {
       const tx = Math.floor(wp.x / TILE), ty = Math.floor(wp.y / TILE);
       const d = Math.hypot(tx * TILE + 16 - cx, ty * TILE + 16 - cy);
-      if (d < REACH) target = { tx, ty };
+      target = { tx, ty, far: d > REACH, px: wp.x, py: wp.y };
     } else if (this.buildMode || g.touchBuild) {
-      if (g.touchBuild && g.touchBuild.tx !== undefined) target = g.touchBuild;
+      if (g.touchBuild && g.touchBuild.tx !== undefined) { const tb = g.touchBuild; target = { tx: tb.tx, ty: tb.ty, far: Math.hypot(tb.tx * TILE + 16 - cx, tb.ty * TILE + 16 - cy) > REACH }; }
       else {
         const f = a.facing;
         let tx = Math.floor((cx + f * 30) / TILE), ty = Math.floor((a.c.y - 20) / TILE);
@@ -170,17 +173,31 @@ export class Player {
       const hit = W.raycast(cx, cy, target.tx * TILE + 16, target.ty * TILE + 16);
       const sol = (x, y) => TILES[W.get(x, y)].solid;
       const exposed = !sol(target.tx + 1, target.ty) || !sol(target.tx - 1, target.ty) || !sol(target.tx, target.ty + 1) || !sol(target.tx, target.ty - 1);
-      const blocked = (hit && Math.max(Math.abs(hit.tx - target.tx), Math.abs(hit.ty - target.ty)) > 1) || (TILES[t].solid && !exposed);
+      let blocked = (hit && Math.max(Math.abs(hit.tx - target.tx), Math.abs(hit.ty - target.ty)) > 1) || (TILES[t].solid && !exposed);
       target.solid = TILES[t].solid || (t !== T.AIR);
       target.tile = t;
       target.blocked = blocked;
+      if (target.far) blocked = true;
+      target.blocked = blocked;
       target.canMine = t !== T.AIR && TILES[t].hard < 100 && !blocked;
       const sel = this.sv.hotbar[this.sv.sel];
-      target.canPlace = !blocked && t === T.AIR && sel !== undefined && (this.sv.inv[sel] || 0) > 0 && this.placeOk(target.tx, target.ty, sel);
+      const have = sel !== undefined && (this.sv.inv[sel] || 0) > 0;
+      // placing onto a solid block puts the new block on the face nearest the pointer
+      target.ptx = target.tx; target.pty = target.ty;
+      if (t !== T.AIR && have && target.px !== undefined) {
+        const lx = target.px / TILE - target.tx - 0.5, ly = target.py / TILE - target.ty - 0.5;
+        const [dx, dy] = Math.abs(lx) > Math.abs(ly) ? [Math.sign(lx), 0] : [0, Math.sign(ly) || -1];
+        if (W.get(target.tx + dx, target.ty + dy) === T.AIR) { target.ptx = target.tx + dx; target.pty = target.ty + dy; }
+      }
+      const pt = W.get(target.ptx, target.pty);
+      const pdist = Math.hypot(target.ptx * TILE + 16 - cx, target.pty * TILE + 16 - cy);
+      const ok = have && pt === T.AIR && pdist <= REACH && this.placeOk(target.ptx, target.pty, sel);
+      target.canPlace = ok && !(target.ptx === target.tx && target.pty === target.ty && blocked);
+      target.why = !have ? (this.sv.hotbar.length ? 'none left' : 'mine a block first') : pdist > REACH || target.far ? 'too far' : pt !== T.AIR ? '' : !ok ? (TILES[sel].solid && this.bodyIn(target.ptx, target.pty) ? 'someone is standing there' : 'needs a block beside it') : '';
     }
     this.cursor = target;
     // mine: hold left mouse (or Strike in build mode)
-    const mineHeld = (this.mouseAim && Input.mouse.l && !this.buildMode) || ((this.buildMode || g.touchBuild) && (Input.down.attack || (g.touchBuild && g.touchBuild.mine)));
+    const mineHeld = (this.mouseAim && Input.mouse.l && !this.buildMode && !this.foeNear) || ((this.buildMode || g.touchBuild) && (Input.down.attack || (g.touchBuild && g.touchBuild.mode === 'mine' && g.touchBuild.pid !== null)));
     if (target && target.canMine && mineHeld && this.sv.hasBlade !== false) {
       if (!this.mine || this.mine.tx !== target.tx || this.mine.ty !== target.ty) this.mine = { tx: target.tx, ty: target.ty, t: 0, tile: target.tile };
       const hard = TILES[this.mine.tile].hard * (this.sv.hasBlade ? 1 : 2.2) / (1 + this.sv.lvl.blade * 0.25);
@@ -191,13 +208,27 @@ export class Player {
       if (this.mine.t >= 1) this.breakTile(target.tx, target.ty);
       this.consumeAttack = true;
     } else this.mine = null;
-    // place: right mouse, or E/place in build mode
-    const placeP = (this.mouseAim && Input.mouse.rp && !this.buildMode) || ((this.buildMode) && Input.pressed('interact')) || (g.touchBuild && g.touchBuild.place);
-    if (g.touchBuild) g.touchBuild.place = false;
-    if (placeP && target) {
-      if (target.canPlace) this.placeTile(target.tx, target.ty, this.sv.hotbar[this.sv.sel], Input.keys.has('ShiftLeft') && this.mouseAim ? 1 : 0);
-      else if (!this.sv.hotbar.length) g.ui && g.ui.toast('Mine something first: hold Click on a block');
+    // place: right mouse (hold and drag to lay a line), E in build mode, or a touch drag in build mode
+    const tb = g.touchBuild;
+    const placeHeld = (this.mouseAim && Input.mouse.r && !this.buildMode) || (tb && tb.mode === 'place' && tb.pid !== null);
+    const placeP = (this.mouseAim && Input.mouse.rp && !this.buildMode) || (this.buildMode && Input.pressed('interact')) || (tb && tb.tap);
+    if (tb) tb.tap = false;
+    this.placeCD = Math.max(0, (this.placeCD || 0) - dt);
+    if (target && (placeP || (placeHeld && this.placeCD <= 0))) {
+      const key = target.ptx + ',' + target.pty;
+      if (target.canPlace && (placeP || key !== this.lastPlaced)) {
+        this.placeTile(target.ptx, target.pty, this.sv.hotbar[this.sv.sel], Input.keys.has('ShiftLeft') && this.mouseAim ? 1 : 0);
+        this.lastPlaced = key; this.placeCD = 0.07;
+      } else if (placeP && target.why) { g.ui && g.ui.toast(target.why === 'mine a block first' ? 'Mine a block first: hold Click on one' : 'Can\'t place: ' + target.why); Audio.play('blip', { pitch: 0.6, vol: 0.5 }); }
     }
+    if (!placeHeld) this.lastPlaced = null;
+  }
+  bodyIn(tx, ty) {
+    const x0 = tx * TILE, y0 = ty * TILE;
+    const hit = (c) => c.x + c.w / 2 > x0 && c.x - c.w / 2 < x0 + TILE && c.y > y0 && c.y - c.h < y0 + TILE;
+    if (hit(this.actor.c)) return true;
+    for (const e of this.game.actors) if (e.mode !== 'dead' && hit(e.c)) return true;
+    return false;
   }
   placeOk(tx, ty, tile) {
     const g = this.game, W = g.world;
@@ -225,7 +256,19 @@ export class Player {
       g.fx.souls(tx * TILE + 16, ty * TILE + 16, 1, this.actor.c, TILES[drop].k && TILES[drop].k[0] === '#' ? TILES[drop].k : '#d8cfc0');
       if (g.ui) g.ui.pickup(drop, 1);
     }
-    if (t === T.LEAVES && Math.random() < 0.12) this.give(T.LOG, 1);
+    // a cut trunk fells the whole tree: every trunk block (and a mushroom cap) comes down with it
+    const tr = t === T.LOG && W.treeAt(tx);
+    if (tr && ty < tr.base && ty >= tr.base - 5) {
+      let n = 0;
+      for (let y = tr.base - 1; y >= tr.base - tr.h; y--) {
+        const u = W.get(tx, y);
+        if (u === T.LOG || u === T.CAP) { W.set(tx, y, T.AIR); if (g.net) g.net.sendEdit(tx, y, T.AIR, 0); n++; }
+      }
+      this.give(T.LOG, 2 + n);
+      if (g.ui) g.ui.pickup(T.LOG, 2 + n);
+      for (let k = 0; k < 4; k++) g.fx.debris(tx * TILE + 16 + rand(-40, 40), (tr.base - tr.h) * TILE + rand(0, 80), T.LEAVES, 6);
+      Audio.play('break', { pitch: 0.6 }); g.shake(0.18);
+    }
     g.fx.debris(tx * TILE + 16, ty * TILE + 16, t, 7);
     g.fx.dust(tx * TILE + 16, ty * TILE + 16, 4, '#cfc6b8', -Math.PI / 2, 60);
     Audio.play('break', { pitch: t === T.CRYSTAL || t === T.GLASS || t === T.ICE ? 1.8 : rand(0.85, 1.1) });
@@ -248,7 +291,7 @@ export class Player {
   // ------------------------------------------------------------ combat
   updateCombat(dt, wp) {
     const g = this.game, a = this.actor;
-    const wantAttack = Input.pressed('attack') || (this.mouseAim && Input.mouse.lp && !(this.cursor && this.cursor.canMine && !this.buildMode));
+    const wantAttack = Input.pressed('attack') || (this.mouseAim && Input.mouse.lp && !(this.cursor && this.cursor.canMine && !this.buildMode && !this.foeNear));
     if (this.consumeAttack) { this.consumeAttack = false; if (!Input.pressed('attack')) return this.activeHits(dt); }
     if (wantAttack && this.sv.hasBlade && !this.buildMode && a.mode === 'ctrl' && a.attackCD <= 0) {
       let kind;
@@ -359,10 +402,13 @@ export class Player {
   }
   updateInteract() {
     const g = this.game, a = this.actor;
-    let best = null, bd = 90;
+    let best = null, bd = -1;
     for (const s of g.systems) if (s.interactables) for (const it of s.interactables()) {
+      // anything in range qualifies; a higher priority wins (resting at a shrine you haven't rested at),
+      // otherwise the later one does (a keeper beside the fire is talked to)
       const d = Math.hypot(it.x - a.c.x, it.y - (a.c.y - 30));
-      if (d < (it.r || bd) && d < bd + (it.r || 0)) { bd = d; best = it; }
+      const pr = it.pri || 0;
+      if (d < (it.r || 90) && (!best || pr >= bd)) { bd = pr; best = it; }
     }
     this.interact = best;
     if (best && Input.pressed('interact') && !this.buildMode) { Input.consume('interact'); best.act(); }
@@ -409,30 +455,44 @@ export class Player {
     const a = this.actor;
     a.draw(ctx, al, { alpha: a.inv > 0 && !this.dead && (this.game.tick >> 3) % 2 ? 0.55 : 1 });
   }
+  // build cursor: a ghost of the chosen block where it will go, cracks on a block being mined, a soft red
+  // frame (and a reason on click) when an action isn't possible, and the reach ring while building
   drawCursor(ctx) {
-    const c = this.cursor;
-    if (!c || this.dead || this.game.cinematic) return;
-    if (!(this.mouseAim || this.buildMode || this.game.touchBuild)) return;
-    const x = c.tx * TILE, y = c.ty * TILE;
-    const show = c.canMine || c.canPlace;
-    if (!show) return;
+    const c = this.cursor, g = this.game;
+    if (!c || this.dead || g.cinematic) return;
+    if (!(this.mouseAim || this.buildMode || g.touchBuild)) return;
+    const a = this.actor, ccx = a.c.x, ccy = a.c.y - 46;
+    // far away the cursor stays quiet; just past reach it shows (dimmed) so you learn the range
+    if (c.far && Math.hypot(c.tx * TILE + 16 - ccx, c.ty * TILE + 16 - ccy) > REACH + 2 * TILE) return;
     ctx.save();
-    ctx.lineWidth = 1.5;
-    ctx.strokeStyle = c.canMine ? rgba('#ffffff', 0.55) : rgba('#9ff3ff', 0.6);
-    ctx.setLineDash([5, 4]);
-    ctx.beginPath(); ctx.roundRect(x + 1, y + 1, TILE - 2, TILE - 2, 6); ctx.stroke();
-    ctx.setLineDash([]);
-    if (c.canPlace && !c.canMine) {
-      const sel = this.sv.hotbar[this.sv.sel];
-      ctx.globalAlpha = 0.28;
-      ctx.fillStyle = TILES[sel] && TILES[sel].k && TILES[sel].k[0] === '#' ? TILES[sel].k : '#8a7f78';
-      ctx.beginPath(); ctx.roundRect(x + 3, y + 3, TILE - 6, TILE - 6, 5); ctx.fill();
+    if (this.buildMode || g.touchBuild) {
+      ctx.strokeStyle = rgba('#ffffff', 0.12); ctx.lineWidth = 1.5; ctx.setLineDash([3, 7]);
+      ctx.beginPath(); ctx.arc(ccx, ccy, REACH, 0, TAU); ctx.stroke(); ctx.setLineDash([]);
+    }
+    const x = c.tx * TILE, y = c.ty * TILE;
+    const sel = this.sv.hotbar[this.sv.sel];
+    const mining = c.tile !== T.AIR && c.tile !== undefined;
+    if (c.canMine || mining) {
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = c.canMine ? rgba('#ffffff', this.foeNear && this.mouseAim ? 0.25 : 0.7) : rgba('#ff8f7a', 0.55);
+      ctx.beginPath(); ctx.roundRect(x + 1, y + 1, TILE - 2, TILE - 2, 5); ctx.stroke();
+    }
+    // ghost block
+    if (sel !== undefined && (c.ptx !== c.tx || c.pty !== c.ty || !mining) && (this.sv.inv[sel] || 0) > 0) {
+      const px = c.ptx * TILE, py = c.pty * TILE;
+      ctx.globalAlpha = c.canPlace ? 0.55 + Math.sin(g.time * 6) * 0.08 : 0.22;
+      try { g.wr.drawTile(ctx, c.ptx, c.pty, sel, px, py); } catch (e) {}
+      ctx.globalAlpha = 1;
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = c.canPlace ? rgba('#bff6ff', 0.75) : rgba('#ff8f7a', 0.6);
+      ctx.setLineDash(c.canPlace ? [] : [4, 4]);
+      ctx.beginPath(); ctx.roundRect(px + 1, py + 1, TILE - 2, TILE - 2, 5); ctx.stroke();
+      ctx.setLineDash([]);
     }
     if (this.mine && this.mine.tx === c.tx && this.mine.ty === c.ty) {
-      // crack overlay grows with progress
       const p = clamp(this.mine.t, 0, 1);
-      ctx.globalAlpha = 0.85;
-      ctx.strokeStyle = 'rgba(20,16,22,0.75)'; ctx.lineWidth = 2;
+      ctx.fillStyle = rgba('#000000', 0.25 * p); ctx.fillRect(x, y, TILE, TILE);
+      ctx.strokeStyle = 'rgba(20,16,22,0.8)'; ctx.lineWidth = 2;
       ctx.beginPath();
       const cx = x + 16, cy = y + 16;
       const n = 3 + Math.floor(p * 5);
@@ -442,6 +502,9 @@ export class Player {
         ctx.lineTo(cx + Math.cos(ang + 0.3) * len, cy + Math.sin(ang + 0.3) * len);
       }
       ctx.stroke();
+      // progress arc
+      ctx.strokeStyle = rgba('#ffffff', 0.8); ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.arc(cx, cy, 20, -Math.PI / 2, -Math.PI / 2 + p * TAU); ctx.stroke();
     }
     ctx.restore();
   }

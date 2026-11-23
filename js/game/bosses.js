@@ -606,15 +606,13 @@ export class Golem extends BossBase {
       ctx.globalCompositeOperation = 'lighter';
       drawGlow(ctx, c.x, c.y, 120 * pulse, hexRgb(this.spec.col), 0.55);
       ctx.globalCompositeOperation = 'source-over';
-      // the skull at the heart of the flower
+      // the porcelain heart of the flower
       const gr = ctx.createRadialGradient(c.x - 8, c.y - 10, 2, c.x, c.y, 30);
       gr.addColorStop(0, this.core.flash > 0 ? '#ffffff' : '#fbf8f2'); gr.addColorStop(0.7, '#e6ded2'); gr.addColorStop(1, '#b9ad9e');
       ctx.fillStyle = '#2a2240'; ctx.beginPath(); ctx.arc(c.x, c.y, 34 * pulse, 0, TAU); ctx.fill();
       ctx.fillStyle = gr; ctx.beginPath(); ctx.ellipse(c.x, c.y - 2, 25, 27, 0, 0, TAU); ctx.fill();
-      ctx.fillStyle = this.state === 'stunned' ? this.spec.col : '#141118';
-      const px = clamp((g.player.x - c.x) * 0.02, -3, 3);
-      ctx.beginPath(); ctx.ellipse(c.x - 8 + px, c.y - 3, 5, 8, 0, 0, TAU); ctx.ellipse(c.x + 8 + px, c.y - 3, 5, 8, 0, 0, TAU); ctx.fill();
-      ctx.fillStyle = '#5a4e60'; ctx.beginPath(); ctx.moveTo(c.x - 2.5, c.y + 9); ctx.lineTo(c.x + 2.5, c.y + 9); ctx.lineTo(c.x, c.y + 13); ctx.fill();
+      // a blank porcelain heart; it glows from within when stunned (the opening to strike)
+      if (this.state === 'stunned') { ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = rgba(this.spec.col, 0.5); ctx.beginPath(); ctx.ellipse(c.x, c.y - 2, 18, 20, 0, 0, TAU); ctx.fill(); ctx.globalCompositeOperation = 'source-over'; }
     }
     ctx.restore();
   }

@@ -193,9 +193,7 @@ export function drawWispSprite(ctx, x, y, t, col, o = {}) {
   // mask
   ctx.fillStyle = '#f4f1ea';
   ctx.beginPath(); ctx.ellipse(x, y - 1, 6.5, 7.5, 0, 0, TAU); ctx.fill();
-  ctx.fillStyle = o.windup ? col : '#141118';
-  const px = o.look || 0;
-  ctx.beginPath(); ctx.ellipse(x - 2.6 + px, y - 2, 1.5, 2.5, -0.2, 0, TAU); ctx.ellipse(x + 2.6 + px, y - 2, 1.5, 2.5, 0.2, 0, TAU); ctx.fill();
+  if (o.windup) { ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = rgba(col, 0.6); ctx.beginPath(); ctx.ellipse(x, y - 1, 6.5, 7.5, 0, 0, TAU); ctx.fill(); }
   ctx.restore();
 }
 
@@ -232,7 +230,10 @@ export class Enemies {
   trySpawn() {
     const g = this.game, P0 = g.player, W = g.world;
     if (P0.dead || this.calm > 0) return;
+    // no ambushes while learning: nothing spawns until the tutorial is over
+    if (g.story && g.story.sv && !g.story.sv.tutDone) return;
     const ptx = Math.floor(P0.x / TILE);
+    if (Math.abs(ptx) < 45 && g.time < 200) return;
     const tier = g.world.tierAtX(P0.x);
     const cap = Math.min(7, 3 + tier);
     if (this.list.length >= cap) return;
@@ -414,14 +415,15 @@ export class Enemies {
   }
   draw(ctx, a, layer) {
     if (layer !== 'front') return;
-    // eye glints on husks/brutes, brighter while winding up
+    // attack tell: an ember glow swells in the chest while a husk or brute winds up (faces stay blank)
     for (const e of this.list) {
       if (e.kind === 'wisp' || e.mode === 'dead') continue;
-      const b = e.body;
-      const hx = b.ipx(P.HEAD, a), hy = b.ipy(P.HEAD, a);
       const k = e.telegraph || 0;
+      if (k < 0.05) continue;
+      const b = e.body;
+      const hx = b.ipx(P.CHEST, a), hy = b.ipy(P.CHEST, a);
       ctx.save(); ctx.globalCompositeOperation = 'lighter';
-      drawGlow(ctx, hx + e.facing * 3 * e.scale, hy - 1, (10 + k * 26) * e.scale, hexRgb(e.glowEye || '#ffb36b'), 0.5 + k * 0.5);
+      drawGlow(ctx, hx, hy, (8 + k * 30) * e.scale, hexRgb(e.glowEye || '#ffb36b'), k * 0.8);
       ctx.restore();
     }
   }

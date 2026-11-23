@@ -34,6 +34,7 @@ const problems = [];
 page.on('pageerror', e => problems.push('pageerror: ' + e.message + '\n' + (e.stack || '').split('\n').slice(0, 4).join('\n')));
 page.on('console', m => { if (m.type() === 'error' && !m.text().includes('ERR_FAILED')) problems.push('console.error: ' + m.text()); else if (m.type() === 'log' || (m.type() === 'warning' && !m.text().includes('GL Driver'))) console.log('[page]', m.text()); });
 await page.route(/crazygames-sdk/, r => r.abort());
+if (args.includes('--cg')) await page.addInitScript({ path: path.join(root, 'tools/cg-mock.js') });
 if (fresh) await page.addInitScript(() => { try { if (!sessionStorage.getItem('keep')) localStorage.clear(); } catch (e) {} });
 const q = opt('q', '');
 await page.goto(`http://localhost:${port}/${q ? '?' + q : ''}`);

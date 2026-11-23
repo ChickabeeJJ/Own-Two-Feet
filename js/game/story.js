@@ -35,19 +35,19 @@ const LORE = [
 // tutorial: one verb at a time, each confirmed before the next
 const TUT = [
   { id: 'move', title: 'Walk', keys: ['A', 'D'], touch: 'drag on the left side of the screen', text: 'Walk toward the light', done: s => Math.abs(s.game.player.x - s.tutX0) > 4 * TILE },
-  { id: 'jump', title: 'Jump', keys: ['Space'], touch: 'tap the ↑ button', text: 'Jump. Tap twice for a higher hop later', done: s => s.jumped },
+  { id: 'jump', title: 'Jump', keys: ['Space'], touch: 'tap Jump', text: 'Jump. Tap twice for a higher hop later', done: s => s.jumped },
   { id: 'blade', title: 'Take the blade', keys: [], touch: 'walk into it', text: 'Walk into the blade in the stone', done: s => s.sv.hasBlade },
-  { id: 'strike', title: 'Strike', keys: ['J', 'Click'], touch: 'tap the ⚔ button', text: 'Hit the training doll three times', done: s => s.dummyHits >= 3 },
-  { id: 'dash', title: 'Dash', keys: ['Shift'], touch: 'tap the » button', text: 'Dash. You can dash in the air too', done: s => s.dashed },
-  { id: 'mine', title: 'Break blocks', keys: ['Hold Click'], touch: 'tap ▦, then hold a block', text: 'Break three blocks of ground', done: s => s.sv.stats.blocks - s.tutB0 >= 3 },
+  { id: 'strike', title: 'Strike', keys: ['J', 'Click'], touch: 'tap Strike', text: 'Hit the training doll three times', done: s => s.dummyHits >= 3 },
+  { id: 'dash', title: 'Dash', keys: ['Shift'], touch: 'tap Dash', text: 'Dash. You can dash in the air too', done: s => s.dashed },
+  { id: 'mine', title: 'Break blocks', keys: ['Hold Click'], touch: 'tap Build, then hold a block', text: 'Break three blocks of ground', done: s => s.sv.stats.blocks - s.tutB0 >= 3 },
   { id: 'place', title: 'Build', keys: ['Right-click'], touch: 'in build mode, tap empty space', text: 'Put a block back into the world', done: s => s.sv.stats.placed - s.tutP0 >= 1 },
-  { id: 'craft', title: 'Craft', keys: ['Q'], touch: 'menu ☰, then Craft', text: 'Open your crafting book', done: s => !!s.tut.craftOpened },
+  { id: 'craft', title: 'Craft', keys: ['Q'], touch: 'open the menu, then Craft', text: 'Open your crafting book', done: s => !!s.tut.craftOpened },
 ];
 
 // the goal chain. each: id, text, hint(touch), target(game) -> {x,y} | null, done(game) -> bool
 const nextGate = (s) => { const p = s.game.player.x / TILE; let gi = gateNear(Math.floor(p)); for (let i = 0; i < 4 && s.game.bosses.defeated(gi.k); i++) gi = gateNear(gi.gx + 440 * (gi.gx >= 0 ? 1 : -1)); return gi; };
 const GOALS = [
-  { id: 'hollow', text: 'Defeat the Hollow', hint: k => k ? 'tap &#9876; to strike' : '<kbd>J</kbd> or <kbd>Click</kbd> strike', target: s => s.firstFoe && !s.firstFoe.removed ? { x: s.firstFoe.c.x, y: s.firstFoe.c.y - 50 } : null, done: s => s.firstFoeDown },
+  { id: 'hollow', text: 'Defeat the Hollow', hint: k => k ? 'tap Strike' : '<kbd>J</kbd> or <kbd>Click</kbd> strike', target: s => s.firstFoe && !s.firstFoe.removed ? { x: s.firstFoe.c.x, y: s.firstFoe.c.y - 50 } : null, done: s => s.firstFoeDown },
   { id: 'shrine', text: 'Follow Thread to the fire', hint: () => 'someone keeps a shrine ahead', target: s => ({ x: 105 * TILE + 16, y: s.game.world.surface(105) * TILE - 40 }), done: s => Object.keys(s.sv.met).length > 0 },
   { id: 'rest', text: 'Rest at the shrine', hint: k => k ? 'tap the action button by the fire' : '<kbd>E</kbd> by the fire', target: s => ({ x: 105 * TILE + 16, y: s.game.world.surface(105) * TILE - 40 }), done: s => !!s.sv.respawn },
   { id: 'lights', text: s => `Gather Threads of Light ${Math.min(s.sv.lights || 0, gateReq(nextGate(s).tier))}/${gateReq(nextGate(s).tier)}`, hint: () => 'wake lost dolls · find stitches · break nests · help keepers', target: s => s.game.content && s.game.content.nearestActivity(s.game.player.x), done: s => (s.sv.lights || 0) >= gateReq(nextGate(s).tier) },
@@ -112,7 +112,7 @@ export class Story {
     const t = this.t += dt;
     if (t > 0.05 && this.loreI < 0) { this.loreI = 0; ui.lore(LORE[0]); Audio.play('beat'); }
     if (t > 0.25 && !this.faded) { this.faded = true; ui.fade(0, 1.2); }
-    if (t > 1.2 && !this.prompted) { this.prompted = true; ui.press(g.touch ? 'drag to steer · catch the light' : '← → steer · catch the light'); }
+    if (t > 1.2 && !this.prompted) { this.prompted = true; ui.press(g.touch ? 'drag to steer · catch the light' : 'A and D steer · catch the light'); }
     const remain = this.groundY - a.c.y;
     if (this.loreI === 0 && t > 3.1) { this.loreI = 1; ui.lore(LORE[1]); }
     if (this.loreI === 1 && t > 6.2) { this.loreI = 2; ui.lore(LORE[2]); }
@@ -120,6 +120,9 @@ export class Story {
     // steer
     const ax = Input.axis.x;
     sp.vx = lerp(sp.vx, ax * 340, 1 - Math.exp(-6 * dt));
+    // the wind holds you over the meadow: steering fades out about 12 tiles from the landing spot
+    const off = a.c.x - (4 * TILE + 16), lim = 12 * TILE;
+    if (Math.abs(off) > lim && Math.sign(sp.vx) === Math.sign(off)) sp.vx *= Math.max(0, 1 - (Math.abs(off) - lim) / (3 * TILE));
     sp.vy = Math.min(1200, 240 + Math.max(0, t - 0.6) * 95);
     g.cam.override.x = a.c.x + sp.vx * 0.2; g.cam.override.y = a.c.y + 90;
     // motes
@@ -290,10 +293,11 @@ export class Story {
       Audio.play('roar', { vol: 0.35, pitch: 0.7 }); g.shake(0.2);
       this.say('That gate... a Warden is behind it. It holds a piece of her.', 3.6);
     }
-    if (p.lowHp && !this.lowSaid) { this.lowSaid = true; this.say(g.touch ? 'You’re hurt. Hold ❤ to mend.' : 'You’re hurt. Hold H to mend with breath.', 3.2); }
+    if (p.lowHp && !this.lowSaid) { this.lowSaid = true; this.say(g.touch ? 'You’re hurt. Hold Mend to heal.' : 'You’re hurt. Hold H to mend with breath.', 3.2); }
     if (!p.lowHp) this.lowSaid = false;
   }
   // ------------------------------------------------------------ tutorial
+  tutStep() { return !this.sv.tutDone && TUT[this.tutI] ? TUT[this.tutI].id : null; }
   updateTutorial(dt) {
     const g = this.game, ui = this.ui, a = g.player.actor;
     if (this.tutX0 === undefined) { this.tutX0 = g.player.x; this.tutB0 = this.sv.stats.blocks; this.tutP0 = this.sv.stats.placed; }
@@ -356,19 +360,36 @@ export class Story {
       this.enterGoal(GOALS[i]);
     }
     const G = GOALS[i];
+    // the first Hollow must stay findable: if it wandered off, fell somewhere unreachable or despawned,
+    // another one claws out of the ground near you
+    if (G.id === 'hollow' && !this.firstFoeDown && !g.cinematic) {
+      const f = this.firstFoe, p = g.player;
+      const lost = !f || f.removed || Math.abs(f.c.x - p.x) > 900 || Math.abs(f.c.y - p.y) > 500;
+      this.foeLostT = lost ? (this.foeLostT || 0) + dt : 0;
+      if (this.foeLostT > 2) { this.foeLostT = 0; if (f && !f.removed) f.removed = true; this.spawnFirstFoe(); }
+    }
     const T_ = G.target(this);
     this.thread.target = T_;
     if (ui && !g.cinematic) {
       let dist = '';
-      if (T_) { const d = Math.round(Math.abs(T_.x - g.player.x) / TILE); dist = d > 4 ? `${d} m ${T_.x > g.player.x ? '→' : '←'}` : ''; }
-      ui.objective(typeof G.text === 'function' ? G.text(this) : G.text, G.hint(!!g.touch), dist);
+      if (T_) { const d = Math.round(Math.abs(T_.x - g.player.x) / TILE); dist = d > 4 ? `${d} m ${T_.x > g.player.x ? '>' : '<'}` : ''; }
+      // when Thread's target is buried or out of reach above, say how to get there
+      let hint = G.hint(!!g.touch);
+      if (T_) {
+        const dx = Math.abs(T_.x - g.player.x), dy = T_.y - (g.player.y - 50);
+        if (dx < 8 * TILE && dy > 3 * TILE) hint = g.touch ? 'it is underground: tap Build, then dig down' : 'it is underground: <kbd>Hold Click</kbd> the ground to dig down';
+        else if (dx < 5 * TILE && dy < -3 * TILE) hint = g.touch ? 'it is up high: jump, or build steps' : 'it is up high: jump, or <kbd>Right-click</kbd> to build steps';
+      }
+      const under = g.player.y / TILE - g.world.surface(Math.floor(g.player.x / TILE));
+      if (under > 5 && (!T_ || T_.y < g.player.y - 3 * TILE)) hint = g.touch ? 'underground: dig a stair up, or jump and place a block under you' : 'underground: dig a stair up, or jump and <kbd>Right-click</kbd> below you';
+      ui.objective(typeof G.text === 'function' ? G.text(this) : G.text, hint, dist);
     }
   }
   completed(G) {
     const g = this.game;
     if (this.stage < 5) return;
     Audio.play('confirm');
-    this.ui && this.ui.toast('✓ ' + G.text);
+    this.ui && this.ui.toast(typeof G.text === 'function' ? G.text(this) : G.text, 'done');
   }
   enterGoal(G) {
     const g = this.game, sv = this.sv;
@@ -384,9 +405,9 @@ export class Story {
     const g = this.game, p = g.player;
     const x = p.x + 340 * (p.actor.facing || 1), tx = Math.floor(x / TILE);
     const y = g.world.surface(tx) * TILE;
-    const e = g.enemies.spawn('husk', x, y + 40, 0, '#ffb36b');
-    // it claws its way out of the ground
-    e.knockdown(0.6, 0, -900);
+    const e = g.enemies.spawn('husk', x, y, 0, '#ffb36b');
+    // it claws its way out of the ground (stands on the surface; the burst of earth sells the emergence)
+    e.knockdown(0.6, 0, -500);
     g.fx.dust(x, y - 4, 16, '#e8dccb', -Math.PI / 2, 220);
     g.fx.debris(x, y - 6, T.DIRT, 8);
     Audio.play('crack'); g.shake(0.25);
@@ -419,7 +440,7 @@ export class Story {
   draw(ctx, a, layer) {
     const g = this.game;
     if (layer === 'back') {
-      if (this.bladeY !== null && this.stage >= 5) { if (this.sv.hasBlade || !drawSprite(ctx, 'props/bladestone', BLADE_X * TILE + 16, this.bladeY + 6, 150)) drawBladeStone(ctx, BLADE_X * TILE + 16, this.bladeY + 2, 1, g.time, !this.sv.hasBlade); }
+      if (this.bladeY !== null && this.stage >= 5) { if (!this.sv.hasBlade && !drawSprite(ctx, 'props/bladestone', BLADE_X * TILE + 16, this.bladeY + 6, 150)) drawBladeStone(ctx, BLADE_X * TILE + 16, this.bladeY + 2, 1, g.time, true); }
       if (this.crater) {
         const c = this.crater, k = clamp(1 - c.t / 40, 0, 1);
         if (k > 0) {
@@ -505,7 +526,33 @@ export class Story {
   }
 
   // ------------------------------------------------------------ death
+  // after a fall: when ads are available (and nobody else shares the world) offer to rise on the spot for a
+  // short rewarded ad; otherwise, or by choice, wake at the last shrine. A midgame ad may play during the fade.
   respawn() {
+    const g = this.game, p = g.player, ui = this.ui;
+    const solo = !(g.net && g.net.remotes && g.net.remotes.size > 0);
+    if (Platform.adsReady && solo && !this.offeredRise) {
+      this.offeredRise = true;
+      const at = { x: p.actor.c.x, y: p.actor.c.y };
+      ui.dialog('Thread', ['You fell. I can stitch you back together right here, if you can spare a moment.'], [
+        { label: 'Rise here (short ad)', close: true, act: () => { Platform.rewarded().then(ok => { this.offeredRise = false; if (ok) this.riseHere(at); else this.toShrine(true); }); } },
+        { label: 'Wake at the shrine', close: true, act: () => { this.offeredRise = false; this.toShrine(); } },
+      ]);
+      return;
+    }
+    this.toShrine();
+  }
+  riseHere(at) {
+    const g = this.game, p = g.player, ui = this.ui;
+    const gy = g.world.groundBelow(at.x, at.y - 60, 400);
+    p.respawnAt(at.x, gy !== null ? gy : at.y);
+    p.actor.inv = 2.5;
+    ui.deathCard(false);
+    g.flash([1, 1, 1], 0.3);
+    this.say('There. Stitched. Go on.', 2.4);
+    g.saveNow();
+  }
+  toShrine(skipAd) {
     const g = this.game, p = g.player, ui = this.ui, sv = this.sv;
     ui.fade(1, 0.8);
     setTimeout(() => {
@@ -515,10 +562,15 @@ export class Story {
       p.respawnAt(r.x, r.y);
       g.cam.x = r.x; g.cam.y = r.y - 80; g.cam.vx = g.cam.vy = 0;
       this.thread.placed = false;
-      ui.fade(0, 1.4);
-      ui.deathCard(false);
-      this.say(['Get up. You always get up.', 'Again. Slower this time.', 'It’s alright. I’ve got you.'][Math.floor(Math.random() * 3)], 2.8);
-      g.saveNow();
+      const wake = () => {
+        ui.fade(0, 1.4);
+        ui.deathCard(false);
+        this.say(['Get up. You always get up.', 'Again. Slower this time.', 'It’s alright. I’ve got you.'][Math.floor(Math.random() * 3)], 2.8);
+        g.saveNow();
+      };
+      // a natural break: the screen is already dark, so a due midgame ad plays here
+      if (!skipAd && Platform.midgameDue() && !(g.net && g.net.remotes && g.net.remotes.size > 0)) Platform.midgame().then(wake);
+      else wake();
     }, 900);
   }
   // kept for older callers
