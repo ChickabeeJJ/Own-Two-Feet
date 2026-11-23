@@ -1,5 +1,5 @@
 /* ============================================================================
-   ART BIBLE — Own Two Feet
+   ART BIBLE — On Two Feet
    Style family: painterly gradient + soft-shaded vector ("lantern-lit storybook").
      No outlines. Form comes from cylindrical gradients, rim light, contact AO and
      material texture. Backgrounds recede through fog; gameplay owns the value extremes.

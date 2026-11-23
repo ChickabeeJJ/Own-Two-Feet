@@ -355,3 +355,8 @@ body.bag-open #hotbar, body.bag-open #objective, body.bag-open #tut, body.bag-op
 }
 
 body.carding #tut { opacity: 0; transition: opacity .3s; }
+
+.terms { max-width: 720px; margin-top: 14px; font-size: 13px; line-height: 1.6; color: var(--dim); overflow-y: auto; }
+.terms h3 { font-family: 'Cormorant Garamond', serif; font-weight: 500; font-size: 22px; color: var(--text); margin: 18px 0 6px; }
+.terms b { color: var(--text); }
+.terms p { margin: 0 0 10px; }

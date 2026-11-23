@@ -217,7 +217,7 @@ export class Story {
         this.say('You stood. Nobody stands anymore.', 3);
         // far away, a warden hears it
         setTimeoutGame(g, 1.4, () => { Audio.play('roar', { vol: 0.55, pitch: 0.65 }); g.shake(0.35); this.roared = g.time; });
-        setTimeoutGame(g, 1.8, () => { this.card('Own Two Feet', 'the last doll walks', '', 4.4); Audio.play('chime'); g.cam.override = null; g.cam.zoomT = 0.85; });
+        setTimeoutGame(g, 1.8, () => { this.card('On Two Feet', 'the last doll walks', '', 4.4); Audio.play('chime'); g.cam.override = null; g.cam.zoomT = 0.85; });
         setTimeoutGame(g, 4.6, () => { ui.letterbox(false); ui.hud(true); g.cinematic = false; g.cam.zoomT = 1; this.say('Let me show you how to walk this world.', 3.2); });
         setTimeoutGame(g, 5.4, () => { this.stage = 5; this.sv.born = true; this.sv.obj = 0; g.saveNow(); Platform.gameplayStart(); });
       }

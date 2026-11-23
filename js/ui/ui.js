@@ -516,8 +516,24 @@ export class UI {
       else { wipe.dataset.sure = 1; wipe.textContent = 'Erase everything? Tap again'; }
     };
     c2.appendChild(wipe);
+    const terms = el('button', 'mini-btn', 'Terms & Privacy');
+    terms.style.marginTop = '12px'; terms.style.marginLeft = '8px';
+    terms.onclick = () => this.showTerms();
+    c2.appendChild(terms);
     row.appendChild(c2);
     body.appendChild(row);
+  }
+  // in-game terms of use and privacy notice (plain text; no outside links). A template for the owner to
+  // review and adapt; it is not legal advice.
+  showTerms() {
+    const body = $('#menu .menu-body');
+    body.innerHTML = '';
+    const back = el('button', 'mini-btn', 'Back to settings');
+    back.onclick = () => this.renderMenu();
+    body.appendChild(back);
+    const t = el('div', 'terms');
+    t.innerHTML = TERMS_HTML;
+    body.appendChild(t);
   }
   tab_controls(body) {
     const rows = [
@@ -618,4 +634,22 @@ export class UI {
     if (g.net && g.net.active) g.net.sendEmote(list[this.emoteI]);
   }
 }
+const TERMS_HTML = `
+<h3>On Two Feet: Terms of Use</h3>
+<p>Last updated: November 2026. By playing On Two Feet ("the game") you agree to these terms. If you do not agree, please do not play.</p>
+<p><b>Using the game.</b> The game is provided for personal, non-commercial entertainment. Please do not cheat, exploit bugs to harm other players, disrupt multiplayer sessions, or try to access parts of the game or its services you are not meant to.</p>
+<p><b>Playing with others.</b> Multiplayer has no text chat; players meet through emotes and play together. Be kind. Do not use names or behaviour that harass, threaten or impersonate others. Hosts can end a session at any time.</p>
+<p><b>Your creations.</b> What you build in your world is yours to enjoy. When you host or join a shared world, other players can see and change what is built there.</p>
+<p><b>Availability.</b> The game is provided "as is" and may change, pause or end at any time. Saved progress can be lost (for example if browser data is cleared). We are not liable for lost progress or for damages arising from use of the game, to the extent the law allows.</p>
+<p><b>Platform.</b> When you play on CrazyGames, the CrazyGames terms and privacy policy also apply, including to accounts, ads and payments they provide.</p>
+<h3>Privacy</h3>
+<p><b>What the game stores.</b> Your save (world edits, progress, settings and your doll's look) is stored by the CrazyGames data service when available, otherwise in your browser's local storage on this device. It contains no personal information. You can erase it at any time with "Start a new life".</p>
+<p><b>Accounts.</b> If you are signed in to CrazyGames, the game may read your public username to show it above your doll. It does not receive your email or password.</p>
+<p><b>Multiplayer.</b> Playing together uses direct peer-to-peer connections (WebRTC) set up through a connection broker. To connect, your network address is shared with the players in your session and with the broker. The game sends your doll's movement, emotes, look and block edits to those players and nothing else.</p>
+<p><b>Ads.</b> Ads are served by CrazyGames. Rewarded ads only ever play when you choose them. Ad providers may collect data under the CrazyGames privacy policy and your consent choices there.</p>
+<p><b>Children.</b> The game does not knowingly collect personal information from anyone, including children.</p>
+<p><b>Contact.</b> Questions about these terms or your data can be sent through the game's page on CrazyGames.</p>
+<h3>Credits</h3>
+<p>Fonts: Cormorant Garamond and Manrope (SIL Open Font License). Networking: PeerJS (MIT). All other art, music and code were made for this game.</p>
+`;
 export { esc };

@@ -75,13 +75,20 @@ async function unstickCheck(st, now) {
     if (Math.abs(st.x - lastProg.x) > 40) { lastProg = { x: st.x, t: now }; unstick = 0; }
     else if (now - lastProg.t > 1500) {
       unstick++;
-      if (unstick < 4) { await tap('Space', 220); await sleep(120); await tap('Space', 220); }
+      if (unstick < 3) { await tap('Space', 260); await sleep(120); await tap('Space', 260); }
+      else if (unstick < 6) {
+        // pillar up like a person: jump, and place a block where your feet were
+        const feet = worldToScreen(st, st.x, st.y + 16);
+        await page.keyboard.down('Space'); await sleep(230);
+        await page.mouse.move(feet[0], feet[1]); await page.mouse.down({ button: 'right' }); await sleep(60); await page.mouse.up({ button: 'right' });
+        await page.keyboard.up('Space'); await sleep(400);
+      }
       else {
         const dir = held.has('KeyD') ? 1 : -1;
         const [sx, sy] = worldToScreen(st, (Math.floor(st.x / 32) + dir) * 32 + 16, (Math.floor(st.y / 32) - 1) * 32 + 16);
         await page.mouse.move(sx, sy); await page.mouse.down(); await sleep(1200); await page.mouse.up();
-        if (unstick === 6) { issue(`walls the player in at tile ${Math.round(st.x / 32)} (needed to dig)`); await page.screenshot({ path: `/tmp/otf-shots/play-stuck-${shots++}.png` }); }
-        if (unstick === 9) {
+        if (unstick === 7) { issue(`walls the player in at tile ${Math.round(st.x / 32)} (needed to dig)`); await page.screenshot({ path: `/tmp/otf-shots/play-stuck-${shots++}.png` }); }
+        if (unstick === 10) {
           // a person gives up and uses the menu's way out
           await releaseAll(); await page.keyboard.press('Escape'); await sleep(400);
           const ok = await page.evaluate(() => { const b = [...document.querySelectorAll('#menu .big-btn')].find(b => /Return to the shrine/.test(b.textContent)); if (b) { b.click(); return true; } return false; });
@@ -117,7 +124,7 @@ while ((Date.now() - t0) / 1000 < SECS) {
     } else await tap('KeyE');
     await sleep(250); continue;
   }
-  if (st.modal === 'menu') { await page.keyboard.press('Escape'); await sleep(200); continue; }
+  if (st.modal === 'menu' || (st.modal === 'bag' && st.tut !== 'craft')) { await tap('Escape', 120); await sleep(200); continue; }
   if (st.dead) { await setPhase('dead'); await releaseAll(); await sleep(400); continue; }
 
   if (!st.born || st.stage < 5) {
@@ -160,7 +167,14 @@ while ((Date.now() - t0) / 1000 < SECS) {
         await page.mouse.down({ button: 'right' }); await sleep(80); await page.mouse.up({ button: 'right' }); await sleep(300);
       } else { await hold('KeyD', true); await sleep(300); await hold('KeyD', false); }
     }
-    else if (tut === 'craft') { await tap('KeyQ'); await sleep(500); await page.keyboard.press('Escape'); }
+    else if (tut === 'craft') {
+      // open the satchel, pick planks, press craft, close
+      await tap('KeyQ', 120); await sleep(700);
+      await page.evaluate(() => { const r = [...document.querySelectorAll('#bag .rec')].find(r => /Planks/.test(r.textContent)); r && r.click(); });
+      await sleep(200);
+      const b = await page.$('#bag .craft'); if (b) { const bb = await b.boundingBox(); if (bb) { await page.mouse.click(bb.x + bb.width / 2, bb.y + bb.height / 2); } }
+      await sleep(1300); await tap('Escape', 120); await sleep(500);
+    }
     await sleep(120); continue;
   }
 

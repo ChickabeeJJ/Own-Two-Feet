@@ -27,7 +27,7 @@ export const LORE = [
   'Embers are the last warm thing she touched. They have not cooled since.',
   'In the Frost Spires the wind stopped to listen for her footsteps. It is still listening.',
   'Some say the world has no edge. Others say she never finished the hem.',
-  'A doll on its own two feet frightens the Wardens. It means the stitch held.',
+  'A doll back on two feet frightens the Wardens. It means the stitch held.',
   'Every gate holds a piece of her light. Put them back together and you might see her face.',
   'Thread is not a moth. Thread is the last thing she said.',
   'If you are reading this, you were made with care. Keep walking.',

@@ -1,4 +1,4 @@
-# Own Two Feet
+# On Two Feet
 
 An open-world, cinematic 2D sandbox. You are a ragdoll that falls out of the sky as a seed of light, learns to stand, and then makes an endless world its own: you dig and build, meet the people who keep its shrines, raise a home, and walk through gate after gate held by stronger and stronger wardens. Every warden you beat leaves a mark on your body, so no two players end up looking alike.
 
@@ -34,16 +34,31 @@ Returning players drop straight back where they were. Esc skips the opening.
 | J, left click | Strike. Hold up or down to aim (down in the air bounces off enemies) |
 | Hold left click on a block | Break it (only blocks you can see; with an enemy close, a click strikes instead). Cutting a trunk fells the whole tree for timber |
 | Right click | Place the chosen block: a ghost shows where it goes, red when it can't (with the reason on click). Click a block's face to build onto it, hold and drag to lay a line. Shift places a back wall |
-| 1-9, mouse wheel | Choose a block |
+| 1-9, mouse wheel | Choose what's in hand (blocks, parts, flares, draughts) |
+| R | Use what's in hand (throw a flare or charge toward the pointer, drink a draught); right click works too |
 | B | Build mode for keyboard and gamepad (Strike mines, E places) |
-| E | Talk, rest, take |
+| E | Talk, rest, take, open doors and chests, use a station |
 | Hold H | Spend breath to mend a vessel |
-| Q | Craft |
+| I, Tab | Open the satchel (inventory) |
+| Q | Open the satchel on the crafting book |
+| W / S on a ladder | Climb; hold S on a platform to drop through |
 | T | Emote (others see it in multiplayer) |
 | M | Mute |
 | Esc | Menu |
 
 Gamepad and touch are supported. Phones get a floating stick that appears wherever the left thumb lands, large thumb-sized buttons arranged in an arc (Strike biggest, then Jump, Dash, Mend, Build), sized from the screen so they stay comfortable on any phone, haptic ticks, and a contextual action button (Talk, Rest, Open, Wake, Read) that appears only when there is something to use. Build mode: hold a block to dig it, touch open space to place, drag to dig or lay a whole line.
+
+## The satchel: inventory and crafting
+
+Press I (or the Bag button on touch) and the game becomes a small cutscene: time slows, the camera leans in, the world dims and the doll sits down and opens its bag. Everything you carry is on the left, sorted into Blocks, Parts, Use and Gear, with three worn slots (lamp, pick, charm) and the hotbar underneath (drag items onto it, or tap an item then a slot). The crafting book is on the right.
+
+- **Where you craft.** Simple things by hand anywhere (planks, ladders, platforms, torches, steps, bricks, a Workbench). The rest needs a station within a few blocks: a **Workbench** (doors, storage chests, lanterns, flares, hearths, and the other stations), a **Forge** (glass, nightglass, blast charges, picks, the miner's lamp) or a **Loom** (draughts, charms). A shrine's fire counts as a workbench.
+- **Crafting** is a little ceremony: the ingredients fly into a ring, it turns and flashes, and the result drops into the satchel. Hold the button to make several.
+- **Building parts:** ladders (climb, step off at the top), one-way platforms (jump up through, hold down to drop), torches, two-high doors (open and close with E), half steps, storage chests (their contents stay where you built them).
+- **Consumables:** mending draughts, flares (thrown, a strong light for twenty seconds) and blast charges (thrown, break the blocks around them and knock Hollows flying; the pieces come back to you).
+- **Gear,** shown on the doll: a miner's lamp (wider light), gilt and crystal picks (much faster mining), the thread charm (breath fills twice as fast) and the ember charm (your dash cuts Hollows).
+
+Nothing attacks while the satchel, a dialog or a cutscene is open.
 
 ## The ragdoll: new physics
 
@@ -58,6 +73,7 @@ The character keeps the look of the Rag Toss and Rag Showdown mannequin (cream b
 
 ## The world
 
+- **Ground you can read.** Thick, uneven topsoil (the soil line rolls with the land, pockets reach into the rock, thin strata below), grass roots hanging into the soil, and sloped **cave mouths** and ravines every so often so the caves can be walked into.
 - **Endless and seeded** (`js/world/world.js`). Generated per 32x32 chunk, in both directions and downward without end. Caves, floating islands, crystal pillars, ice spikes, ember vents, ore veins, sand pockets, and each biome's painted tree from the materials sheet (round crowns, glass trees, giant mushrooms, dead trees, pines) leaning in the wind and away from anyone brushing past. Only your edits are saved; everything else regenerates identically.
 - **Five biomes** that cycle with distance and darken with each loop: the Pale Meadow, the Glass Wood, the Hollow Below, the Ember Reach and the Frost Spires. Each has its own palette, parallax silhouettes, ambient particles, colour grade and generative score.
 - **Boss gates.** Every boundary between biomes is an arena held by a warden. Three archetypes with stronger variants: the Hollow Warden and the Pyre Knight (giant ragdolls: slam waves, wall-stunning charges, leaps), the Glass Widow and the Still Queen (flying ragdolls: volleys, dives, summons, rings, icefall), and the Unmade Heart (a core wrapped in torn-up blocks: throws, pound, spin). Tier scales health and adds patterns; a second phase starts at half health.
@@ -80,14 +96,16 @@ The painted art comes from hand-made reference sheets, cut up by `tools/extract_
 - `assets/props/`: shrine, campfire, blade in stone, hearth, lantern, gate banner, seed of light, with the sheet background removed.
 - `assets/icons/`: block icons, vessels, glimmer, relic medallions.
 - `assets/fx/`: slash, hit spark, shockwave, soul glimmer, dust, thread trail.
-- `assets/trees/`: the five flora sprites, cut with their cast shadow and halo removed.
+- `assets/trees/`: the five flora sprites, cut by a flood fill from the border (shadow and halo removed, clean edges).
+
+In the world, sheet sprites are colour graded per biome (`gradedImg` in `js/art/images.js`) so they sit in its light. Crafted parts, stations and item icons are painted in code for now (`js/art/itemart.js`); `art/sheets/requests.png` lists every one of them with its target size, ready to be replaced by hand-painted art.
 
 `js/art/images.js` loads them (pattern fills for tiles, sprites for props and icons). Characters are drawn in code to match the character reference (`js/art/doll.js`), matte with blank faces: round heads, scarves, belts and boots, cloaks and hoods, painted with soft shading and no outlines. Anything not on the sheets is still generated in code from the art bible (`js/art/paint.js`): key light from the upper left, rim light from behind.
 
 - `js/art/tex.js`, `js/art/props.js`: code-drawn fallbacks used if an image fails to load.
 - `js/art/bg.js`: painted parallax flats with rim light and haze, cloud banks, and one sky set piece per biome (floating isles, glowing crystal spires, a stone sky, a smoking volcano, an aurora).
 
-The asset sheets in `art/sheets/` are rendered from that same code (so they always match the game): `characters.png`, `maps.png` (materials and in-game captures of every biome) and `assets.png` (props, items, interface, effects). Rebuild them with `node tools/sheets.mjs`.
+The asset sheets in `art/sheets/` are rendered from that same code (so they always match the game): `characters.png`, `maps.png` (materials and in-game captures of every biome), `assets.png` (props, items, interface, effects) and `requests.png` (art still wanted). Rebuild them with `node tools/sheets.mjs`.
 
 ## Look and feel
 
@@ -118,6 +136,8 @@ Ads (`ad.requestAd`):
 - **Midgame, at a natural break.** Only while waking at a shrine after a fall (the screen is already dark), never in the first 3 minutes, at most once every 3 minutes, never while other players share your world.
 - While any ad plays the game is paused and silent, `gameplayStop` is sent, and everything is restored afterwards. A lost callback can't hang the game (90 s guard).
 
+**Terms & Privacy** are shown in game (Menu, Settings, Terms & Privacy) as plain text with no outside links: use terms, what is stored and where, what peer-to-peer multiplayer shares, and that ads come from CrazyGames. It's a template to review before release, not legal advice.
+
 `tools/cg-mock.js` stands in for the SDK in tests (`node tools/shot.mjs sdk --cg` checks the whole flow).
 
 ## Project layout
@@ -132,9 +152,10 @@ js/world/               tiles.js (tiles, biomes), world.js (generation, chunks, 
 js/game/                game.js (loop, camera, render pipeline), actor.js, player.js, enemies.js,
                         bosses.js, npcs.js (shrines, keepers, favours, home), content.js (dolls, chests,
                         lore, nests, Threads of Light), story.js (cinematics, tutorial, goals), thread.js,
+                        items.js (items, recipes, stations), parts.js (doors, chests, stations), throwables.js,
                         progress.js (save, cosmetics, relics, recipes), fx.js
 js/art/                 images.js (sheet art loader), doll.js (characters), bg.js, paint.js, tex.js, props.js
-js/ui/                  ui.js (HUD, tutorial, journal, cards, dialog, menus, editor), touch.js
+js/ui/                  ui.js (HUD, tutorial, journal, cards, dialog, menus, editor, terms), bag.js (satchel), touch.js
 assets/tex, props, icons, fx   art cut from the reference sheets
 js/net/net.js           multiplayer
 vendor/peerjs.min.js    PeerJS 1.5.4 (MIT)
@@ -149,6 +170,10 @@ tools/                  headless test harness, extract_assets.py (sheet cutter)
 ```bash
 node tools/play.mjs 480        # 8 minutes of play
 node tools/shot.mjs film       # frame-by-frame filmstrip of walk, run, jump, strike, dash
+node tools/shot.mjs bag        # satchel: craft by hand and at a workbench, drink, wear gear, climb a ladder
+node tools/shot.mjs climb      # a Hollow follows you up ledges of 2, 3, 4 and 5 blocks
+node tools/shot.mjs doll       # a lost doll sleeps, then wakes, stands, stretches and waves
+node tools/shot.mjs mouth      # visit a cave mouth
 node tools/shot.mjs sdk --cg   # CrazyGames SDK flow against the mock
 ```
 

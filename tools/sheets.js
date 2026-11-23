@@ -15,6 +15,7 @@ import { drawChest, drawStitch, drawNest } from '../js/game/content.js';
 import { texture, grassLip, snowLip } from '../js/art/tex.js';
 import { BIOMES, T, TILES } from '../js/world/tiles.js';
 import { loadImages, setBase, IMG, drawSprite, TILE_ICON } from '../js/art/images.js';
+import { drawPart, drawItemIcon } from '../js/art/itemart.js';
 
 const fakeWorld = {
   get(tx, ty) { return ty >= 0 ? 3 : 0; },
@@ -224,6 +225,50 @@ function assets() {
   fx.forEach(([n, fn], i) => { const x = 180 + i * 330, y = 1240; fn(x, y); label(g, x, y + 110, n); });
 }
 
+// ---------------------------------------------------------------- requests: art to be hand-painted
+function requests() {
+  const W = 2400, H = 1720;
+  const g = board('requests', W, H, 'Art requests', 'paint these to replace the placeholders: same style as your sheets, transparent PNG, one per slot');
+  const slot = (x, y, w, h, name, size, note, draw) => {
+    g.save();
+    g.fillStyle = 'rgba(255,255,255,.03)'; g.beginPath(); g.roundRect(x, y, w, h, 16); g.fill();
+    g.setLineDash([6, 6]); g.strokeStyle = 'rgba(255,240,220,.25)'; g.lineWidth = 1.5; g.beginPath(); g.roundRect(x, y, w, h, 16); g.stroke(); g.setLineDash([]);
+    g.restore();
+    g.save(); g.beginPath(); g.rect(x, y, w, h - 54); g.clip(); draw(x + w / 2, y + (h - 54) / 2 + 6); g.restore();
+    label(g, x + w / 2, y + h - 30, name, size + (note ? ' · ' + note : ''));
+  };
+  const part = (t, k = 3.2, two) => (cx, cy) => { g.save(); g.translate(cx - 16 * k, cy - (two ? 32 : 16) * k); g.scale(k, k); if (two) { drawPart(g, t, 0, 0, (dx, dy) => (dy === 1 ? t : 0)); drawPart(g, t, 0, 32, (dx, dy) => (dy === -1 ? t : 0)); } else drawPart(g, t, 0, 0, (dx, dy) => (dy === 1 ? 1 : 0)); g.restore(); };
+  const icon = (id) => (cx, cy) => drawItemIcon(g, id, cx, cy, 120);
+  section(g, 60, 196, 'Characters and world');
+  const sv = newSave(3); const doll = lookFromSave(sv); doll.blade = null;
+  slot(60, 220, 420, 300, 'Sleeping doll', '256 x 160', 'curled on its side, on moss', (cx, cy) => drawFigure(g, cx - 20, cy + 50, doll, 2.2, { st: { mode: 'sleep' }, ticks: 240 }, { blade: false }));
+  slot(500, 220, 420, 300, 'Turf into soil', '128 x 128 per biome', 'seamless, grass top fading into soil', (cx, cy) => {
+    const a = IMG['tex/meadow_groundA'], b = IMG['tex/meadow_groundB'];
+    if (b) g.drawImage(b, cx - 96, cy - 96, 192, 192);
+    if (a) { g.save(); g.beginPath(); g.moveTo(cx - 96, cy - 96); g.lineTo(cx + 96, cy - 96); for (let i = 8; i >= 0; i--) g.lineTo(cx - 96 + i * 24, cy - 40 + Math.sin(i * 2.1) * 14); g.closePath(); g.clip(); g.drawImage(a, cx - 96, cy - 96, 192, 192); g.restore(); }
+  });
+  slot(940, 220, 420, 300, 'Cave mouth', '256 x 256', 'arched opening edge, any biome', (cx, cy) => {
+    g.fillStyle = '#2a2430'; g.beginPath(); g.ellipse(cx, cy + 40, 110, 90, 0, Math.PI, 0); g.fill();
+    g.fillStyle = 'rgba(243,236,224,.35)'; g.font = 'italic 18px Cormorant'; g.textAlign = 'center'; g.fillText('currently: plain carved tiles', cx, cy + 90);
+  });
+  slot(1380, 220, 420, 300, 'Hollow nest', '256 x 200', 'thorned mound with a glowing heart', (cx, cy) => { g.save(); g.translate(cx, cy + 60); g.scale(1.6, 1.6); drawNest(g, 0, 0, 1, 0); g.restore(); });
+  slot(1820, 220, 520, 300, 'Satchel', '256 x 200', 'open leather bag (UI and on the doll)', (cx, cy) => {
+    g.fillStyle = '#6e523b'; g.beginPath(); g.roundRect(cx - 80, cy - 30, 160, 100, [14, 14, 30, 30]); g.fill();
+    g.fillStyle = '#8a6a4c'; g.beginPath(); g.moveTo(cx - 80, cy - 30); g.quadraticCurveTo(cx, cy - 90, cx + 80, cy - 30); g.fill();
+  });
+  section(g, 60, 586, 'Building parts and stations');
+  const parts = [[T.LADDER, 'Ladder', '64 x 64 tile'], [T.PLATFORM, 'Platform', '64 x 64 tile'], [T.TORCH, 'Torch', '64 x 64'], [T.DOOR, 'Door', '64 x 128', true], [T.STEP, 'Step', '64 x 64'], [T.STORE, 'Storage chest', '64 x 64'], [T.BENCH, 'Workbench', '64 x 64'], [T.FORGE, 'Forge', '64 x 64'], [T.LOOM, 'Loom', '64 x 64']];
+  parts.forEach(([t, n, sz, two], i) => slot(60 + i * 254, 610, 236, 330, n, sz, '', part(t, two ? 2.6 : 3.6, two)));
+  section(g, 60, 1006, 'Items and gear');
+  const items = [['i_draught', 'Mending draught'], ['i_flare', 'Flare'], ['i_charge', 'Blast charge'], ['g_lamp', "Miner's lamp"], ['g_pick_gilt', 'Gilt pick'], ['g_pick_crystal', 'Crystal pick'], ['g_charm_thread', 'Thread charm'], ['g_charm_ember', 'Ember charm']];
+  items.forEach(([id, n], i) => slot(60 + i * 286, 1030, 266, 280, n, '128 x 128 icon', '', icon(id)));
+  section(g, 60, 1376, 'Interface');
+  slot(60, 1400, 520, 270, 'Item slot frame', '96 x 96, 9-slice', 'empty, hover, selected', (cx, cy) => { for (let i = 0; i < 3; i++) { g.strokeStyle = ['rgba(255,240,220,.25)', 'rgba(255,217,160,.6)', '#9ff3ff'][i]; g.lineWidth = 2; g.beginPath(); g.roundRect(cx - 190 + i * 130, cy - 50, 100, 100, 16); g.stroke(); } });
+  slot(600, 1400, 520, 270, 'Crafting ring', '256 x 256', 'the circle the result appears in', (cx, cy) => { g.strokeStyle = 'rgba(255,217,160,.5)'; g.lineWidth = 2; g.beginPath(); g.arc(cx, cy, 80, 0, TAU); g.stroke(); g.setLineDash([5, 6]); g.beginPath(); g.arc(cx, cy, 94, 0, TAU); g.stroke(); g.setLineDash([]); });
+  slot(1140, 1400, 520, 270, 'Panel backdrop', '9-slice', 'satchel and crafting panels', (cx, cy) => { g.fillStyle = 'rgba(20,17,26,.9)'; g.strokeStyle = 'rgba(255,244,228,.14)'; g.beginPath(); g.roundRect(cx - 200, cy - 80, 400, 160, 18); g.fill(); g.stroke(); });
+  slot(1680, 1400, 660, 270, 'Touch buttons', '160 x 160 each', 'Strike, Jump, Dash, Mend, Build, Bag, Talk', (cx, cy) => { for (let i = 0; i < 5; i++) { g.strokeStyle = 'rgba(255,240,220,.4)'; g.lineWidth = 2; g.beginPath(); g.arc(cx - 240 + i * 120, cy, 46, 0, TAU); g.stroke(); } });
+}
+
 setBase('../assets/');
 const loadImg = (src) => new Promise(r => { const i = new Image(); i.onload = () => r(i); i.onerror = () => r(null); i.src = src; });
 Promise.all(['meadow', 'glass', 'hollow', 'ember', 'frost', 'shrine'].map(id => loadImg('../art/sheets/scenes/' + id + '.png').then(i => [id, i])))
@@ -231,5 +276,6 @@ Promise.all(['meadow', 'glass', 'hollow', 'ember', 'frost', 'shrine'].map(id => 
   try { characters(); } catch (e) { console.error('characters', e.stack); }
   try { maps(); } catch (e) { console.error('maps', e.stack); }
   try { assets(); } catch (e) { console.error('assets', e.stack); }
+  try { requests(); } catch (e) { console.error('requests', e.stack); }
   window.__sheetsDone = true;
 });

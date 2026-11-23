@@ -181,6 +181,7 @@ export class World {
       const g = gateNear(mx);
       if (Math.abs(mx - g.gx) < ARENA_HALF + 10 || this.shrineNear(mx) !== null) continue;
       if (r > 0.86) {
+        if (Math.abs(mx) < BIOME_W / 2 + 20) continue;   // no sheer drops in the first stretch
         // ravine: narrow, tapering, 14-24 deep
         const depth = 14 + Math.floor(hash2(kk, 53, s) * 10), w = 1.6 + hash2(kk, 54, s);
         const dd = ty - this.col(mx).h;
@@ -190,9 +191,11 @@ export class World {
       const dir = hash2(kk, 55, s) < 0.5 ? -1 : 1, len = 18 + Math.floor(hash2(kk, 56, s) * 14);
       const u = (tx - mx) * dir;
       if (u < 0 || u > len) continue;
+      // the floor starts level with the ground and drops at most a block per column, so you can always
+      // walk back up and out
       const top = this.col(mx).h;
-      const cy = top - 1 + u * 0.62 + Math.sin(u * 0.35 + kk) * 0.8;
-      const half = 1.6 + (u < 3 ? 0.6 : 0) + Math.sin(u * 0.5 + kk * 3) * 0.3;
+      const half = 1.6;
+      const cy = top - half + u * 0.62 + Math.sin(u * 0.35 + kk) * 0.25;
       // an open sloped cut until the roof would be thick enough, then a tunnel (no thin slivers of turf)
       const roof = (cy - half) - this.col(tx).h;
       if (roof < 2.8 ? (ty >= this.col(tx).h - 1 && ty <= cy + half) : (ty >= cy - half && ty <= cy + half)) return true;
