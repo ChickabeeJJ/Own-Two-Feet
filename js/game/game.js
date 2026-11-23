@@ -131,7 +131,7 @@ export class Game {
     if (this.player) this.player.update(dt);
     for (const a of this.actors) a.update(dt);
     this.actors = this.actors.filter(a => !a.removed);
-    if (!(this.ui && this.ui.modal)) for (const p of this.projectiles) p.update(dt);
+    if (!(this.ui && this.ui.modal) && !this.cinematic) for (const p of this.projectiles) p.update(dt);
     this.projectiles = this.projectiles.filter(p => !p.dead);
     this.fx.update(dt);
     if (this.player) {

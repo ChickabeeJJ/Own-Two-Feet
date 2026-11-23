@@ -63,7 +63,7 @@ async function boot() {
   game.throwables = new Throwables(game);
   game.parts = new Parts(game);
   game.systems.push(game.story, game.content, game.shrines, game.enemies, game.bosses, game.throwables, game.parts);
-  game.systems.push({ draw: (ctx, a, layer) => { if (layer === 'front') game.player.drawCursor(ctx); } });
+  game.systems.push({ draw: (ctx, a, layer) => { if (layer === 'front') { game.player.drawCursor(ctx); game.player.drawPrompt(ctx); } } });
   game.ui = new UI(game);
   game.touchCtl = new Touch(game);
   if (st.touchOn && !game.touch) game.touchCtl.show(true);

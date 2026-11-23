@@ -207,8 +207,15 @@ export class Player {
       const hard = TILES[this.mine.tile].hard * (this.sv.hasBlade ? 1 : 2.2) / (1 + this.sv.lvl.blade * 0.25) / pick;
       this.mine.t += dt / Math.max(0.05, hard);
       a.face(sign(target.tx * TILE + 16 - a.c.x) || a.facing);
-      if (!a.attack) { a.startAttack(Math.random() < 0.5 ? 'side' : 'side2', 0.26); Audio.play('swing', { vol: 0.35, pitch: 1.3 }); }
-      if ((g.tick % 18) === 0) { Audio.play('mine', { pitch: rand(0.8, 1.2) }); g.fx.debris(target.tx * TILE + 16, target.ty * TILE + 16, this.mine.tile, 2); }
+      if (!a.attack) { a.startAttack('mine', 0.3); this.chipped = false; }
+      // the chop lands: chips fly from the face of the block (no blade ribbon, no hitbox)
+      if (a.attack && a.attack.kind === 'mine' && a.attack.t > 0.55 && !this.chipped) {
+        this.chipped = true;
+        const fx = target.tx * TILE + 16 - sign(target.tx * TILE + 16 - a.c.x) * 14, fy = target.ty * TILE + 16;
+        Audio.play('mine', { pitch: rand(0.8, 1.2) });
+        g.fx.debris(fx, fy, this.mine.tile, 3);
+        g.fx.sparks(fx, fy, Math.atan2(a.c.y - 50 - fy, a.c.x - fx), 4, '#fff1d8');
+      }
       if (this.mine.t >= 1) this.breakTile(target.tx, target.ty);
       this.consumeAttack = true;
     } else this.mine = null;
@@ -365,6 +372,7 @@ export class Player {
     const g = this.game, a = this.actor;
     const at = a.attack;
     if (!at) { a.prevBlade = null; return; }
+    if (at.kind === 'mine') { a.prevBlade = null; return; }   // digging never cuts or leaves a slash
     const seg = a.bladeSeg(1);
     const prev = a.prevBlade || seg;
     a.prevBlade = seg;
@@ -515,6 +523,21 @@ export class Player {
       ctx.restore();
     }
   }
+  // touch: a small marker over whatever the action button will use, so it's clear what Talk/Open means
+  drawPrompt(ctx) {
+    const g = this.game, it = this.interact;
+    if (!it || !g.touch || this.dead || g.cinematic || (g.ui && g.ui.modal)) return;
+    const verb = (it.verb || it.label.split(' ')[0]).toUpperCase();
+    const x = it.x, y = it.y - 46 + Math.sin(g.time * 3) * 2;
+    ctx.save();
+    ctx.font = '800 10px Manrope, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    const w = ctx.measureText(verb).width + 18;
+    ctx.fillStyle = rgba('#ffd9a0', 0.92);
+    ctx.beginPath(); ctx.roundRect(x - w / 2, y - 9, w, 18, 9); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(x - 4, y + 9); ctx.lineTo(x + 4, y + 9); ctx.lineTo(x, y + 14); ctx.fill();
+    ctx.fillStyle = '#241a12'; ctx.fillText(verb, x, y + 0.5);
+    ctx.restore();
+  }
   // build cursor: a ghost of the chosen block where it will go, cracks on a block being mined, a soft red
   // frame (and a reason on click) when an action isn't possible, and the reach ring while building
   drawCursor(ctx) {
@@ -550,21 +573,32 @@ export class Player {
       ctx.setLineDash([]);
     }
     if (this.mine && this.mine.tx === c.tx && this.mine.ty === c.ty) {
+      // cracks stay inside the block: thin seeded fractures that branch further as it gives
       const p = clamp(this.mine.t, 0, 1);
-      ctx.fillStyle = rgba('#000000', 0.25 * p); ctx.fillRect(x, y, TILE, TILE);
-      ctx.strokeStyle = 'rgba(20,16,22,0.8)'; ctx.lineWidth = 2;
+      ctx.save();
+      ctx.beginPath(); ctx.rect(x, y, TILE, TILE); ctx.clip();
+      ctx.fillStyle = rgba('#000000', 0.2 * p); ctx.fillRect(x, y, TILE, TILE);
+      ctx.strokeStyle = 'rgba(16,12,18,0.85)'; ctx.lineWidth = 1; ctx.lineJoin = 'round';
+      let seed = (c.tx * 73856093) ^ (c.ty * 19349663);
+      const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+      const n = 2 + Math.floor(p * 4);
       ctx.beginPath();
-      const cx = x + 16, cy = y + 16;
-      const n = 3 + Math.floor(p * 5);
       for (let i = 0; i < n; i++) {
-        const ang = i * 2.39996 + c.tx, len = 6 + p * 14;
-        ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(ang) * len * 0.6, cy + Math.sin(ang) * len * 0.6);
-        ctx.lineTo(cx + Math.cos(ang + 0.3) * len, cy + Math.sin(ang + 0.3) * len);
+        let px = x + 16 + (rnd() - 0.5) * 6, py = y + 16 + (rnd() - 0.5) * 6, ang = rnd() * TAU;
+        ctx.moveTo(px, py);
+        const segs = 2 + Math.floor(p * 3);
+        for (let k = 0; k < segs; k++) {
+          ang += (rnd() - 0.5) * 1.1;
+          const len = (3 + rnd() * 4) * (0.6 + p * 0.6);
+          px += Math.cos(ang) * len; py += Math.sin(ang) * len;
+          ctx.lineTo(px, py);
+        }
       }
       ctx.stroke();
+      ctx.restore();
       // progress arc
-      ctx.strokeStyle = rgba('#ffffff', 0.8); ctx.lineWidth = 2.5; ctx.lineCap = 'round';
-      ctx.beginPath(); ctx.arc(cx, cy, 20, -Math.PI / 2, -Math.PI / 2 + p * TAU); ctx.stroke();
+      ctx.strokeStyle = rgba('#ffffff', 0.75); ctx.lineWidth = 2; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.arc(x + 16, y + 16, 21, -Math.PI / 2, -Math.PI / 2 + p * TAU); ctx.stroke();
     }
     ctx.restore();
   }

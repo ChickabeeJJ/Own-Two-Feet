@@ -539,6 +539,7 @@ export class Story {
         { label: 'Rise here (short ad)', close: true, act: () => { Platform.rewarded().then(ok => { this.offeredRise = false; if (ok) this.riseHere(at); else this.toShrine(true); }); } },
         { label: 'Wake at the shrine', close: true, act: () => { this.offeredRise = false; this.toShrine(); } },
       ]);
+      if (ui.dlg) ui.dlg.cancel = () => { this.offeredRise = false; this.toShrine(); };
       return;
     }
     this.toShrine();

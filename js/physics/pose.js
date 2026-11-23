@@ -13,6 +13,8 @@ const ATK = {
   up: [[0, 0.5, 0.8], [0.18, 0.7, 1.1], [0.38, -1.5, -1.55], [0.62, -2.05, -2.3], [1, -1.0, -1.2]],
   down: [[0, -1.6, -1.9], [0.18, -1.85, -2.2], [0.38, 1.35, 1.4], [0.62, 1.62, 1.66], [1, 1.3, 1.35]],
   slam: [[0, -1.6, -1.6], [0.3, -1.75, -1.85], [0.5, 1.2, 1.3], [1, 1.3, 1.35]],
+  // mining: a short overhead chop with the pommel, not a sweeping slash
+  mine: [[0, -1.2, -2.0], [0.3, -1.55, -2.5], [0.55, 0.35, 0.15], [0.72, 0.55, 0.45], [1, 0.1, -0.5]],
 };
 function keyArm(kind, t) {
   const K = ATK[kind] || ATK.side;
@@ -87,7 +89,7 @@ export class Animator {
       const breathe = Math.sin(this.time * 1.9) * 0.7 * s, shift = Math.sin(this.time * 0.55) * 1.6 * s;
       // vertical bob: two dips per cycle (one per foot strike), deeper and springier when running
       const dip = Math.max(0, Math.cos(((ph * 2) % 1) * TAU)) * lerp(1.6, 4.5, rk) * s * moving;
-      rootY = st.gy - standH + this.squash + crouch + dip + 1.5 * s + (1 - moving) * breathe - (rk > 0.6 ? lerp(0, 2.5, rk) * s * moving : 0);
+      rootY = st.gy - standH + this.squash + crouch + dip + 1.5 * s + (1 - moving) * (breathe + 0.9 * s) - (rk > 0.6 ? lerp(0, 2.5, rk) * s * moving : 0);
       rootX += shift * (1 - moving) * 0.4;
       torso = -HALF_PI + lerp(0.06, 0.3, rk) * moving + (st.accel || 0) * 0.08 + (st.crouch ? 0.25 : 0) + Math.sin(ph * TAU * 2) * 0.03 * moving;
       const legs = [];
@@ -149,8 +151,11 @@ export class Animator {
       // ground on the way down; a long fall turns into a flail
       const up = clamp(-vy / 700, 0, 1), fall = clamp((vy - 80) / 800, 0, 1);
       const apex = 1 - Math.max(up, fall);
-      fF = [rootX + lerp(lerp(9, 11, up), 5, fall) * s * f, st.py + lerp(lerp(24, 18, up), 33, fall) * s, lerp(0.5, -0.1, fall)];
-      fB = [rootX + lerp(lerp(-6, -10, up), -4, fall) * s * f, st.py + lerp(lerp(28, 30, up), 31, fall) * s, lerp(0.9, 0.2, fall)];
+      // legs: the lead knee drives up on take-off while the other trails, both tuck at the apex, and on
+      // the way down they reach for the ground, pedalling a little in a long fall
+      const cyc = Math.sin(this.time * 10) * fall * 0.6;
+      fF = [rootX + (lerp(lerp(9, 13, up), 6, fall) - apex * 3 + cyc * 6) * s * f, st.py + (lerp(lerp(24, 15, up), 31, fall) - apex * 6 - Math.max(0, cyc) * 5) * s, lerp(lerp(0.4, 0.7, up), -0.15, fall)];
+      fB = [rootX + (lerp(lerp(-6, -13, up), -7, fall) + apex * 4 - cyc * 6) * s * f, st.py + (lerp(lerp(28, 31, up), 32, fall) - apex * 7 - Math.max(0, -cyc) * 5) * s, lerp(lerp(0.9, 1.2, up), 0.25, fall)];
       torso = -HALF_PI + 0.06 + up * 0.08 - fall * 0.06 + (st.vx * f) * 0.0003;
       const flail = clamp((vy - 1000) / 600, 0, 1);
       const fl = Math.sin(this.time * 19) * 0.9 * flail, fl2 = Math.cos(this.time * 17) * 0.9 * flail;
@@ -178,8 +183,9 @@ export class Animator {
     } else if (mode === 'dash') {
       rootY = null;
       torso = -HALF_PI + 0.95;
-      fF = [rootX + 14 * s * f, st.py + 22 * s, 0.2];
-      fB = [rootX - 18 * s * f, st.py + 26 * s, 0.9];
+      // dash: a long lunge, front foot reaching, back leg stretched with the toe pointed
+      fF = [rootX + 17 * s * f, st.py + 21 * s, 0.35];
+      fB = [rootX - 23 * s * f, st.py + 25 * s, 1.15];
       armF = [2.2, 2.4]; armB = [2.5, 2.7];
       spine = [0.1, 0.1];
       rate = 40;
@@ -215,6 +221,17 @@ export class Animator {
       armF = [0.35, -0.3]; armB = [0.6, -0.1];
       head = -HALF_PI + 0.15;
       rate = 10;
+    } else if (mode === 'sleep') {
+      // curled on its side, knees drawn up, hands tucked under the head, breathing slowly
+      const br = Math.sin(this.time * 1.4);
+      rootY = st.gy - 7 * s + br * 0.6 * s;
+      torso = -HALF_PI + 1.5 + br * 0.03;
+      fF = [rootX + 7 * s * f, st.gy - 3.6 * s, 0.35];
+      fB = [rootX + 3 * s * f, st.gy - 3.6 * s, 0.35];
+      armF = [0.35, -1.25 + br * 0.04]; armB = [0.6, -1.0];
+      spine = [0.28 + br * 0.04, 0.26];
+      head = 0.25;
+      rate = 8;
     } else if (mode === 'cocoon') {
       rootY = st.gy - 10 * s;
       torso = -HALF_PI + 1.2;
@@ -254,9 +271,16 @@ export class Animator {
       const w = a.t > 0.75 ? 1 - smooth((a.t - 0.75) / 0.25) : 1;
       armF = armF ? [lerp(armF[0], ua, w), lerp(armF[1], fa, w)] : [ua, fa];
       const strike = a.t > 0.18 && a.t < 0.62 ? 1 : 0;
-      torso += (a.kind === 'up' ? -0.1 : a.kind === 'down' ? 0.25 : 0.22) * strike * w;
+      torso += (a.kind === 'up' ? -0.1 : a.kind === 'down' ? 0.25 : a.kind === 'mine' ? 0.3 : 0.22) * strike * w;
       armB = [lerp(armB ? armB[0] : 1.5, 2.2, 0.6 * w), lerp(armB ? armB[1] : 1.2, 1.8, 0.6 * w)];
       rate = 60;
+      // standing strikes step into the blow: front foot plants forward, back heel lifts, hips drop
+      if (mode === 'ground' && fF && fB && speed < 60) {
+        const k = Math.sin(clamp(a.t / 0.7, 0, 1) * Math.PI) * w * (a.kind === 'mine' ? 0.5 : 1);
+        fF = [fF[0] + f * 10 * s * k, fF[1], fF[2]];
+        fB = [fB[0] - f * 4 * s * k, fB[1] - 1.5 * s * k, fB[2] - 0.55 * k];
+        if (rootY !== null && rootY !== undefined) rootY += 3 * s * k;
+      }
     }
     // where the head looks
     if (st.look) {

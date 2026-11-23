@@ -88,9 +88,12 @@ export class Content {
     for (const [x, d] of this.dolls) {
       if (d.state === 'thanks') {
         d.t -= dt;
-        const a = d.actor;
+        const a = d.actor, ph = 5.2 - d.t;
         a.look_at = { x: p.x, y: p.y - 60 };
-        if (d.t < 2.2 && !d.waved) { d.waved = true; a.doEmote('wave', 1.6); }
+        // sit up, rise, stretch, then wave
+        if (ph > 1.0 && ph < 2.1) a.scriptPose = { mode: 'getup', getup: clamp((ph - 1.0) / 1.1, 0, 1), strength: 1 };
+        if (ph >= 2.1 && a.mode === 'script') { a.mode = 'ctrl'; a.c.ground = true; a.doEmote('cheer', 0.9); }
+        if (ph > 3.1 && !d.waved) { d.waved = true; a.face(sign(p.x - a.c.x) || 1); a.doEmote('wave', 1.6); }
         if (d.t < 0) { d.state = 'leave'; d.t = 3; }
       } else if (d.state === 'leave') {
         d.t -= dt; d.actor.intent.mx = d.dir; d.alpha = clamp(d.t / 1.2, 0, 1);
@@ -131,10 +134,10 @@ export class Content {
     sv.look.color = colors[Math.floor(hash2(x, 3, W.seed) * colors.length)].id;
     sv.look.head = heads[Math.floor(hash2(x, 4, W.seed) * heads.length)];
     sv.look.cape = capes[Math.floor(hash2(x, 5, W.seed) * capes.length)].id;
-    const look = lookFromSave(sv); look.thread = false;
+    const look = lookFromSave(sv); look.thread = true; look.threadCol = '#bff6ff';
     const a = new Actor(g, { x: x * TILE + 16, y: ty * TILE, team: 'npc', look, facing: hash2(x, 6, W.seed) < 0.5 ? 1 : -1 });
-    a.mode = 'limp'; a.limpT = 1e9; a.strength = 0; a.noCrumple = true;
-    a.body.impulseAll(rand(-60, 60), 0);
+    a.mode = 'script'; a.scriptPose = { mode: 'sleep', strength: 0.8 }; a.noCrumple = true;
+    a.body.reset(a.c.x, a.c.y - 10);
     g.actors.push(a);
     this.dolls.set(x, { actor: a, state: 'lying', cave: inCave !== null, t: 0 });
   }
@@ -142,8 +145,8 @@ export class Content {
     const g = this.game, d = this.dolls.get(x);
     if (!d || d.state !== 'lying') return;
     const a = d.actor;
-    d.state = 'thanks'; d.t = 4.2; d.dir = sign(a.c.x - g.player.x) || 1;
-    a.limpT = 0; a.mode = 'limp';
+    d.state = 'thanks'; d.t = 5.2; d.dir = sign(a.c.x - g.player.x) || 1;
+    a.scriptPose = { mode: 'sit', strength: 1 };
     this.sv.rescued[x] = 1;
     this.sv.lights = (this.sv.lights || 0) + 1;
     const n = Object.keys(this.sv.rescued).length;
@@ -292,16 +295,37 @@ export class Content {
     const g = this.game, t = g.time;
     if (layer === 'back') {
       for (const n of this.nests.values()) drawNest(ctx, n.ent.c.x, n.ent.c.y + 26, t, n.ent.flash);
+      for (const d of this.dolls.values()) if (d.state === 'lying' || d.state === 'thanks') drawMossBed(ctx, d.bedX ?? (d.bedX = d.actor.c.x), d.bedY ?? (d.bedY = d.actor.c.y), d.state === 'thanks' ? clamp(d.t / 5.2, 0, 1) : 1);
       for (const c of this.chests.values()) { if (c.open) c.t = Math.min(1, c.t + 0.05); drawChest(ctx, c.x, c.y, c.t, t); }
     }
     if (layer === 'front') {
       for (const s of this.stitches.values()) if (!s.got) drawStitch(ctx, s.px, s.py + Math.sin(t * 2 + s.t) * 5, t + s.t);
       // sleeping dolls glint so you notice them
-      for (const d of this.dolls.values()) if (d.state === 'lying') { ctx.save(); ctx.globalCompositeOperation = 'lighter'; drawGlow(ctx, d.actor.c.x, d.actor.c.y - 20, 40 + Math.sin(t * 2) * 6, [0.62, 0.95, 1], 0.35); ctx.restore(); }
+      for (const d of this.dolls.values()) if (d.state === 'lying') {
+        const b = d.actor.body, cx = b.x[P.CHEST], cy = b.y[P.CHEST];
+        const br = 0.5 + Math.sin(t * 1.4) * 0.5;
+        ctx.save(); ctx.globalCompositeOperation = 'lighter';
+        drawGlow(ctx, cx, cy, 26 + br * 14, [0.62, 0.95, 1], 0.25 + br * 0.2);
+        // breath motes drift up from the sleeper
+        for (let i = 0; i < 3; i++) { const u = ((t * 0.35 + i / 3) % 1); ctx.fillStyle = rgba('#dff6ff', 0.5 * Math.sin(u * Math.PI)); ctx.beginPath(); ctx.arc(b.x[P.HEAD] + Math.sin(u * 6 + i) * 5, b.y[P.HEAD] - 10 - u * 34, 1.6 + u * 1.6, 0, TAU); ctx.fill(); }
+        ctx.restore();
+      }
     }
   }
 }
 
+// a soft hollow of moss where a doll fell asleep
+export function drawMossBed(g, x, y, k) {
+  g.save(); g.globalAlpha = k;
+  softDisc(g, x, y + 2, 46, '#000000', 0.3);
+  const cols = ['#5f7a4a', '#6f8f5a', '#7fa36b', '#4f6a42'];
+  for (let i = 0; i < 9; i++) {
+    const u = i / 8 - 0.5, bx = x + u * 70, by = y + 2 - Math.cos(u * Math.PI) * 4;
+    ballShade(g, bx, by, 7 + (i % 3) * 2.5, cols[i % 4], { dark: 0.3 });
+  }
+  for (let i = 0; i < 4; i++) { g.fillStyle = ['#f3e6d0', '#d6c7f0', '#f0b7a6', '#f3e6d0'][i]; g.beginPath(); g.arc(x - 26 + i * 17, y - 4 - (i % 2) * 3, 2.2, 0, TAU); g.fill(); }
+  g.restore();
+}
 export function drawChest(g, x, y, open, t) {
   g.save();
   softDisc(g, x, y, 30, '#000000', 0.35);

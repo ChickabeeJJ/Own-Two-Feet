@@ -139,36 +139,62 @@ if __name__ == '__main__':
     main(*sys.argv[1:5])
 
 def tree_sprites(p3, outdir, meta):
-    """the five flora sprites of the materials sheet: keep pixels brighter than the board (drops the cast
-    shadow and dark halo), erode one pixel of fringe, bleed edge colours outward so scaling has no dark rim"""
+    """the five flora sprites of the materials sheet. The board is removed by flood fill from the crop border
+    (only background connected to the outside goes, so dark shading inside a tree stays), the cast shadow and
+    glow halo count as background, edges get a soft alpha from colour distance, and edge colours are bled in
+    from the inside so there is no dark rim when the sprite is scaled."""
+    from collections import deque
     from PIL import ImageFilter
     img = load(p3)
-    boxes = {'meadow': (1340, 236, 1495, 453), 'glass': (1492, 236, 1634, 456), 'hollow': (1634, 276, 1759, 456),
-             'ember': (1405, 516, 1480, 746), 'frost': (1530, 488, 1672, 746)}
+    boxes = {'meadow': (1340, 236, 1495, 456), 'glass': (1492, 236, 1634, 458), 'hollow': (1634, 276, 1759, 458),
+             'ember': (1405, 516, 1480, 748), 'frost': (1530, 488, 1672, 748)}
     os.makedirs(outdir + '/trees', exist_ok=True)
     for k, (x0, y0, x1, y1) in boxes.items():
         reg = img[y0:y1, x0:x1]
+        h, w, _ = reg.shape
         ring = np.concatenate([reg[:3].reshape(-1, 3), reg[:, :3].reshape(-1, 3), reg[:, -3:].reshape(-1, 3)])
         bg = np.median(ring, axis=0)
-        lum = reg.mean(axis=2) - bg.mean()
         d = np.sqrt(((reg - bg) ** 2).sum(axis=2))
-        lt = 34 if k == 'hollow' else 6
-        a = np.clip((d - 22) / 30, 0, 1) * np.clip((lum - lt) / 14, 0, 1)
-        # the cast shadow at the foot: below the trunk base keep only the trunk's columns
-        h = a.shape[0]; ref = a[h - 22]
+        lum = reg.mean(axis=2) - bg.mean()
+        dark_lim = 42 if k == 'hollow' else 10
+        bgl = (d < 30) | (lum < dark_lim)
+        flood = np.zeros((h, w), bool)
+        q = deque()
+        for y in range(h):
+            for x in (0, w - 1):
+                if bgl[y, x] and not flood[y, x]: flood[y, x] = True; q.append((y, x))
+        for x in range(w):
+            for y in (0, h - 1):
+                if bgl[y, x] and not flood[y, x]: flood[y, x] = True; q.append((y, x))
+        while q:
+            y, x = q.popleft()
+            for ny, nx in ((y + 1, x), (y - 1, x), (y, x + 1), (y, x - 1)):
+                if 0 <= ny < h and 0 <= nx < w and not flood[ny, nx] and bgl[ny, nx]:
+                    flood[ny, nx] = True; q.append((ny, nx))
+        # dark specks clinging to the edge belong to the board too
+        near = np.asarray(Image.fromarray((flood * 255).astype(np.uint8)).filter(ImageFilter.MaxFilter(5))) > 0
+        flood |= near & (lum < 26)
+        a = (~flood).astype(np.float32)
+        # the cast shadow at the foot: below the trunk base only the trunk's own columns stay
+        ref = a[h - 24]
         cols = np.where(ref > 0.5)[0]
         if len(cols):
-            keep = np.zeros_like(ref); keep[max(0, cols.min() - 2):cols.max() + 3] = 1
-            a[h - 21:] *= keep
-        am = Image.fromarray((a * 255).astype(np.uint8)).filter(ImageFilter.MinFilter(3)).filter(ImageFilter.GaussianBlur(0.6))
-        a = np.asarray(am).astype(np.float32) / 255
+            keep = np.zeros(w, np.float32); keep[max(0, cols.min() - 1):cols.max() + 2] = 1
+            a[h - 23:] *= keep
+            flood[h - 23:] |= keep[None, :] < 0.5
+        # soft edge: pixels touching the background get partial alpha from how different they are
+        edge = np.asarray(Image.fromarray((a * 255).astype(np.uint8)).filter(ImageFilter.MinFilter(3))).astype(np.float32) / 255
+        rim = (a > 0) & (edge < 1)
+        a[rim] = np.clip((d[rim] - 18) / 50, 0.25, 1)
+        a = np.asarray(Image.fromarray((a * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(0.45))).astype(np.float32) / 255
+        a[flood & (a < 0.5)] *= 0.4
         col = reg.copy()
-        solid = a > 0.6
-        for _ in range(4):  # bleed solid colours into the fringe
-            sh = [np.roll(col, s, ax) for s in (1, -1) for ax in (0, 1)]
-            ms = [np.roll(solid, s, ax) for s in (1, -1) for ax in (0, 1)]
+        solid = edge >= 1
+        for _ in range(3):
             acc = np.zeros_like(col); n = np.zeros(solid.shape, np.float32)
-            for c, m in zip(sh, ms): acc += c * m[..., None]; n += m
+            for sy, sx in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                m = np.roll(np.roll(solid, sy, 0), sx, 1); c = np.roll(np.roll(col, sy, 0), sx, 1)
+                acc += c * m[..., None]; n += m
             grow = (~solid) & (n > 0)
             col[grow] = acc[grow] / n[grow][:, None]; solid = solid | grow
         ys, xs = np.where(a > 0.05)

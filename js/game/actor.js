@@ -100,7 +100,7 @@ export class Actor {
       const nx = c.x + sdx;
       if (this.boxFree(nx, c.y)) { c.x = nx; continue; }
       // step up one tile when walking on the ground
-      if (c.ground || c.coyote > 0.05) {
+      if (c.ground || c.coyote > 0.05 || c.clawing) {
         for (const up of [TILE * 0.5 + 0.5, TILE + 1]) {
           const ty = c.y - up;
           if (this.boxFree(nx, ty) && this.boxFree(c.x, ty)) {
@@ -141,7 +141,27 @@ export class Actor {
   }
   unstick() {
     const c = this.c;
-    for (let k = 0; k < 12 && !this.boxFree(c.x, c.y); k++) c.y -= 8;
+    if (this.boxFree(c.x, c.y)) return;
+    // nearest free spot, searching up first, then sideways and down
+    for (let r = 8; r <= 160; r += 8) for (const [dx, dy] of [[0, -r], [r, 0], [-r, 0], [r, -r], [-r, -r], [0, r]]) {
+      if (this.boxFree(c.x + dx, c.y + dy)) { c.x += dx; c.y += dy; return; }
+    }
+  }
+  // a body wedged in blocks (a block placed into it, a shove into a wall) twists into strange shapes; after a
+  // moment the controller steps out to free space and the ragdoll snaps back into its pose
+  checkWedged(dt) {
+    if (this.mode !== 'ctrl') { this.wedgedT = 0; return; }
+    const b = this.body, W = this.world;
+    let inside = 0;
+    for (let i = 0; i < b.x.length; i++) { const t = W.get(Math.floor(b.x[i] / TILE), Math.floor(b.y[i] / TILE)); if (TILES[t].solid && !TILES[t].half) inside++; }
+    const boxStuck = !this.boxFree(this.c.x, this.c.y);
+    this.wedgedT = inside >= 3 || boxStuck ? (this.wedgedT || 0) + dt : 0;
+    if (this.wedgedT > 0.25) {
+      this.wedgedT = 0;
+      this.unstick();
+      b.reset(this.c.x, this.c.y - this.pelvisH);
+      if (this.cape) this.cape.init = false;
+    }
   }
 
   // ------------------------------------------------------------ simulation
@@ -174,6 +194,7 @@ export class Actor {
     b.balanceK = 1;
     b.oneWayOff = this.dropT > 0 || !!this.c.climb;
     b.step(dt, this.world);
+    this.checkWedged(dt);
     if (this.mode === 'limp' && b.lastHitSpeed > 900 && this.onSplat) this.onSplat(b.lastHitSpeed);
     // cape
     if (this.cape) {
@@ -254,7 +275,9 @@ export class Actor {
       }
       if (!I.jumpHeld && c.vy < -260 && !this.bounced) c.vy *= PHYS.cut;
       if (c.vy >= 0) this.bounced = false;
-      c.vy = Math.min(c.vy + PHYS.grav * dt, c.wallSlide ? PHYS.wallSlide : PHYS.maxFall);
+      // claw-climbing a wall (Hollows): no gravity while hands are on the wall
+      if (I.climbWall && c.wall === I.climbWall) { c.vy = -190; c.clawing = true; }
+      else { c.clawing = false; c.vy = Math.min(c.vy + PHYS.grav * dt, c.wallSlide ? PHYS.wallSlide : PHYS.maxFall); }
     }
     // integrate + collide
     this.moveX(c.vx * dt);
@@ -272,7 +295,7 @@ export class Actor {
     if (!c.ground && wasGround) c.fallStart = c.y;
     if (c.climb) { c.fallStart = c.y; if (c.ground && I.down) c.ground = false; }
     // drive the animator
-    const mode = c.climb && !c.ground ? 'climb' : this.sitting && c.ground ? 'sit' : c.dashT > 0 ? 'dash' : c.ground ? (this.emote && !I.mx && !this.attack ? 'emote' : 'ground') : c.wallSlide ? 'wall' : 'air';
+    const mode = c.climb && !c.ground ? 'climb' : this.sitting && c.ground ? 'sit' : c.dashT > 0 ? 'dash' : c.ground ? (this.emote && !I.mx && !this.attack ? 'emote' : 'ground') : (c.wallSlide || c.clawing) ? 'wall' : 'air';
     this.anim.update(dt, {
       mode, x: c.x, gy: c.y, py: c.y - this.pelvisH, vx: c.vx, vy: c.vy, runMax: this.run, attack: this.attack, blade: !!this.blade,
       look: this.look_at, crouch, emote: this.emote, windup: this.telegraph || 0, accel: clamp((I.mx * this.facing), -1, 1) * (c.ground ? 1 : 0), climbD: this.climbD || 0,

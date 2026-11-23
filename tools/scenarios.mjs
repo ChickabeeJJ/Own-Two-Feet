@@ -143,6 +143,39 @@ export default ({ page, sleep, key, shot, evalg }) => ({
     console.log('bag', JSON.stringify({ r0, planks, placed, near, after, climb }));
     if (r0.modal !== 'bag' || planks < 8 || !placed || !near.includes('Workbench') || after.hp !== 4 || after.lamp !== 'g_lamp' || climb.rose < 100) throw new Error('bag flow broken');
   },
+  // a husk follows the player up ledges of 2, 3, 4 and 5 blocks
+  async climb() {
+    await page.waitForFunction(() => window.__game && window.__game.story);
+    await sleep(600);
+    const res = [];
+    for (const hgt of [2, 3, 4, 5]) {
+      const r = await evalg(async (hgt) => {
+        const g = window.__game, W = g.world, p = g.player; g.story.skipBirth(); g.story.skipTutorial && g.story.skipTutorial(); g.enemies.calm = 999; g.story.firstFoeDown = true; g.save.tut.foe = 1;
+        for (const e of g.actors) if (e.team === 'enemy') e.removed = true;
+        const bx = 300 + hgt * 40, gy = 40;
+        for (let x = bx - 12; x < bx + 12; x++) { for (let y = gy - 14; y < gy + 4; y++) W.set(x, y, y >= gy ? 3 : 0); }
+        for (let x = bx; x < bx + 12; x++) for (let y = gy - hgt; y < gy; y++) W.set(x, y, 3);
+        p.respawnAt((bx + 3) * 32 + 16, (gy - hgt) * 32); p.hp = 99; p.actor.inv = 0;
+        const e = g.enemies.spawn('husk', (bx - 8) * 32, gy * 32, 0); e.ai.state = 'chase'; e.ai.cd = 99;
+        const y0 = e.c.y; let best = 0;
+        for (let i = 0; i < 40; i++) { await new Promise(r => setTimeout(r, 100)); p.hp = 99; best = Math.max(best, Math.round((y0 - e.c.y) / 32)); if (e.c.x > bx * 32 + 20 && e.c.y <= (gy - hgt) * 32 + 2) return { hgt, up: true, t: i / 10 }; }
+        return { hgt, up: false, rose: best, x: Math.round(e.c.x / 32) - bx };
+      }, hgt);
+      res.push(r);
+    }
+    console.log('climb', JSON.stringify(res));
+    if (res.some(r => !r.up)) throw new Error('husk failed a ledge');
+  },
+  async doll() {
+    await page.waitForFunction(() => window.__game && window.__game.story);
+    await sleep(600);
+    await evalg(() => { const g = window.__game; g.story.skipBirth(); g.story.skipTutorial && g.story.skipTutorial(); g.enemies.calm = 999; g.story.firstFoeDown = true; g.save.tut.foe = 1; });
+    await sleep(800);
+    const x = await evalg(() => { const g = window.__game, c = g.content; const xs = c.sites('doll', 20, 300).filter(x => !c.caveSpot || true); const x = xs[0]; g.player.respawnAt(x * 32 + 16 - 90, g.world.surface(x) * 32); return x; });
+    await sleep(2500); await shot('doll-0-sleep');
+    await evalg((x) => window.__game.content.wakeDoll(x), x); await sleep(900); await shot('doll-1-sit');
+    await sleep(1100); await shot('doll-2-rise'); await sleep(1400); await shot('doll-3-stretch'); await sleep(1200); await shot('doll-4-wave');
+  },
   async content() {
     await sleep(900);
     const info = await evalg(() => { const g = window.__game; g.story.skipBirth(); g.save.tutDone = 1; g.save.hasBlade = true; g.player.actor.blade = true; g.enemies.calm = 999;

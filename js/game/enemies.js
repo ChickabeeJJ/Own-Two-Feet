@@ -229,6 +229,14 @@ export class Enemies {
       this.trySpawn();
     }
   }
+  // how many blocks tall the wall right in front of e is (0 = open ground)
+  ledgeAhead(e, dir) {
+    const c = e.c, W = this.game.world;
+    const tx = Math.floor((c.x + dir * (c.w / 2 + 6)) / TILE), ty = Math.floor((c.y - 1) / TILE);
+    let k = 0;
+    while (k < 7 && W.solid(tx, ty - k)) k++;
+    return k;
+  }
   trySpawn() {
     const g = this.game, P0 = g.player, W = g.world;
     if (P0.dead || this.calm > 0) return;
@@ -288,11 +296,11 @@ export class Enemies {
   think(e, dt) {
     const g = this.game, ai = e.ai, I = e.intent, c = e.c;
     const p = this.target(e);
-    I.jump = false; I.attack = false; I.dash = false;
+    I.jump = false; I.attack = false; I.dash = false; I.climbWall = 0;
     if (e.mode !== 'ctrl') { I.mx = 0; return; }
     ai.t -= dt; ai.cd -= dt;
     const dx = p ? p.c.x - c.x : 1e9, dy = p ? p.c.y - c.y : 1e9;
-    const sees = p && Math.abs(dx) < 420 && Math.abs(dy) < 160;
+    const sees = p && Math.abs(dx) < 420 && Math.abs(dy) < 210;
     const brute = e.kind === 'brute';
     e.look_at = sees ? { x: p.c.x, y: p.c.y - 60 } : null;
     switch (ai.state) {
@@ -308,7 +316,13 @@ export class Enemies {
         if (!sees) { ai.state = 'wander'; ai.t = 2; break; }
         const dir = sign(dx);
         I.mx = dir;
-        if (e.wallAt(dir) && c.ground) I.jump = true;
+        // read the ledge ahead: step up 1, jump 2-3 (holding the jump for full height), husks claw up 4-5
+        const ledge = this.ledgeAhead(e, dir);
+        I.jumpHeld = true; I.climbWall = 0;
+        if (ledge >= 2 && ledge <= 3 && c.ground) I.jump = true;
+        else if (ledge >= 4 && ledge <= 5 && !brute) { I.climbWall = dir; if (c.ground) I.jump = true; }
+        else if (c.clawing && ledge >= 1) I.climbWall = dir;   // keep hauling up until over the lip
+        else if (ledge > 5 || (brute && ledge > 3)) I.mx = 0;
         if (!this.groundAhead(e, dir) && dy >= -10) I.mx = 0;
         const range = brute ? 120 : 78;
         if (Math.abs(dx) < range && Math.abs(dy) < 70 && ai.cd <= 0) {

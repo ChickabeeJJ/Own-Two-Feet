@@ -191,6 +191,9 @@ export class UI {
   showOpts() {
     const d = this.dlg, box = $('#dialog .opts');
     if (box.childElementCount) return;
+    // there is always a way to just leave
+    if (!d.opts) d.opts = [];
+    if (!d.opts.some(o => /^(Farewell|Wake at|Leave|Not now)/.test(o.label))) d.opts.push({ label: 'Farewell' });
     d.opts.forEach((o, i) => {
       const b = el('button', 'opt', esc(o.label) + (o.cost ? ` <small>${o.cost.glimmer} glimmer${(o.cost.items || []).map(([t, n]) => ` + ${n} ${esc(TILES[t].name)}`).join('')}</small>` : ''));
       b.addEventListener('click', () => this.pickOpt(i));
@@ -234,7 +237,7 @@ export class UI {
       if (Input.pressed('right') || Input.pressed('down')) this.focusOpt(d.focus + 1);
       for (let i = 1; i <= 6; i++) if (Input.pressed('slot' + i) && i - 1 < d.opts.length) this.pickOpt(i - 1);
     }
-    if (Input.pressed('menu')) { Input.consume('menu'); this.closeDialog(); }
+    if (Input.pressed('menu')) { Input.consume('menu'); const c = d.cancel; this.closeDialog(); if (c) c(); }
   }
   shop(name, items) {
     this.dialog(name, ['Have a look. Everything is honest, mostly.'], items.map(it => ({ label: it.label, cost: it.cost, act: it.act })).concat([{ label: 'Farewell' }]));
