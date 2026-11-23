@@ -38,9 +38,34 @@ export function texPattern(g, name, scale = 0.5) {
   }
   return p;
 }
-// draw a sprite with its base centred at (x, y), height h (width follows the aspect)
-export function drawSprite(g, name, x, y, h, o = {}) {
+// The sheets were painted on a neutral board; in the world each sprite is graded toward its biome so it
+// sits in the light: a little less saturated, slightly softer contrast, washed toward the biome's haze at
+// the top and darkened toward the ground at the foot. Cached per sprite and biome.
+const graded = new Map();
+const filterOK = (() => { try { const c = document.createElement('canvas').getContext('2d'); c.filter = 'saturate(0.5)'; return c.filter === 'saturate(0.5)'; } catch (e) { return false; } })();
+export function gradedImg(name, B) {
   const im = IMG[name];
+  if (!im || !B) return im || null;
+  const key = name + '|' + B.id;
+  let c = graded.get(key);
+  if (c) return c;
+  c = document.createElement('canvas'); c.width = im.width; c.height = im.height;
+  const g = c.getContext('2d');
+  const sat = { meadow: 0.88, glass: 0.92, hollow: 0.85, ember: 0.9, frost: 0.78 }[B.id] ?? 0.88;
+  if (filterOK) g.filter = `saturate(${sat}) contrast(0.94) brightness(0.96)`;
+  g.drawImage(im, 0, 0);
+  g.filter = 'none';
+  g.globalCompositeOperation = 'source-atop';
+  const gr = g.createLinearGradient(0, 0, 0, c.height);
+  gr.addColorStop(0, hexA(B.sunCol, 0.1)); gr.addColorStop(0.55, hexA(B.fog, 0.08)); gr.addColorStop(1, hexA(B.deep || '#000000', 0.28));
+  g.fillStyle = gr; g.fillRect(0, 0, c.width, c.height);
+  graded.set(key, c);
+  return c;
+}
+function hexA(hex, a) { if (!hex) return `rgba(0,0,0,${a})`; const n = parseInt(String(hex).slice(1), 16); return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`; }
+// draw a sprite with its base centred at (x, y), height h (width follows the aspect); o.grade = biome
+export function drawSprite(g, name, x, y, h, o = {}) {
+  const im = o.grade ? gradedImg(name, o.grade) : IMG[name];
   if (!im) return false;
   const w = im.width * h / im.height;
   if (o.alpha !== undefined) g.globalAlpha = o.alpha;

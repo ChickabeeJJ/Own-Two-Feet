@@ -353,3 +353,5 @@ body.bag-open #hotbar, body.bag-open #objective, body.bag-open #tut, body.bag-op
   .bag-hot .bslot { width: 40px; min-height: 40px; }
   .bag-x { top: 8px; padding: 8px 14px; }
 }
+
+body.carding #tut { opacity: 0; transition: opacity .3s; }

@@ -49,6 +49,7 @@ export class Content {
     const g = gateNear(x);
     if (Math.abs(x - g.gx) < ARENA_HALF + 12) return false;
     if (W.shrineNear(x) !== null) return false;
+    if (W.mouthAt && (W.mouthAt(x, W.surface(x), W.surface(x)) || W.mouthAt(x, W.surface(x) + 1, W.surface(x)))) return false;
     return true;
   }
   // deterministic sites in [a, b] tiles

@@ -6,7 +6,7 @@ import { pattern, grassLip, snowLip } from '../art/tex.js';
 import { drawLantern, drawHearth } from '../art/props.js';
 import { capsule } from '../art/paint.js';
 import { makeLayers, drawClouds, drawSkyFeature } from '../art/bg.js';
-import { texPattern, drawSprite, IMG } from '../art/images.js';
+import { texPattern, drawSprite, IMG, gradedImg } from '../art/images.js';
 import { drawPart } from '../art/itemart.js';
 
 const TREE_SPRITE = { round: 'meadow', crystal: 'glass', shroom: 'hollow', dead: 'ember', pine: 'frost' };
@@ -215,6 +215,33 @@ export class WorldRenderer {
     if (t === T.ICE) g.globalAlpha = 0.9;
     roundTile(g, x, y, TILE, TILE, rNW, rNE, rSE, rSW);
     g.globalAlpha = 1;
+    // turf roots: the grass layer hangs down into the soil below it with a ragged, uneven edge (and thins out
+    // over a second tile), so the surface reads as living topsoil instead of a flat stripe
+    if (t === T.DIRT && p.id !== 'frost') {
+      const up1 = W.get(tx, ty - 1), up2 = W.get(tx, ty - 2);
+      const depth = up1 === T.GRASS ? 1 : up2 === T.GRASS && up1 === T.DIRT ? 2 : 0;
+      if (depth) {
+        const gp = tp(g, T.GRASS, p.id) || pattern(g, 'soil', p.grass);
+        const reach = depth === 1 ? 14 + hash2(tx, ty, 91) * 14 : 4 + hash2(tx, ty, 92) * 8;
+        g.save(); roundTile(g, x, y, TILE, TILE, rNW, rNE, rSE, rSW, true); g.clip();
+        g.fillStyle = gp; g.globalAlpha = depth === 1 ? 0.95 : 0.6;
+        g.beginPath(); g.moveTo(x - 1, y - 1); g.lineTo(x + TILE + 1, y - 1);
+        for (let i = 8; i >= 0; i--) {
+          const px = x + i * (TILE / 8);
+          const k = hash2(tx * 8 + i, ty, 93 + depth);
+          g.lineTo(px, y + reach * (0.45 + k * 0.75) + (depth === 1 && i % 3 === 0 ? 5 * k : 0));
+        }
+        g.closePath(); g.fill();
+        // a soft shadow where the roots end
+        g.globalAlpha = 1;
+        const sh = g.createLinearGradient(0, y + reach * 0.4, 0, y + reach * 1.3);
+        sh.addColorStop(0, rgba('#000000', 0)); sh.addColorStop(0.5, rgba('#000000', depth === 1 ? 0.12 : 0.06)); sh.addColorStop(1, rgba('#000000', 0));
+        g.fillStyle = sh; g.fillRect(x, y, TILE, TILE);
+        g.restore();
+      }
+      // pebbles and root threads sit inside the soil (never dangling)
+      if (hash2(tx, ty, 95) < 0.22) { g.fillStyle = rgba('#2b2420', 0.35); g.beginPath(); g.ellipse(x + 6 + hash2(tx, ty, 96) * 20, y + 10 + hash2(tx, ty, 97) * 16, 2.4, 1.6, 0.3, 0, TAU); g.fill(); }
+    }
     // ore and veins
     if (t === T.CRYSTAL) {
       for (let k = 0; k < (painted ? 1 : 3); k++) {
@@ -295,14 +322,14 @@ export class WorldRenderer {
       g.fillStyle = '#e6deff'; g.beginPath(); g.arc(x + 12, y + 15, 1.5, 0, TAU); g.arc(x + 19, y + 16, 1.2, 0, TAU); g.fill();
       return;
     }
-    if (t === T.LANTERN && drawSprite(g, 'icons/b_lantern', x + 16, y + 30, 28)) return;
+    if (t === T.LANTERN && drawSprite(g, 'icons/b_lantern', x + 16, y + 30, 28, { grade: biomeOf(biomeIndexAt(tx)) })) return;
     if (t === T.LANTERN) {
       const hang = TILES[W.get(tx, ty - 1)].solid && !TILES[W.get(tx, ty + 1)].solid;
       if (hang) { g.strokeStyle = '#2d2a30'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(x + 16, y); g.lineTo(x + 16, y + 8); g.stroke(); drawLantern(g, x + 16, y + 17, 1, 0); }
       else { capsule(g, x + 16, y + TILE, x + 16, y + 20, 2.2, 2, '#3a3036', { dark: 0.5 }); drawLantern(g, x + 16, y + 12, 1, 0); }
       return;
     }
-    if (t === T.HEARTH) { if (!drawSprite(g, 'icons/b_brazier', x + 16, y + TILE + 2, 34)) drawHearth(g, x + 16, y + TILE, 0.62, 0.5); return; }
+    if (t === T.HEARTH) { if (!drawSprite(g, 'icons/b_brazier', x + 16, y + TILE + 2, 34, { grade: biomeOf(biomeIndexAt(tx)) })) drawHearth(g, x + 16, y + TILE, 0.62, 0.5); return; }
   }
 
   refreshArt() { for (const c of this.cache.values()) c.dirty = true; }
@@ -356,9 +383,9 @@ export class WorldRenderer {
       const tr = W.treeAt(tx);
       if (!tr || W.get(tx, tr.base - 1) !== T.LOG) continue;
       const name = 'trees/' + TREE_SPRITE[tr.kind];
-      const im = IMG[name];
-      if (!im) continue;
-      const ax = treeAnchor(name, im);
+      if (!IMG[name]) continue;
+      const im = gradedImg(name, biomeOf(biomeIndexAt(tx)));
+      const ax = treeAnchor(name, IMG[name]);
       const h = (tr.h + (tr.kind === 'shroom' ? 0.6 : 1.6)) * TILE * (tr.kind === 'dead' ? 0.92 : 1);
       const w = im.width * h / im.height;
       const bx = tx * TILE + 16, by = tr.base * TILE + 3;
@@ -518,14 +545,14 @@ export function biomeBlendAt(x) {
 }
 
 // rounded rect with individual corner radii, filled
-function roundTile(g, x, y, w, h, a, b, c, d) {
-  if (!a && !b && !c && !d) { g.fillRect(x, y, w + 0.5, h + 0.5); return; }
+function roundTile(g, x, y, w, h, a, b, c, d, pathOnly) {
+  if (!a && !b && !c && !d) { if (pathOnly) { g.beginPath(); g.rect(x, y, w + 0.5, h + 0.5); } else g.fillRect(x, y, w + 0.5, h + 0.5); return; }
   g.beginPath();
   g.moveTo(x + a, y);
   g.lineTo(x + w - b + 0.5, y); if (b) g.quadraticCurveTo(x + w, y, x + w, y + b); else g.lineTo(x + w + 0.5, y);
   g.lineTo(x + w + (b || c ? 0 : 0.5), y + h - c + 0.5); if (c) g.quadraticCurveTo(x + w, y + h, x + w - c, y + h); else g.lineTo(x + w + 0.5, y + h + 0.5);
   g.lineTo(x + d, y + h + (c || d ? 0 : 0.5)); if (d) g.quadraticCurveTo(x, y + h, x, y + h - d); else g.lineTo(x, y + h + 0.5);
   g.lineTo(x, y + a); if (a) g.quadraticCurveTo(x, y, x + a, y);
-  g.closePath(); g.fill();
+  g.closePath(); if (!pathOnly) g.fill();
 }
 

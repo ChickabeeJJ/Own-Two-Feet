@@ -166,6 +166,16 @@ export default ({ page, sleep, key, shot, evalg }) => ({
     console.log('climb', JSON.stringify(res));
     if (res.some(r => !r.up)) throw new Error('husk failed a ledge');
   },
+  async mouth() {
+    await page.waitForFunction(() => window.__game && window.__game.story);
+    await sleep(600);
+    const info = await evalg(() => { const g = window.__game, W = g.world; g.story.skipBirth(); g.story.skipTutorial && g.story.skipTutorial(); g.enemies.calm = 999; g.story.firstFoeDown = true; g.save.tut.foe = 1;
+      const found = []; for (let tx = 40; tx < 600 && found.length < 4; tx++) { const h = W.surface(tx); if (W.mouthAt(tx, h + 2, h) && !found.some(f => Math.abs(f - tx) < 30)) found.push(tx); }
+      const tx = found[0]; g.player.respawnAt((tx - 6) * 32, W.surface(tx - 6) * 32); return found; });
+    console.log('mouths', JSON.stringify(info));
+    await sleep(2500); await shot('mouth-0');
+    await page.keyboard.down('KeyD'); await sleep(2500); await page.keyboard.up('KeyD'); await sleep(600); await shot('mouth-1');
+  },
   async doll() {
     await page.waitForFunction(() => window.__game && window.__game.story);
     await sleep(600);

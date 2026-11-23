@@ -99,6 +99,7 @@ export class World {
     const c = this.col(tx);
     if (c.arena || c.shrine !== null) return null;
     if (tx > -4 && tx < 12) return null;
+    if (this.mouthAt(tx, c.h, c.h) || this.mouthAt(tx, c.h + 1, c.h)) return null;
     const B = biomeOf(c.bi);
     if (hash2(tx, 7, this.seed) > B.trees) return null;
     // keep trees apart
@@ -129,19 +130,26 @@ export class World {
       }
       return [T.AIR, 0];
     }
-    const dirtDepth = 3 + Math.floor(hash2(tx, 3, s) * 3);
+    // thick, uneven topsoil: the soil/stone line rolls with the land (4-9 tiles), with pockets of soil
+    // reaching down into the rock and thin darker strata in the stone below
+    const dirtDepth = 4 + Math.floor((fbm1(tx * 0.045, s + 61) * 0.5 + 0.5) * 5 + hash2(tx, 3, s) * 1.2);
+    const pocket = d >= dirtDepth && d < dirtDepth + 4 && fbm2(tx * 0.11, ty * 0.16, s + 63, 2) > 0.28;
     let fg, wall;
     if (d === 0) fg = B.id === 'frost' ? T.SNOW : T.GRASS;
-    else if (d < dirtDepth) fg = B.id === 'frost' && d < 2 ? T.SNOW : T.DIRT;
+    else if (d < dirtDepth || pocket) fg = B.id === 'frost' && d < 2 ? T.SNOW : T.DIRT;
     else if (d > 55 + fbm1(tx * 0.05, s + 3) * 8) fg = T.DEEP;
-    else fg = T.STONE;
+    else fg = Math.abs(((d + fbm1(tx * 0.03, s + 67) * 6) % 13) - 6.5) < 0.55 ? T.DEEP : T.STONE;
     wall = d >= 2 ? (fg === T.DEEP ? T.DEEP : d < dirtDepth + 2 ? T.DIRT : T.STONE) : 0;
     if (c.arena && d < 14) {
       if (d === 0) fg = T.RUIN;
       return [fg, wall];
     }
+    // cave mouths and ravines open from the surface, so the caves can be walked into
+    if (this.mouthAt(tx, ty, c.h)) return [T.AIR, d >= 2 ? (wall || T.STONE) : 0];
     // caves
     const calm = (tx > SPAWN_L - 10 && tx < SPAWN_R + 10) ? 10 : 4;
+    // roomier chambers in the first stretch underground
+    if (d > 5 && d < 16 && calm < 10 && fbm2(tx * 0.028, ty * 0.06, s + 71, 2) > 0.4) return [T.AIR, wall || T.STONE];
     if (d > calm) {
       const depthK = Math.min(d, 220);
       const worm = Math.abs(noise2(tx * 0.04, ty * 0.065, s + 41));
@@ -160,6 +168,36 @@ export class World {
       else if ((B.id === 'meadow' || B.id === 'glass') && noise2(tx * 0.08, ty * 0.08, s + 17) > 0.45) fg = T.MOSS;
     }
     return [fg, wall];
+  }
+  // a sloping tunnel from the surface every ~45-90 tiles, and now and then a narrow ravine
+  mouthAt(tx, ty, h) {
+    if (tx > SPAWN_L - 16 && tx < SPAWN_R + 16) return false;
+    const s = this.seed, STEP = 67;
+    const k = Math.round(tx / STEP);
+    for (const kk of [k - 1, k, k + 1]) {
+      const r = hash2(kk, 51, s);
+      if (r < 0.2) continue;
+      const mx = kk * STEP + Math.floor(hash2(kk, 52, s) * 22) - 11;
+      const g = gateNear(mx);
+      if (Math.abs(mx - g.gx) < ARENA_HALF + 10 || this.shrineNear(mx) !== null) continue;
+      if (r > 0.86) {
+        // ravine: narrow, tapering, 14-24 deep
+        const depth = 14 + Math.floor(hash2(kk, 53, s) * 10), w = 1.6 + hash2(kk, 54, s);
+        const dd = ty - this.col(mx).h;
+        if (dd >= -1 && dd < depth && Math.abs(tx - mx) < w * (1 - dd / depth * 0.6)) return true;
+        continue;
+      }
+      const dir = hash2(kk, 55, s) < 0.5 ? -1 : 1, len = 18 + Math.floor(hash2(kk, 56, s) * 14);
+      const u = (tx - mx) * dir;
+      if (u < 0 || u > len) continue;
+      const top = this.col(mx).h;
+      const cy = top - 1 + u * 0.62 + Math.sin(u * 0.35 + kk) * 0.8;
+      const half = 1.6 + (u < 3 ? 0.6 : 0) + Math.sin(u * 0.5 + kk * 3) * 0.3;
+      // an open sloped cut until the roof would be thick enough, then a tunnel (no thin slivers of turf)
+      const roof = (cy - half) - this.col(tx).h;
+      if (roof < 2.8 ? (ty >= this.col(tx).h - 1 && ty <= cy + half) : (ty >= cy - half && ty <= cy + half)) return true;
+    }
+    return false;
   }
   stampTrees(cx, cy, fg) {
     const x0 = cx * CH, y0 = cy * CH;

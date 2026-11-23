@@ -134,8 +134,9 @@ export class UI {
     c.classList.remove('hidden');
     void c.offsetWidth;
     c.classList.add('show');
+    document.body.classList.add('carding');
     clearTimeout(this.cardTimer);
-    this.cardTimer = setTimeout(() => { c.classList.remove('show'); }, dur * 1000);
+    this.cardTimer = setTimeout(() => { c.classList.remove('show'); document.body.classList.remove('carding'); }, dur * 1000);
   }
   toast(msg, kind) {
     const t = el('div', 'toast' + (kind ? ' ' + kind : ''), esc(msg));

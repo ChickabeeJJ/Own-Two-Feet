@@ -441,7 +441,7 @@ export class Story {
   draw(ctx, a, layer) {
     const g = this.game;
     if (layer === 'back') {
-      if (this.bladeY !== null && this.stage >= 5) { if (!this.sv.hasBlade && !drawSprite(ctx, 'props/bladestone', BLADE_X * TILE + 16, this.bladeY + 6, 150)) drawBladeStone(ctx, BLADE_X * TILE + 16, this.bladeY + 2, 1, g.time, true); }
+      if (this.bladeY !== null && this.stage >= 5) { if (!this.sv.hasBlade && !drawSprite(ctx, 'props/bladestone', BLADE_X * TILE + 16, this.bladeY + 6, 150, { grade: g.biomeAt(BLADE_X * TILE) })) drawBladeStone(ctx, BLADE_X * TILE + 16, this.bladeY + 2, 1, g.time, true); }
       if (this.crater) {
         const c = this.crater, k = clamp(1 - c.t / 40, 0, 1);
         if (k > 0) {

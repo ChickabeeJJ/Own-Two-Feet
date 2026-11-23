@@ -142,7 +142,7 @@ export class Bosses {
         const gy = g.world.surface(gi.gx) * TILE;
         const down = this.defeated(gi.k);
         ctx.save(); if (down) ctx.globalAlpha = 0.45;
-        for (const sd of [-1, 1]) if (!drawSprite(ctx, 'props/banner', gi.gxw + sd * (gi.half - 40), gy + 4, 170)) drawGateBanner(ctx, gi.gxw + sd * (gi.half - 40), gy + 1, 1, down ? '#6a6470' : spec.col, g.time + sd);
+        for (const sd of [-1, 1]) if (!drawSprite(ctx, 'props/banner', gi.gxw + sd * (gi.half - 40), gy + 4, 170, { grade: g.biomeAt(gi.gxw) })) drawGateBanner(ctx, gi.gxw + sd * (gi.half - 40), gy + 1, 1, down ? '#6a6470' : spec.col, g.time + sd);
         ctx.restore();
       }
     }

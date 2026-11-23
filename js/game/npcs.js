@@ -302,8 +302,8 @@ export class Shrines {
     const g = this.game;
     for (const s of this.map.values()) {
       if (Math.abs(s.x - g.cam.x) > 1400) continue;
-      if (!drawSprite(ctx, 'props/shrine', s.x - 84, s.y + 6, 112)) drawShrine(ctx, s.x - 78, s.y + 1, 0.95, g.time, true);
-      if (!drawSprite(ctx, 'props/campfire', s.x, s.y + 8, 58)) drawCampfire(ctx, s.x, s.y + 1, 0.95, g.time);
+      if (!drawSprite(ctx, 'props/shrine', s.x - 84, s.y + 6, 112, { grade: g.biomeAt(s.x) })) drawShrine(ctx, s.x - 78, s.y + 1, 0.95, g.time, true);
+      if (!drawSprite(ctx, 'props/campfire', s.x, s.y + 8, 58, { grade: g.biomeAt(s.x) })) drawCampfire(ctx, s.x, s.y + 1, 0.95, g.time);
     }
     if (this.sv.home && Math.abs(this.sv.home.x - g.cam.x) < 1400) drawCampfire(ctx, this.sv.home.x + 54, this.sv.home.y + 1, 0.7, g.time + 1);
   }
