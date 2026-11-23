@@ -3,7 +3,7 @@
 
 const KEYMAP = {
   left: ['KeyA', 'ArrowLeft'], right: ['KeyD', 'ArrowRight'], up: ['KeyW', 'ArrowUp'], down: ['KeyS', 'ArrowDown'],
-  jump: ['Space', 'KeyW', 'ArrowUp'], attack: ['KeyJ', 'KeyX'], dash: ['ShiftLeft', 'ShiftRight', 'KeyK', 'KeyC'],
+  jump: ['Space', 'KeyW', 'ArrowUp'], attack: ['KeyJ', 'KeyX'], dash: ['ShiftLeft', 'ShiftRight', 'KeyK'], crawl: ['ControlLeft', 'ControlRight', 'KeyC'],
   interact: ['KeyE', 'KeyF'], menu: ['Escape', 'KeyP'], craft: ['KeyQ'], emote: ['KeyT'], build: ['KeyB'], bag: ['KeyI', 'Tab'], use: ['KeyR'],
   slot1: ['Digit1'], slot2: ['Digit2'], slot3: ['Digit3'], slot4: ['Digit4'], slot5: ['Digit5'],
   slot6: ['Digit6'], slot7: ['Digit7'], slot8: ['Digit8'], slot9: ['Digit9'], mute: ['KeyM'], heal: ['KeyH'],

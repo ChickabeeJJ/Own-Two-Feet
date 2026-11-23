@@ -71,6 +71,10 @@ export class Body {
     this.limitsOn = true;
     this.collide = true;
     this.lastHitSpeed = 0;   // fastest impact against terrain this tick (px/s)
+    // characters are animated, not simulated: the skeleton is placed by forward kinematics from the
+    // pose generator. Pushes ("impulses") are collected as a kick for the owner's controller instead.
+    this.kinematic = o.kinematic !== false;
+    this.kickX = 0; this.kickY = 0;
     this.reset(o.x || 0, o.y || 0);
   }
   // place in a standing T-ish pose with pelvis at (x,y)
@@ -95,8 +99,8 @@ export class Body {
     for (let i = 0; i < NP; i++) { const m = 1 / this.w[i]; mx += this.x[i] * m; my += this.y[i] * m; vx += this.vx[i] * m; vy += this.vy[i] * m; M += m; }
     return { x: mx / M, y: my / M, vx: vx / M, vy: vy / M };
   }
-  impulse(i, dvx, dvy) { this.vx[i] += dvx; this.vy[i] += dvy; }
-  impulseAll(dvx, dvy, k = 1) { for (let i = 0; i < NP; i++) { this.vx[i] += dvx * k; this.vy[i] += dvy * k; } }
+  impulse(i, dvx, dvy) { if (this.kinematic) { this.kickX += dvx / NP; this.kickY += dvy / NP; return; } this.vx[i] += dvx; this.vy[i] += dvy; }
+  impulseAll(dvx, dvy, k = 1) { if (this.kinematic) { this.kickX += dvx * k; this.kickY += dvy * k; return; } for (let i = 0; i < NP; i++) { this.vx[i] += dvx * k; this.vy[i] += dvy * k; } }
   translate(dx, dy) { for (let i = 0; i < NP; i++) { this.x[i] += dx; this.y[i] += dy; this.ix[i] += dx; this.iy[i] += dy; this.px[i] += dx; this.py[i] += dy; } }
   // mirror the body horizontally about the pelvis (an instant, readable turn)
   flip() {
@@ -117,11 +121,43 @@ export class Body {
 
   // ------------------------------------------------------------ simulation
   step(dt, world) {
+    if (this.kinematic) { this.pose(dt); return; }
     const h = dt / SUB;
     for (let i = 0; i < NP; i++) { this.ix[i] = this.x[i]; this.iy[i] = this.y[i]; }
     this.contact.fill(0);
     this.lastHitSpeed = 0;
     for (let n = 0; n < SUB; n++) this.substep(h, world);
+  }
+  // forward kinematics: pelvis at the root, then each bone hangs off its parent at the joint's angle.
+  // Joint angles are relative turns from the incoming bone (facing-right frame, mirrored by facing),
+  // exactly as jointAngle() measures them, clamped to the joint's range.
+  pose(dt) {
+    const { x, y } = this, f = this.facing, L = this.len, T = this.target;
+    for (let i = 0; i < NP; i++) { this.ix[i] = x[i]; this.iy[i] = y[i]; }
+    const t = (k) => { const J = JOINTS[k]; return clamp(T[k], J[4], J[5]); };
+    const put = (a, b, ang, bone) => { x[b] = x[a] + Math.cos(ang) * L[bone]; y[b] = y[a] + Math.sin(ang) * L[bone]; };
+    x[P.PELVIS] = this.root.x; y[P.PELVIS] = this.root.y;
+    const tw = f > 0 ? this.torso : Math.PI - this.torso;
+    const t0 = t(0), t1 = t(1);
+    const d43 = tw;   // matches the pose generator's IK frame (belly->pelvis is straight down the torso)
+    put(4, 3, d43, 3);
+    const d32 = d43 + t0 * f; put(3, 2, d32, 2);
+    const d21 = d32 + t1 * f; put(2, 1, d21, 1);
+    const d10 = d21 + t(2) * f; put(1, 0, d10, 0);
+    const d25 = d32 + (t(3) + JOINTS[3][3]) * f; put(2, 5, d25, 4);
+    put(5, 6, d25 + t(4) * f, 5);
+    const d27 = d32 + (t(5) + JOINTS[5][3]) * f; put(2, 7, d27, 6);
+    put(7, 8, d27 + t(6) * f, 7);
+    const d49 = d43 + Math.PI + t(7) * f; put(4, 9, d49, 8);
+    const d910 = d49 + t(8) * f; put(9, 10, d910, 9);
+    put(10, 11, d910 + t(9) * f, 10);
+    const d412 = d43 + Math.PI + t(10) * f; put(4, 12, d412, 11);
+    const d1213 = d412 + t(11) * f; put(12, 13, d1213, 12);
+    put(13, 14, d1213 + t(12) * f, 13);
+    // velocities for anything that reads them (rest checks, trails)
+    const inv = dt > 0 ? 1 / dt : 0;
+    for (let i = 0; i < NP; i++) { this.vx[i] = (x[i] - this.ix[i]) * inv; this.vy[i] = (y[i] - this.iy[i]) * inv; }
+    this.lastHitSpeed = 0;
   }
   substep(h, world) {
     const { x, y, vx, vy, px, py, w } = this;

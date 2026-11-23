@@ -176,6 +176,45 @@ export default ({ page, sleep, key, shot, evalg }) => ({
     await sleep(2500); await shot('mouth-0');
     await page.keyboard.down('KeyD'); await sleep(2500); await page.keyboard.up('KeyD'); await sleep(600); await shot('mouth-1');
   },
+  // movement: walk down stairs without falling poses, mantle a 3-block wall, crawl through a 1-block gap
+  async moves() {
+    await page.waitForFunction(() => window.__game && window.__game.story);
+    await sleep(600);
+    const pr = evalg(async () => {
+      const g = window.__game, W = g.world, p = g.player, a = p.actor, I = window.__input;
+      g.story.skipBirth(); g.story.skipTutorial && g.story.skipTutorial(); g.enemies.calm = 999; g.story.firstFoeDown = true; g.save.tut.foe = 1;
+      for (const e of g.actors) if (e.team === 'enemy') e.removed = true;
+      const bx = 600, gy = 40; const wait = ms => new Promise(r => setTimeout(r, ms));
+      const clear = () => { for (let x = bx - 4; x < bx + 40; x++) for (let y = gy - 12; y < gy + 6; y++) W.set(x, y, y >= gy ? 3 : 0); };
+      // stairs down: 6 one-block steps
+      clear(); for (let i = 0; i < 6; i++) for (let x = bx + i * 2; x < bx + 40; x++) W.set(x, gy - 6 + i, 0), W.set(x, gy - 6 + i + (x < bx + i * 2 + 2 ? 1 : 0), 3);
+      for (let x = bx - 4; x < bx; x++) for (let y = gy - 6; y < gy; y++) W.set(x, y, 3);
+      p.respawnAt((bx - 2) * 32 + 16, (gy - 6) * 32); await wait(300);
+      let airFrames = 0; I.keys.add('KeyD');
+      for (let i = 0; i < 25; i++) { await wait(60); if (a.anim && !a.c.ground) airFrames++; }
+      I.keys.delete('KeyD'); await wait(200);
+      // mantle: a 3-block wall
+      clear(); for (let x = bx + 6; x < bx + 12; x++) for (let y = gy - 3; y < gy; y++) W.set(x, y, 3);
+      p.respawnAt((bx + 2) * 32, gy * 32); await wait(400);
+      let mantled = false; I.keys.add('KeyD'); I.keys.add('Space'); await wait(120); I.keys.delete('Space');
+      let onTop = false;
+      for (let i = 0; i < 30; i++) { await wait(60); if (a.mantle) mantled = true; if (mantled && !a.mantle) { onTop = a.c.y <= (gy - 3) * 32 + 2; break; } }
+      I.keys.delete('KeyD');
+      // crawl: a gap one block high
+      clear(); for (let x = bx + 6; x < bx + 14; x++) W.set(x, gy - 2, 3);
+      p.respawnAt((bx + 2) * 32, gy * 32); await wait(400);
+      I.keys.add('KeyC'); I.keys.add('KeyD'); await wait(1400); window.__crawlShot = true; await wait(3800); I.keys.delete('KeyD');
+      const through = a.c.x > (bx + 14) * 32; I.keys.delete('KeyC'); await wait(400);
+      return { airFrames, mantled, onTop, through, stood: !a.crawling };
+    });
+    // grab frames mid-mantle and mid-crawl
+    await page.waitForFunction(() => window.__game.player.actor.mantle && window.__game.player.actor.mantle.t > 0.3, null, { timeout: 15000 }).then(() => shot('moves-mantle')).catch(() => {});
+    await page.waitForFunction(() => window.__crawlShot, null, { timeout: 15000 }).then(() => shot('moves-crawl')).catch(() => {});
+    const r = await pr;
+    console.log('moves', JSON.stringify(r));
+    await shot('moves-end');
+    if (r.airFrames > 4 || !r.mantled || !r.onTop || !r.through) throw new Error('movement broken');
+  },
   async doll() {
     await page.waitForFunction(() => window.__game && window.__game.story);
     await sleep(600);

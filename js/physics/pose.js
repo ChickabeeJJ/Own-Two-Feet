@@ -46,6 +46,8 @@ export class Animator {
     for (let k = 0; k < NJ; k++) this.cur[k] = body.jointAngle(k);
   }
   land(v) { this.squashV += clamp(v * 0.05, 0, 90); }
+  // a flinch from a hit: dir is the side the blow came from (-1 / 1), k its size 0..1
+  hit(dir, k) { this.hitK = Math.min(1, Math.max(this.hitK || 0, k)); this.hitDir = dir; }
   flip() { this.spin = TAU; }
 
   // st: {mode, x, gy (ground y under controller), vx, vy, runMax, facing, attack, look, wall, dash, crouch, getup, onGround}
@@ -200,6 +202,56 @@ export class Animator {
       armF = [lerp(0.1, 0.4, k1) * (1 - k2) + HALF_PI * k2, lerp(0.2, -0.4, k1) * (1 - k2) + (HALF_PI - 0.2) * k2];
       armB = [lerp(0.5, 0.9, k1) * (1 - k2) + (HALF_PI + 0.1) * k2, lerp(0.6, 0.2, k1) * (1 - k2) + (HALF_PI - 0.1) * k2];
       rate = 12;
+    } else if (mode === 'tumble') {
+      // knocked through the air: thrown back, arms flung out, legs kicking
+      rootY = null;
+      const k = clamp(Math.abs(st.vx) / 600, 0, 1), up = clamp(-st.vy / 600, 0, 1);
+      const fl = Math.sin(this.time * 13) * 0.5, fl2 = Math.cos(this.time * 11) * 0.5;
+      torso = -HALF_PI - 0.55 - 0.35 * k + up * 0.2;
+      fF = [rootX + (12 + fl * 6) * s * f, st.py + (20 + fl2 * 5) * s, 0.4];
+      fB = [rootX + (4 - fl * 5) * s * f, st.py + (26 + fl * 4) * s, 0.6];
+      armF = [-1.2 + fl, -1.6 + fl]; armB = [2.6 + fl2, 2.9 + fl2];
+      spine = [-0.2, -0.15];
+      rate = 16;
+    } else if (mode === 'down') {
+      // lying on the back where the fall ended
+      rootY = st.gy - 6 * s + Math.sin(this.time * 1.6) * 0.4 * s;
+      torso = -HALF_PI - 1.42;
+      fF = [rootX + 33 * s * f, st.gy - 3.6 * s, 0.25];
+      fB = [rootX + 29 * s * f, st.gy - 3.6 * s, 0.4];
+      armF = [Math.PI - 0.25, Math.PI - 0.12]; armB = [Math.PI - 0.55, Math.PI - 0.35];
+      spine = [0.05, 0.05];
+      head = -HALF_PI - 1.2;
+      rate = 9;
+    } else if (mode === 'mantle') {
+      // grab the edge, haul up, knee onto the ledge, push up to stand
+      rootY = null;
+      const u = clamp(st.mantle || 0, 0, 1);
+      const a = smooth(clamp(u / 0.5, 0, 1)), b = smooth(clamp((u - 0.45) / 0.55, 0, 1));
+      torso = -HALF_PI + 0.25 + 0.35 * a - 0.45 * b;
+      armF = [lerp(-1.75, 0.9, b), lerp(-1.55, 1.3, b)];
+      armB = [lerp(-1.6, 1.1, b), lerp(-1.4, 1.5, b)];
+      fF = [rootX + lerp(6, 14, a) * s * f, st.py + lerp(lerp(31, 14, a), 31, b) * s, 0.4 * (1 - b)];
+      fB = [rootX + lerp(-2, 2, a) * s * f, st.py + lerp(32, 31, b) * s, 0.8 * (1 - b)];
+      spine = [0.15 * a, 0.1];
+      rate = 30;
+    } else if (mode === 'crawl') {
+      // hands and knees, limbs moving in diagonal pairs with the distance crawled
+      const ph = this.phase += (Math.abs(st.vx) * dt) / (22 * s);
+      const sw = Math.sin(ph * TAU), cw = Math.cos(ph * TAU);
+      const moving = clamp(Math.abs(st.vx) / 40, 0, 1);
+      rootY = st.gy - 13 * s + Math.abs(sw) * 1.2 * s * moving;
+      torso = -HALF_PI + 1.32;
+      armF = [HALF_PI - 0.35 - sw * 0.35 * moving, HALF_PI - 0.05 - sw * 0.25 * moving];
+      armB = [HALF_PI - 0.35 + sw * 0.35 * moving, HALF_PI - 0.05 + sw * 0.25 * moving];
+      // floor right under the knees (searching from above would find the low ceiling you crawl under)
+      const fl = (x) => { const gy = world ? world.groundBelow(x, st.gy - 10, 40) : st.gy; return gy === null ? st.gy - footR : gy - footR; };
+      const gF = fl(rootX - 16 * s * f), gB = gF;
+      fF = [rootX + (-24 + sw * 5 * moving) * s * f, gF + 1 * s - Math.max(0, cw) * 3 * s * moving, 1.45];
+      fB = [rootX + (-25 - sw * 5 * moving) * s * f, gB + 1 * s - Math.max(0, -cw) * 3 * s * moving, 1.45];
+      spine = [0.12, 0.1];
+      head = -0.15;
+      rate = 20;
     } else if (mode === 'climb') {
       // hand over hand, foot over foot: one limb pair reaches while the other pulls, driven by distance climbed
       rootY = null;
@@ -290,6 +342,16 @@ export class Animator {
       head = -HALF_PI + la * 0.7 + (torso + HALF_PI) * 0.5;
     } else head = torso * 0.5 - HALF_PI * 0.5;
 
+    // flinch from a hit: lean away, arms jerk up, knees give a little
+    if (this.hitK > 0.01 && armF && armB) {
+      const h = this.hitK;
+      torso -= 0.42 * h;
+      armF = [armF[0] - 0.9 * h, armF[1] - 1.1 * h];
+      armB = [armB[0] + 0.5 * h, armB[1] + 0.7 * h];
+      if (rootY !== null && rootY !== undefined) rootY += 3 * s * h;
+      this.hitK = Math.max(0, h - dt * 4.5);
+    }
+    if (this.slowBlend > 0) { rate *= 0.35; this.slowBlend -= dt; }
     // ---------- convert to joint targets ----------
     const down = torso + Math.PI;   // belly->pelvis direction
     tg[0] = spine[0]; tg[1] = spine[1];

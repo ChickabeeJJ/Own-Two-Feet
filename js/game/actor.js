@@ -5,6 +5,7 @@ import { Body, P } from '../physics/body.js';
 import { Animator } from '../physics/pose.js';
 import { Cape, drawBody, drawShadow, bladeGeom } from '../physics/skin.js';
 import { clamp, lerp, sign } from '../core/util.js';
+const smooth01 = (t) => t * t * (3 - 2 * t);
 
 export const PHYS = {
   grav: 2600, maxFall: 1500, run: 300, accG: 3400, decG: 4200, accA: 2300, jumpV: 770, djumpV: 700, cut: 0.42,
@@ -176,7 +177,14 @@ export class Actor {
     this.flash = Math.max(0, this.flash - dt * 6);
     this.attackCD -= dt;
     this.stepped = false;
-    if (this.mode === 'ctrl') { if (this.puppet) this.updatePuppet(dt); else this.updateCtrl(dt); }
+    // pushes from hits arrive as a kick: it throws a knocked body, and only nudges (and flinches) a standing one
+    if (b.kickX || b.kickY) {
+      const kx = b.kickX, ky = b.kickY; b.kickX = b.kickY = 0;
+      if (this.mode === 'limp' || this.mode === 'dead') { c.vx += kx; c.vy += ky; if (ky < 0) c.ground = false; }
+      else if (this.mode === 'ctrl') { c.vx += clamp(kx * 0.45, -320, 320); this.anim.hit(-sign(kx) || -this.facing, Math.min(1, Math.hypot(kx, ky) / 500)); }
+    }
+    if (this.mantle) this.updateMantle(dt);
+    else if (this.mode === 'ctrl') { if (this.puppet) this.updatePuppet(dt); else this.updateCtrl(dt); }
     else if (this.mode === 'limp' || this.mode === 'dead') this.updateLimp(dt);
     else if (this.mode === 'getup') this.updateGetup(dt);
     else if (this.mode === 'script') this.updateScript(dt);
@@ -195,7 +203,6 @@ export class Actor {
     b.oneWayOff = this.dropT > 0 || !!this.c.climb;
     b.step(dt, this.world);
     this.checkWedged(dt);
-    if (this.mode === 'limp' && b.lastHitSpeed > 900 && this.onSplat) this.onSplat(b.lastHitSpeed);
     // cape
     if (this.cape) {
       const ax = lerp(b.x[P.NECK], b.x[P.CHEST], 0.4) - this.facing * 2 * this.scale, ay = lerp(b.y[P.NECK], b.y[P.CHEST], 0.4);
@@ -219,7 +226,9 @@ export class Actor {
     c.buffer = I.jump ? PHYS.buffer : c.buffer - dt;
     c.dashCD -= dt;
     if (c.ground) { c.jumps = 0; c.airDash = 1; }
-    const crouch = I.down && c.ground && !this.attack;
+    const crouch = false;
+    if (I.crawl && c.ground && !c.climb) this.setCrawl(true);
+    else if (this.crawling && (!I.crawl || !c.ground)) this.setCrawl(false);   // stays down under a ceiling
     // dash
     if (I.dash && A.dash && c.dashCD <= 0 && (c.ground || c.airDash > 0)) {
       if (I.mx) this.face(sign(I.mx));
@@ -255,7 +264,7 @@ export class Actor {
       if (c.dashT <= 0) c.vx = this.facing * this.run * 0.9;
     } else {
       // run
-      const target = I.mx * this.run * (crouch ? 0.35 : 1);
+      const target = I.mx * this.run * (this.crawling ? 0.32 : 1);
       const same = Math.sign(target) === Math.sign(c.vx) && Math.abs(target) >= Math.abs(c.vx);
       const acc = c.ground ? (same ? PHYS.accG : PHYS.decG) : PHYS.accA;
       if (c.wallLock > 0) c.wallLock -= dt;
@@ -266,7 +275,8 @@ export class Actor {
       c.wallSlide = A.wall && !c.ground && c.wall !== 0 && I.mx === c.wall && c.vy > 0;
       // jumping
       if (c.buffer > 0) {
-        if (c.coyote > 0) { c.vy = -PHYS.jumpV; c.coyote = 0; c.buffer = 0; c.ground = false; this.jumped('jump'); }
+        if (this.crawling) { c.buffer = 0; }
+        else if (c.coyote > 0) { c.vy = -PHYS.jumpV; c.coyote = 0; c.buffer = 0; c.ground = false; this.jumped('jump'); }
         else if (c.wallSlide || (A.wall && c.wall && !c.ground)) {
           c.vy = -PHYS.wallJumpY; c.vx = -c.wall * PHYS.wallJumpX; c.wallLock = 0.14; c.buffer = 0; this.face(-c.wall); c.jumps = 0; this.jumped('wall');
         } else if (A.djump && c.jumps < 1) {
@@ -279,6 +289,9 @@ export class Actor {
       if (I.climbWall && c.wall === I.climbWall) { c.vy = -190; c.clawing = true; }
       else { c.clawing = false; c.vy = Math.min(c.vy + PHYS.grav * dt, c.wallSlide ? PHYS.wallSlide : PHYS.maxFall); }
     }
+    // ledge mantle: airborne against a wall whose top (2+ blocks up from its foot) is within reach
+    if (this.canMantle && !c.ground && !c.climb && I.mx && c.vy > -320 && c.dashT <= 0 && !this.attack && this.wallAt(sign(I.mx))) this.tryMantle(sign(I.mx));
+    if (this.mantle) return;
     // integrate + collide
     this.moveX(c.vx * dt);
     c.lastVy = c.vy;
@@ -290,12 +303,18 @@ export class Actor {
     else {
       // still grounded? probe just below
       c.ground = (!!this.overlaps(c.x - c.w / 2, c.y, c.x + c.w / 2, c.y + 2) || this.oneWayTop(c.x - c.w / 2, c.x + c.w / 2, c.y - 0.5, c.y + 2) !== null) && c.vy >= 0 && !c.climb;
+      // walking down steps: stick to the ground for drops of up to a block instead of falling each step
+      if (!c.ground && wasGround && c.vy >= 0 && !c.climb && c.dashT <= 0) {
+        for (let d = 4; d <= TILE + 2; d += 4) {
+          if (!this.boxFree(c.x, c.y + d)) { const y = c.y + d - 4; let yy = y; while (this.boxFree(c.x, yy + 1) && yy < c.y + d) yy += 1; c.y = yy; c.ground = true; c.vy = 0; break; }
+        }
+      }
       if (c.ground && !wasGround) this.landed(c.lastVy);
     }
     if (!c.ground && wasGround) c.fallStart = c.y;
     if (c.climb) { c.fallStart = c.y; if (c.ground && I.down) c.ground = false; }
     // drive the animator
-    const mode = c.climb && !c.ground ? 'climb' : this.sitting && c.ground ? 'sit' : c.dashT > 0 ? 'dash' : c.ground ? (this.emote && !I.mx && !this.attack ? 'emote' : 'ground') : (c.wallSlide || c.clawing) ? 'wall' : 'air';
+    const mode = this.crawling ? 'crawl' : c.climb && !c.ground ? 'climb' : this.sitting && c.ground ? 'sit' : c.dashT > 0 ? 'dash' : c.ground ? (this.emote && !I.mx && !this.attack ? 'emote' : 'ground') : (c.wallSlide || c.clawing) ? 'wall' : 'air';
     this.anim.update(dt, {
       mode, x: c.x, gy: c.y, py: c.y - this.pelvisH, vx: c.vx, vy: c.vy, runMax: this.run, attack: this.attack, blade: !!this.blade,
       look: this.look_at, crouch, emote: this.emote, windup: this.telegraph || 0, accel: clamp((I.mx * this.facing), -1, 1) * (c.ground ? 1 : 0), climbD: this.climbD || 0,
@@ -320,29 +339,69 @@ export class Actor {
     if (this.mode === 'dead') return;
     this.mode = 'limp';
     this.limpT = time;
-    this.attack = null;
-    this.body.impulseAll(vx, vy);
-    this.c.dashT = 0;
+    this.attack = null; this.mantle = null;
+    const c = this.c;
+    c.vx += vx; c.vy = Math.min(c.vy, 0) + vy; if (vy < 0) c.ground = false;
+    c.dashT = 0; c.climb = false;
+    if (this.crawling) this.setCrawl(false);
   }
+  // knocked down (or dead): an animated fall, not a ragdoll. The controller flies with the knock,
+  // bounces once, slides to a stop; the body tumbles in the air and lies on its back on the ground.
   updateLimp(dt) {
-    const b = this.body, c = this.c;
+    const c = this.c;
     this.limpT -= dt;
-    // controller rides along with the pelvis
-    c.x = b.x[P.PELVIS]; c.y = b.y[P.PELVIS] + this.pelvisH * 0.6;
-    c.vx = b.vx[P.PELVIS]; c.vy = b.vy[P.PELVIS];
+    c.vy = Math.min(c.vy + PHYS.grav * dt, PHYS.maxFall);
+    if (this.moveX(c.vx * dt)) c.vx *= -0.25;
+    const hy = this.moveY(c.vy * dt);
+    if (hy === 1) { c.vy = c.vy > 520 ? -c.vy * 0.22 : 0; c.ground = c.vy === 0; }
+    else if (hy === -1) c.vy = Math.max(0, c.vy);
+    else c.ground = !!this.overlaps(c.x - c.w / 2, c.y, c.x + c.w / 2, c.y + 2) && c.vy >= 0;
+    if (c.ground) c.vx *= Math.pow(0.004, dt);
+    const lying = c.ground && Math.abs(c.vy) < 60;
+    this.anim.update(dt, { mode: lying ? 'down' : 'tumble', x: c.x, gy: c.y, py: c.y - this.pelvisH * 0.7, vx: c.vx, vy: c.vy }, this.world);
     if (this.mode === 'dead') { this.deadT += dt; return; }
-    if (this.limpT <= 0 && b.restSpeed() < 160) {
-      // stand back up from wherever the body came to rest
-      const gy = this.world.groundBelow(b.x[P.PELVIS], b.y[P.PELVIS] - 6, 160);
-      c.x = b.x[P.PELVIS];
-      c.y = gy === null ? b.y[P.PELVIS] + 20 : gy;
-      this.unstick();
+    if (this.limpT <= 0 && lying && Math.abs(c.vx) < 40) {
       c.vx = c.vy = 0;
+      this.unstick();
       this.mode = 'getup'; this.getupT = 0;
-      // face the way the body ended up
-      const hx = b.x[P.HEAD] - b.x[P.PELVIS];
-      if (Math.abs(hx) > 4 && sign(hx) !== this.facing) this.facing = sign(hx), this.body.facing = this.facing;
     }
+  }
+  tryMantle(dir) {
+    const c = this.c, W = this.world;
+    const tx = Math.floor((c.x + dir * (c.w / 2 + 6)) / TILE);
+    for (let ty = Math.floor((c.y - 96) / TILE); ty <= Math.floor((c.y + 8) / TILE); ty++) {
+      const top = ty * TILE, rel = c.y - top;
+      if (rel < 18 || rel > 92) continue;   // the edge must be above the feet (else you'd just land) and within reach
+      if (!W.solid(tx, ty) || W.solid(tx, ty - 1) || W.solid(tx, ty - 2) || W.solid(tx, ty - 3)) continue;
+      if (!W.solid(tx, ty + 1)) continue;                 // a wall at least two blocks tall
+      const x1 = tx * TILE + TILE / 2 + dir * 6;
+      if (!this.boxFree(x1, top) || !this.boxFree(c.x, Math.min(c.y, top))) continue;
+      this.mantle = { t: 0, dur: 0.62, x0: c.x, y0: c.y, x1, y1: top, dir };
+      c.vx = c.vy = 0; this.attack = null; this.face(dir);
+      if (this.onMantle) this.onMantle();
+      return true;
+    }
+    return false;
+  }
+  updateMantle(dt) {
+    const m = this.mantle, c = this.c;
+    m.t += dt / m.dur;
+    const u = Math.min(1, m.t);
+    // rise along the wall first, then roll over the lip
+    const up = smooth01(Math.min(1, u / 0.6)), over = smooth01(Math.max(0, (u - 0.5) / 0.5));
+    c.y = m.y0 + (m.y1 - m.y0) * up;
+    c.x = m.x0 + (m.x1 - m.x0) * over;
+    this.anim.update(dt, { mode: 'mantle', mantle: u, x: c.x, gy: c.y, py: c.y - this.pelvisH, vx: 0, vy: 0 }, this.world);
+    if (u >= 1) { this.mantle = null; c.ground = true; c.vy = 0; this.anim.slowBlend = 0.32; }
+  }
+  // crawling: a body one block tall
+  setCrawl(on) {
+    const c = this.c, s = this.scale;
+    if (on === !!this.crawling) return true;
+    if (!on) { const h0 = c.h; c.h = 82 * s; if (!this.boxFree(c.x, c.y)) { c.h = h0; return false; } }
+    else c.h = 28 * s;
+    this.crawling = on;
+    return true;
   }
   updateGetup(dt) {
     const c = this.c;

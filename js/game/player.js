@@ -55,7 +55,8 @@ export class Player {
       else game.fx.dust(a.c.x, a.c.y - 2, 4, '#d8cfc0', -Math.PI / 2, 90);
     };
     a.onDash = () => { Audio.play('dash'); game.fx.dust(a.c.x - a.facing * 10, a.c.y - 20, 6, '#e8e0d0', Math.PI * (a.facing > 0 ? 1 : 0), 160); game.pulse(0.6); };
-    a.onSplat = (v) => { if (v > 1100) { Audio.play('hit', { vol: 0.5, gap: 0.15 }); game.shake(0.15); } };
+    a.canMantle = true;
+    a.onMantle = () => { Audio.play('step', { pitch: 0.8 }); game.fx.dust(a.c.x + a.facing * 12, a.c.y - 70, 4, '#d8cfc0', -Math.PI / 2, 60); };
   }
   get x() { return this.actor.c.x; }
   get y() { return this.actor.c.y; }
@@ -89,7 +90,8 @@ export class Player {
       I.jumpHeld = !!Input.down.jump;
       I.dash = Input.pressed('dash');
       I.up = Input.axis.y < -0.5; I.down = Input.axis.y > 0.5;
-    } else { I.mx = 0; I.jump = I.dash = false; I.jumpHeld = false; I.up = I.down = false; }
+      I.crawl = !!Input.down.crawl;
+    } else { I.mx = 0; I.jump = I.dash = false; I.jumpHeld = false; I.up = I.down = false; I.crawl = false; }
     // mouse aim
     const m = Input.mouse;
     if (m.moved) { this.lastMouse = g.time; m.moved = false; }
