@@ -113,19 +113,28 @@ export class Wisp {
       if (this.deadT > 0.6) this.removed = true;
       return;
     }
+    // knocked out of the air (sling, heavy hits): drops and flounders for a moment
+    if (this.stunT > 0) {
+      this.stunT -= dt; c.vy = Math.min(c.vy + 900 * dt, 420); c.vx *= Math.pow(0.1, dt);
+      c.x += c.vx * dt; c.y += c.vy * dt;
+      if (g.world.solidAt(c.x, c.y + 10)) { c.vy = 0; c.y -= 2; }
+      this.windup = 0; return;
+    }
     const p = g.player && !g.player.dead ? g.player.actor : null;
     let tx = c.x + Math.sin(this.t * 0.7) * 40, ty = c.y + Math.cos(this.t * 0.9) * 20;
+    // underground they keep closer to the ceiling of the tunnel and shoot far less often
+    const under = p && p.c.y > (g.world.surface(Math.floor(p.c.x / TILE)) + 4) * TILE;
     if (p && Math.abs(p.c.x - c.x) < 700) {
       const side = sign(c.x - p.c.x) || 1;
       tx = p.c.x + side * 210 + Math.sin(this.t) * 40; ty = p.c.y - 150 + Math.cos(this.t * 1.3) * 30;
       this.cd -= dt;
-      if (this.cd < 0.6 && !this.windup) { this.windup = 0.6; Audio.play('shard', { pitch: 0.7, vol: 0.5 }); }
+      if (this.cd < 0.9 && !this.windup) { this.windup = 0.9; Audio.play('shard', { pitch: 0.7, vol: 0.5 }); }
       if (this.windup) {
         this.windup -= dt;
         if (this.windup <= 0) {
-          this.windup = 0; this.cd = rand(2.2, 3.2) - this.tier * 0.2;
+          this.windup = 0; this.cd = rand(3.2, 4.4) * (under ? 1.6 : 1) - this.tier * 0.2;
           const dx = p.c.x - c.x, dy = p.cy - c.y, d = Math.hypot(dx, dy) || 1;
-          const sp = 300 + this.tier * 30;
+          const sp = 230 + this.tier * 25;
           g.projectiles.push(new Proj(g, { x: c.x, y: c.y, vx: dx / d * sp, vy: dy / d * sp, r: 7, col: this.col, life: 4 }));
           Audio.play('shoot');
         }
@@ -140,6 +149,7 @@ export class Wisp {
     const g = this.game;
     this.hp -= dmg; this.flash = 1;
     this.c.vx += info.dx * 420; this.c.vy += (info.dy || -0.3) * 300;
+    if (info.finisher || (info.poise || 0) > 14) this.stunT = 1.2;
     this.windup = 0; this.cd = Math.max(this.cd, 1);
     if (this.hp <= 0) g.enemies.kill(this, info);
   }
@@ -286,6 +296,7 @@ export class Enemies {
       look: brute ? BRUTE_LOOK(eye) : HUSK_LOOK(eye), hp: (brute ? 90 : 28) * (1 + tier * 0.55), run: brute ? 120 : 175, facing: -1,
     });
     e.kind = kind; e.tier = tier; e.noCrumple = true;
+    e.maxPoise = e.poise = brute ? 70 : 26;
     e.ai = { state: 'wander', t: rand(1, 3), dir: Math.random() < 0.5 ? -1 : 1, cd: 0 };
     e.hurt = (dmg, info) => this.hurt(e, dmg, info);
     e.glowEye = eye;
@@ -299,6 +310,12 @@ export class Enemies {
     I.jump = false; I.attack = false; I.dash = false; I.climbWall = 0;
     if (e.mode !== 'ctrl') { I.mx = 0; return; }
     ai.t -= dt; ai.cd -= dt;
+    // status: burning or bleeding ticks, frost slows, poise refills after a while, stagger wobbles
+    if (e.dot) { e.dot.t -= dt; e.dot.acc = (e.dot.acc || 0) + dt; if (e.dot.acc >= e.dot.tick) { e.dot.acc = 0; this.hurt(e, Math.ceil(e.dot.dps * e.dot.tick), { x: e.cx, y: e.cy, dx: 0, dy: 0, dot: true }); g.fx.burst(e.cx, e.cy, { n: 4, speed: 90, col: e.dot.col, col1: '#ffffff', add: true, life: 0.4, size: 2, kind: 'mote' }); } if (e.dot && e.dot.t <= 0) e.dot = null; }
+    if (e.slowT > 0) e.slowT -= dt;
+    e.run = (e.baseRun || (e.baseRun = e.run)) * (e.slowT > 0 ? 0.5 : 1);
+    if (e.poiseT > 0) { e.poiseT -= dt; if (e.poiseT <= 0) e.poise = e.maxPoise; }
+    if (ai.state === 'stagger') { I.mx = 0; e.telegraph = 0; if (ai.t <= 0) { e.staggered = false; e.poise = e.maxPoise; ai.state = 'recover'; ai.t = 0.3; } return; }
     const dx = p ? p.c.x - c.x : 1e9, dy = p ? p.c.y - c.y : 1e9;
     const sees = p && Math.abs(dx) < 420 && Math.abs(dy) < 210;
     const brute = e.kind === 'brute';
@@ -351,7 +368,7 @@ export class Enemies {
           Audio.play('slam', { vol: 0.8 }); g.shake(0.3);
           g.fx.ring(fx, c.y - 4, 8, 90, 0.4, '#ffd2a0', 5); g.fx.dust(fx, c.y - 4, 10, '#e8dccb', -Math.PI / 2, 200);
           for (const d of [-1, 1]) g.projectiles.push(new Proj(g, { kind: 'wave', x: fx, y: c.y, vx: d * 380, life: 1.6, col: '#ffb36b' }));
-          if (p && Math.abs(p.c.x - fx) < 70 && Math.abs(p.c.y - c.y) < 60) this.hitTarget(p, 1, fx, c.y - 20, { knock: 520, lift: 480 });
+          if (p && Math.abs(p.c.x - fx) < 70 && Math.abs(p.c.y - c.y) < 60) this.hitTarget(p, 1, fx, c.y - 20, { knock: 520, lift: 480 }, e);
         }
         if (!brute && !ai.hit && p) {
           // claws: the actual hands must reach the player's body
@@ -363,7 +380,7 @@ export class Enemies {
             if (ai.hit) break;
           }
           if (!ai.hit && Math.abs(dx) < 36 && Math.abs(dy) < 50) ai.hit = true;
-          if (ai.hit) this.hitTarget(p, 1, c.x, c.y - 50);
+          if (ai.hit) this.hitTarget(p, 1, c.x, c.y - 50, undefined, e);
         }
         if (ai.t <= 0) { ai.state = 'recover'; ai.t = brute ? 0.9 : 0.55; ai.slammed = false; ai.cd = brute ? 1.6 : 0.9; }
         break;
@@ -384,8 +401,9 @@ export class Enemies {
     }
     return best;
   }
-  hitTarget(a, n, x, y, o) {
+  hitTarget(a, n, x, y, o, from) {
     const g = this.game;
+    if (a === g.player.actor && from && g.player.tryParry(from)) return;
     if (a === g.player.actor) g.player.takeHit(n, x, y, o);
     else if (g.net) { g.net.hitRemote(a, n, x, y, o); a.takeImpulse(x, y, sign(a.c.x - x) * 400, -200, 0.6); }
   }
@@ -397,13 +415,37 @@ export class Enemies {
   hurt(e, dmg, info) {
     const g = this.game;
     if (e.mode === 'dead') return;
+    // elites with a guard turn aside blows from the front unless the guard is broken
+    if (e.guard && !e.staggered && !info.breaksGuard && !info.dot && sign(info.dx || 0) === -e.facing) {
+      e.poise = Math.max(0, (e.poise || 0) - (info.poise || 8) * 0.5);
+      if (e.poise <= 0) this.stagger(e, 1.6);
+      e.flash = 0.6; return 'armor';
+    }
     e.hp -= dmg; e.flash = 1;
-    const k = e.kind === 'brute' ? 0.45 : 1;
+    if (info.dot) { if (e.hp <= 0) this.kill(e, info); return; }
+    const k = (e.kind === 'brute' || e.elite ? 0.45 : 1) * (info.knock || 1);
     e.takeImpulse(info.x, info.y, info.dx * 700 * k, (info.dy || -0.3) * 500 * k, e.kind === 'brute' ? 0.4 : 0.8);
     e.c.vx += info.dx * 340 * k;
     if (info.dy < 0) e.c.vy = Math.min(e.c.vy, -260 * k);
+    // launches and air juggles
+    if (info.launch) { e.c.vy = -820; e.c.ground = false; if (e.ai) { e.ai.state = 'recover'; e.ai.t = 1.0; } }
+    else if (!e.c.ground && e.mode === 'ctrl') e.c.vy = Math.min(e.c.vy, -300);
+    // poise breaks into a stagger
+    if (e.poise !== undefined) { e.poise -= info.poise || 8; e.poiseT = 2.2; if (e.poise <= 0 && !e.staggered) this.stagger(e, 1.4); }
+    // bleed, burn, frost
+    if (info.bleed) e.dot = { t: 2.4, tick: 0.4, dps: 2.5, col: '#ff6a6a' };
+    if (info.element === 'ember') e.dot = { t: 3.5, tick: 0.5, dps: 4, col: '#ff9b4a' };
+    if (info.element === 'frost') e.slowT = 3;
     if (e.ai && e.ai.state === 'windup' && e.kind !== 'brute') { e.ai.state = 'recover'; e.ai.t = 0.4; }
     if (e.hp <= 0) this.kill(e, info);
+  }
+  stagger(e, t) {
+    e.staggered = true; e.staggerT = t; e.poise = 0;
+    if (e.ai) { e.ai.state = 'stagger'; e.ai.t = t; }
+    e.attack = null; e.telegraph = 0;
+    if (e.anim) e.anim.hit(-e.facing, 1);
+    this.game.fx.ring(e.cx, e.c.y - 90 * e.scale, 4, 30, 0.4, '#ffe3a0', 3);
+    Audio.play('clang', { pitch: 0.6, vol: 0.6 });
   }
   kill(e, info) {
     const g = this.game;

@@ -391,10 +391,56 @@ export function bladeGeom(b, look, a) {
   const s = b.s;
   const ex = b.ipx(P.ELB_F, a), ey = b.ipy(P.ELB_F, a), hx = b.ipx(P.HAND_F, a), hy = b.ipy(P.HAND_F, a);
   const ang = Math.atan2(hy - ey, hx - ex);
-  const L = (look.blade ? look.blade.len : 30) * s;
+  const L = (look.weaponLen || (look.blade ? look.blade.len : 30)) * s;
   return { x0: hx, y0: hy, x1: hx + Math.cos(ang) * L, y1: hy + Math.sin(ang) * L, ang };
 }
+// the weapon in hand, by kind; infused weapons glow with their element
 export function drawBlade(g, b, look, a, o) {
+  const w = look.weapon;
+  if (look.infuse && o.glows) { const geo = bladeGeom(b, look, a); o.glows.push([lerp(geo.x0, geo.x1, 0.6), lerp(geo.y0, geo.y1, 0.6), 18 * b.s, look.infuse, 0.35]); }
+  if (w === 'w_spear') return drawSpear(g, b, look, a);
+  if (w === 'w_hammer') return drawHammerW(g, b, look, a);
+  if (w === 'w_daggers') { drawDagger(g, b, look, a, P.ELB_B, P.HAND_B); return drawDagger(g, b, look, a, P.ELB_F, P.HAND_F); }
+  if (w === 'w_sling') return drawSling(g, b, look, a, o);
+  drawSword(g, b, look, a, o);
+}
+function handDir(b, a, e, h) { const ex = b.ipx(e, a), ey = b.ipy(e, a), hx = b.ipx(h, a), hy = b.ipy(h, a); const ang = Math.atan2(hy - ey, hx - ex); return { hx, hy, ang, ux: Math.cos(ang), uy: Math.sin(ang) }; }
+function drawSpear(g, b, look, a) {
+  const s = b.s, d = handDir(b, a, P.ELB_F, P.HAND_F), L = (look.weaponLen || 54) * s, B = 16 * s;
+  capsule(g, d.hx - d.ux * B, d.hy - d.uy * B, d.hx + d.ux * L * 0.86, d.hy + d.uy * L * 0.86, 1.3 * s, 1.3 * s, '#7a5a3e', { dark: 0.35 });
+  const tx = d.hx + d.ux * L, ty = d.hy + d.uy * L, nx = -d.uy, ny = d.ux, bx = d.hx + d.ux * L * 0.8, by = d.hy + d.uy * L * 0.8;
+  g.fillStyle = '#cfd6de';
+  g.beginPath(); g.moveTo(bx, by); g.quadraticCurveTo(bx + d.ux * 6 * s + nx * 4 * s, by + d.uy * 6 * s + ny * 4 * s, tx, ty); g.quadraticCurveTo(bx + d.ux * 6 * s - nx * 4 * s, by + d.uy * 6 * s - ny * 4 * s, bx, by); g.fill();
+  g.strokeStyle = rgba('#ffffff', 0.7); g.lineWidth = 0.7 * s; g.beginPath(); g.moveTo(bx + d.ux * 2 * s, by + d.uy * 2 * s); g.lineTo(tx, ty); g.stroke();
+  g.fillStyle = '#c9a45c'; g.beginPath(); g.arc(bx, by, 1.8 * s, 0, TAU); g.fill();
+}
+function drawHammerW(g, b, look, a) {
+  const s = b.s, d = handDir(b, a, P.ELB_F, P.HAND_F), L = (look.weaponLen || 34) * s;
+  capsule(g, d.hx - d.ux * 6 * s, d.hy - d.uy * 6 * s, d.hx + d.ux * L, d.hy + d.uy * L, 1.6 * s, 1.6 * s, '#6e523b', { dark: 0.35 });
+  g.save(); g.translate(d.hx + d.ux * L, d.hy + d.uy * L); g.rotate(d.ang + Math.PI / 2);
+  const gr = g.createLinearGradient(-9 * s, 0, 9 * s, 0); gr.addColorStop(0, '#5a5560'); gr.addColorStop(0.5, '#8a8590'); gr.addColorStop(1, '#4a4650');
+  g.fillStyle = gr; g.beginPath(); g.roundRect(-10 * s, -6 * s, 20 * s, 12 * s, 3 * s); g.fill();
+  g.fillStyle = '#c9a45c'; g.fillRect(-10 * s, -1 * s, 20 * s, 2 * s);
+  g.restore();
+}
+function drawDagger(g, b, look, a, e, h) {
+  const s = b.s, d = handDir(b, a, e, h), L = (look.weaponLen || 19) * s, nx = -d.uy, ny = d.ux;
+  const x0 = d.hx + d.ux * 3 * s, y0 = d.hy + d.uy * 3 * s, tx = d.hx + d.ux * L, ty = d.hy + d.uy * L;
+  g.fillStyle = '#d8dee6';
+  g.beginPath(); g.moveTo(x0 + nx * 1.8 * s, y0 + ny * 1.8 * s); g.lineTo(tx, ty); g.lineTo(x0 - nx * 1.8 * s, y0 - ny * 1.8 * s); g.closePath(); g.fill();
+  capsule(g, x0 + nx * 3.5 * s, y0 + ny * 3.5 * s, x0 - nx * 3.5 * s, y0 - ny * 3.5 * s, 1 * s, 1 * s, '#c9a45c', { dark: 0.4 });
+  g.strokeStyle = '#3a2c2a'; g.lineWidth = 1.8 * s; g.beginPath(); g.moveTo(d.hx - d.ux * 4 * s, d.hy - d.uy * 4 * s); g.lineTo(x0, y0); g.stroke();
+}
+function drawSling(g, b, look, a, o) {
+  const s = b.s, d = handDir(b, a, P.ELB_F, P.HAND_F);
+  const t = (o.time || 0) * 3, len = 16 * s;
+  const px = d.hx + d.ux * len * 0.5 + Math.sin(t) * 2 * s, py = d.hy + d.uy * len * 0.5 + 9 * s;
+  g.strokeStyle = '#8a6a4c'; g.lineWidth = 1.2 * s;
+  g.beginPath(); g.moveTo(d.hx, d.hy); g.quadraticCurveTo(d.hx + d.ux * 4 * s, py + 2 * s, px, py); g.stroke();
+  g.fillStyle = '#6e523b'; g.beginPath(); g.ellipse(px, py, 3.2 * s, 2.2 * s, 0, 0, TAU); g.fill();
+  g.fillStyle = '#9a96a0'; g.beginPath(); g.arc(px, py - 1 * s, 1.6 * s, 0, TAU); g.fill();
+}
+function drawSword(g, b, look, a, o) {
   const s = b.s;
   const geo = bladeGeom(b, look, a);
   const bl = look.blade;

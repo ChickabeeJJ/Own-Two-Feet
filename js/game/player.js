@@ -8,6 +8,7 @@ import { lookFromSave, Save } from './progress.js';
 import { Cape } from '../physics/skin.js';
 import { clamp, lerp, segPointDist2, rgba, TAU, rand, sign } from '../core/util.js';
 import { norm, placeable, usable, onHotbar, ITEMS } from './items.js';
+import { WEAPONS, weaponOf, weaponId, INFUSE } from './weapons.js';
 
 const REACH = 6 * TILE;
 
@@ -89,6 +90,8 @@ export class Player {
       I.jump = Input.pressed('jump');
       I.jumpHeld = !!Input.down.jump;
       I.dash = Input.pressed('dash');
+      // daggers can cut a swing short with a dash
+      if (I.dash && a.attack && weaponId(this.sv) === 'w_daggers') a.attack = null;
       I.up = Input.axis.y < -0.5; I.down = Input.axis.y > 0.5;
       I.crawl = !!Input.down.crawl;
     } else { I.mx = 0; I.jump = I.dash = false; I.jumpHeld = false; I.up = I.down = false; I.crawl = false; }
@@ -255,6 +258,15 @@ export class Player {
       Audio.play('heal'); a.doEmote && a.doEmote('cheer', 0.6);
       return;
     }
+    if (id === 'i_infuse_ember' || id === 'i_infuse_frost') {
+      const w = weaponId(this.sv);
+      if (!this.take(id, 1)) return;
+      (this.sv.infuse = this.sv.infuse || {})[w] = id === 'i_infuse_ember' ? 'ember' : 'frost';
+      this.refreshLook();
+      g.ui && g.ui.toast(`${WEAPONS[w].name} infused with ${INFUSE[this.sv.infuse[w]].name.toLowerCase()}`);
+      Audio.play('confirm'); g.fx.ring(a.c.x, a.c.y - 50, 6, 60, 0.4, INFUSE[this.sv.infuse[w]].col, 4);
+      return;
+    }
     if (id === 'i_flare' || id === 'i_charge') {
       if (!g.throwables || !this.take(id, 1)) return;
       const ox = a.c.x + a.facing * 10, oy = a.c.y - 60;
@@ -348,43 +360,98 @@ export class Player {
   }
 
   // ------------------------------------------------------------ combat
+  // ------------------------------------------------------------ combat
+  // tap Strike for the weapon's combo chain (presses during a swing are buffered), hold it to charge a
+  // heavy, Strike + up on the ground launches, down in the air pogos. Striking just as a Hollow's blow
+  // lands parries it. Staggered or nearly-dead Hollows (and some chain enders) get a finisher.
   updateCombat(dt, wp) {
-    const g = this.game, a = this.actor;
-    const wantAttack = Input.pressed('attack') || (this.mouseAim && Input.mouse.lp && !(this.cursor && this.cursor.canMine && !this.buildMode && !this.foeNear));
+    const g = this.game, a = this.actor, W = weaponOf(this.sv);
+    const mouseHold = this.mouseAim && Input.mouse.l && (this.foeNear || !(this.cursor && this.cursor.canMine));
+    const held = !!Input.down.attack || mouseHold;
+    const pressed = Input.pressed('attack') || (this.mouseAim && Input.mouse.lp && !(this.cursor && this.cursor.canMine && !this.buildMode && !this.foeNear));
     if (this.consumeAttack) { this.consumeAttack = false; if (!Input.pressed('attack')) return this.activeHits(dt); }
-    if (wantAttack && this.sv.hasBlade && !this.buildMode && a.mode === 'ctrl' && a.attackCD <= 0) {
-      let kind;
-      const air = !a.c.ground;
-      if (this.mouseAim && Input.mouse.lp) {
-        const dx = wp.x - a.c.x, dy = wp.y - (a.c.y - 50);
-        const ang = Math.atan2(dy, Math.abs(dx));
-        if (Math.abs(dx) > 8) a.face(sign(dx));
-        kind = ang < -0.9 ? 'up' : ang > 0.9 && air ? 'down' : null;
-      } else kind = a.intent.up ? 'up' : a.intent.down && air ? 'down' : null;
-      if (!kind) { kind = a.combo % 2 ? 'side2' : 'side'; a.combo++; }
-      if (kind === 'down' && this.sv.abil.plunge && Input.axis.y > 0.5) { this.plunge(); return; }
-      a.startAttack(kind, 0.3);
-      a.attackCD = 0.34;
-      Audio.play('swing', { pitch: rand(0.9, 1.15) });
-      this.slashPts = [];
+    this.counterT = Math.max(0, (this.counterT || 0) - dt);
+    if (this.punchT > 0) { this.punchT -= dt; if (this.punchT <= 0 && !(g.bagK > 0.05)) g.cam.zoomT = 1; }
+    const able = this.sv.hasBlade && !this.buildMode && a.mode === 'ctrl' && !a.crawling && !a.mantle;
+    if (!able) { this.charging = false; this.chargeK = 0; this.holdT = 0; return this.activeHits(dt); }
+    if (!a.attack) { this.comboT = (this.comboT || 0) + dt; if (this.comboT > 0.6) this.chainI = 0; }
+    // charge
+    if (held && !a.attack && !W.ranged) {
+      this.holdT = (this.holdT || 0) + dt;
+      if (this.holdT > 0.28 && !this.charging) { this.charging = true; Audio.play('shard', { pitch: 0.6, vol: 0.4 }); }
+    } else if (!held && !this.charging) this.holdT = 0;
+    if (this.charging) {
+      this.chargeK = Math.min(1, (this.holdT - 0.28) / 0.55);
+      if (this.chargeK >= 1 && !this.chargeFull) { this.chargeFull = true; Audio.play('chime', { pitch: 1.6, vol: 0.5 }); g.fx.ring(a.c.x + a.facing * 18, a.c.y - 50, 4, 40, 0.3, '#ffe3a0', 3); }
+      if (!held) { this.heavy(W); this.charging = false; this.chargeK = 0; this.chargeFull = false; this.holdT = 0; }
     }
+    if (pressed && !this.charging) {
+      if (a.attack && a.attack.kind !== 'mine') { if (a.attack.t > 0.35) this.queued = true; }
+      else if (a.attackCD <= 0) this.lightAttack(W, wp);
+    }
+    if (!a.attack && this.queued && a.attackCD <= 0) { this.queued = false; this.lightAttack(W, wp); }
     this.activeHits(dt);
+  }
+  lightAttack(W, wp) {
+    const a = this.actor, air = !a.c.ground;
+    let kind = null;
+    if (this.mouseAim && Input.mouse.lp) {
+      const dx = wp.x - a.c.x, dy = wp.y - (a.c.y - 50);
+      const ang = Math.atan2(dy, Math.abs(dx));
+      if (Math.abs(dx) > 8) a.face(sign(dx));
+      kind = ang < -0.9 ? 'up' : ang > 0.9 && air ? 'down' : null;
+    } else kind = a.intent.up ? 'up' : a.intent.down && air ? 'down' : null;
+    if (W.ranged) kind = null;
+    if (kind === 'down' && this.sv.abil.plunge && Input.axis.y > 0.5) { this.plunge(); return; }
+    let step;
+    if (kind) step = { k: kind, dur: 0.3, launch: kind === 'up' && !air };
+    else { step = W.chain[(this.chainI || 0) % W.chain.length]; this.chainI = (this.chainI || 0) + 1; }
+    const dur = step.dur / (W.speed > 1 ? Math.sqrt(W.speed) : 1);
+    a.startAttack(step.k, dur);
+    a.attack.step = step; a.attack.W = W;
+    a.attackCD = dur * 0.82;
+    this.comboT = 0;
+    this.slashPts = [];
+    Audio.play('swing', { pitch: rand(0.9, 1.15) * (W === WEAPONS.w_hammer ? 0.6 : W === WEAPONS.w_daggers ? 1.4 : 1) });
+  }
+  heavy(W) {
+    const a = this.actor, g = this.game, H = W.heavy;
+    const k = 0.5 + this.chargeK * 0.5;
+    a.startAttack(H.k, H.dur);
+    a.attack.step = Object.assign({}, H, { mult: H.mult * k, heavy: true, ender: true });
+    a.attack.W = W;
+    a.attackCD = H.dur * 0.9;
+    this.chainI = 0; this.slashPts = [];
+    if (H.dash) { a.c.vx = a.facing * H.dash; a.inv = Math.max(a.inv, 0.25); }
+    if (H.k === 'cleave') { a.c.vy = Math.min(a.c.vy, -340); }
+    Audio.play('swing', { pitch: 0.7 }); Audio.play('dash', { pitch: 0.8, vol: 0.6 });
+    g.shake(0.1);
   }
   activeHits(dt) {
     const g = this.game, a = this.actor;
     const at = a.attack;
     if (!at) { a.prevBlade = null; return; }
     if (at.kind === 'mine') { a.prevBlade = null; return; }   // digging never cuts or leaves a slash
+    const step = at.step || {}, W = at.W || weaponOf(this.sv);
+    // the sling releases a shot instead of cutting
+    if (W.ranged) {
+      if (at.t > 0.45 && !at.fired) { at.fired = true; this.fireSling(W, step); }
+      return;
+    }
     const seg = a.bladeSeg(1);
     const prev = a.prevBlade || seg;
     a.prevBlade = seg;
-    const active = at.t > 0.16 && at.t < 0.66;
+    const active = at.t > 0.16 && at.t < 0.7;
     if (!active) return;
+    // multi-hit moves open fresh hit windows
+    if (step.multi) { const win = Math.floor(at.t * step.multi); if (win !== at.win) { at.win = win; at.hits.clear(); } }
     if (this.slashPts) this.slashPts.push([seg.x0, seg.y0, seg.x1, seg.y1]);
     if (this.slashPts && this.slashPts.length >= 2 && at.t > 0.5 && !at.slashed) {
       at.slashed = true;
-      g.fx.slash(this.slashPts, a.look.blade.glow || '#9ff3ff');
+      g.fx.slash(this.slashPts, a.look.infuse || a.look.blade.glow || '#9ff3ff', step.heavy || step.ender ? 1.6 : 1);
     }
+    // the hammer's slam meets the ground
+    if (step.quake && at.t > 0.55 && !at.quaked) { at.quaked = true; this.quake(step); }
     const tipSpeed = Math.hypot(seg.x1 - prev.x1, seg.y1 - prev.y1) / dt;
     for (const e of g.targets()) {
       if (at.hits.has(e.id) || e.mode === 'dead') continue;
@@ -407,26 +474,97 @@ export class Player {
       at.hits.add(e.id);
       const dirx = at.kind === 'up' ? 0 : at.kind === 'down' ? 0 : a.facing;
       const diry = at.kind === 'up' ? -1 : at.kind === 'down' ? 1 : -0.25;
-      this.strike(e, hx, hy, dirx, diry, clamp(0.75 + tipSpeed / 3000, 0.75, 1.35), at.kind);
+      this.strike(e, hx, hy, dirx, diry, clamp(0.8 + tipSpeed / 3200, 0.8, 1.3) * (step.mult || 1), at.kind, { W, step });
     }
   }
-  strike(e, hx, hy, dirx, diry, mult, kind) {
-    const g = this.game, a = this.actor;
-    const dmg = Math.round((10 + this.sv.lvl.blade * 4) * mult);
-    const res = e.hurt ? e.hurt(dmg, { x: hx, y: hy, dx: dirx, dy: diry, from: this, kind }) : null;
+  strike(e, hx, hy, dirx, diry, mult, kind, o = {}) {
+    const g = this.game, a = this.actor, W = o.W || weaponOf(this.sv), step = o.step || {};
+    let dmg = Math.round(W.dmg * (1 + this.sv.lvl.blade * 0.35) * mult);
+    // finishers: a staggered or nearly-undone Hollow, a countered one, or now and then a chain ender
+    const low = e.hp !== undefined && e.maxHp && e.hp - dmg <= e.maxHp * 0.2;
+    const fin = kind !== 'surge' && kind !== 'plunge' && !e.isBoss && (e.staggered || this.counterT > 0 || (low && Math.random() < 0.55) || (step.ender && Math.random() < 0.3));
+    if (this.counterT > 0) dmg = Math.round(dmg * 1.6);
+    if (fin) dmg = Math.round(dmg * (e.staggered ? 3 : 2));
+    const infuse = this.sv.infuse && this.sv.infuse[weaponId(this.sv)];
+    const res = e.hurt ? e.hurt(dmg, { x: hx, y: hy, dx: dirx, dy: diry, from: this, kind, poise: W.poise * (step.poise || 1) * mult, knock: W.knock * (step.heavy ? 1.6 : 1), launch: step.launch, bleed: W.bleed, element: infuse, finisher: fin, breaksGuard: W === WEAPONS.w_hammer || step.heavy }) : null;
     const armored = res === 'armor';
-    // feedback
-    g.hitstop(armored ? 0.04 : 0.06);
-    g.shake(armored ? 0.12 : 0.18);
-    Audio.play(armored ? 'clang' : 'hit', { pitch: rand(0.9, 1.1) });
-    g.fx.sparks(hx, hy, Math.atan2(diry, dirx || 0.0001), armored ? 14 : 9, armored ? '#ffe3a0' : '#ffffff');
-    g.fx.ring(hx, hy, 4, 26, 0.18, '#ffffff', 3);
-    g.fx.flash('fx/spark', hx, hy, armored ? 70 : 90, Math.random() * 0.6, 0.2);
-    g.pulse(0.5);
+    // feedback scaled by weight
+    const heavyHit = step.heavy || step.ender || W === WEAPONS.w_hammer;
+    g.hitstop(fin ? 0.13 : armored ? 0.04 : heavyHit ? 0.085 : W.speed > 1.2 ? 0.035 : 0.06);
+    g.shake(fin ? 0.45 : armored ? 0.12 : heavyHit ? 0.3 : 0.16);
+    Audio.play(armored ? 'clang' : 'hit', { pitch: rand(0.9, 1.1) * (W === WEAPONS.w_hammer ? 0.7 : 1) });
+    g.fx.sparks(hx, hy, Math.atan2(diry, dirx || 0.0001), armored ? 14 : heavyHit ? 16 : 9, armored ? '#ffe3a0' : infuse ? (infuse === 'ember' ? '#ffb36b' : '#dff6ff') : '#ffffff');
+    g.fx.ring(hx, hy, 4, heavyHit ? 44 : 26, 0.18, '#ffffff', 3);
+    g.fx.flash('fx/spark', hx, hy, armored ? 70 : heavyHit ? 120 : 90, Math.random() * 0.6, 0.2);
+    g.pulse(heavyHit ? 0.8 : 0.5);
+    if (navigator.vibrate && g.touch) navigator.vibrate(fin ? 35 : heavyHit ? 18 : 8);
+    if (fin) this.finisher(e, hx, hy);
     // recoil and pogo
     if (kind === 'down') { a.c.vy = -680; a.bounced = true; a.c.jumps = 0; a.c.airDash = 1; }
-    else if (kind !== 'surge') a.c.vx -= a.facing * (armored ? 260 : 140);
+    else if (kind === 'up' && step.launch) { a.c.vy = Math.min(a.c.vy, -560); }       // follow the launch up
+    else if (!a.c.ground && kind !== 'surge') a.c.vy = Math.min(a.c.vy, -120);       // air combos hang a moment
+    else if (kind !== 'surge') a.c.vx -= a.facing * (armored ? 260 : W === WEAPONS.w_hammer ? 60 : 120);
     this.sv.breath = Math.min(100, (this.sv.breath || 0) + (armored ? 6 : 11) * (this.sv.equip && this.sv.equip.charm === 'g_charm_thread' ? 2 : 1));
+  }
+  finisher(e, hx, hy) {
+    const g = this.game, a = this.actor;
+    g.slowmo(0.2, 0.55);
+    g.cam.zoomT = 1.32; this.punchT = 0.5;
+    g.flash([1, 1, 1], 0.35);
+    Audio.play('slam', { pitch: 1.2 }); Audio.play('kill', { pitch: 0.8 });
+    g.fx.ring(hx, hy, 8, 140, 0.5, '#ffffff', 6);
+    g.fx.ring(hx, hy, 4, 90, 0.35, a.look.infuse || '#ffe3a0', 4);
+    g.fx.burst(hx, hy, { n: 34, speed: 640, col: '#ffffff', col1: a.look.infuse || '#ffe3a0', add: true, life: 0.6, size: 3.2, kind: 'streak' });
+    g.fx.text(hx, hy - 60, 'Undone', '#ffe3a0', 26);
+    this.counterT = 0;
+  }
+  // a parry: striking as a blow lands turns it aside, staggers the attacker and opens a counter
+  tryParry(e) {
+    const a = this.actor, g = this.game, at = a.attack;
+    if (!at || at.kind === 'mine' || at.t * at.dur > 0.2 || (at.W && at.W.ranged)) return false;
+    if (e && e.poise !== undefined) { e.poise = 0; if (g.enemies && g.enemies.stagger) g.enemies.stagger(e, 1.5); }
+    if (e && e.c) { e.c.vx += sign(e.c.x - a.c.x) * 420; }
+    this.counterT = 1.4;
+    g.slowmo(0.25, 0.6); g.flash([1, 0.95, 0.8], 0.3); g.hitstop(0.08); g.shake(0.3);
+    Audio.play('clang', { pitch: 1.3 }); Audio.play('chime', { pitch: 1.4 });
+    const hx = a.c.x + a.facing * 26, hy = a.c.y - 52;
+    g.fx.sparks(hx, hy, a.facing > 0 ? 0 : Math.PI, 22, '#ffe3a0');
+    g.fx.ring(hx, hy, 6, 70, 0.3, '#ffe3a0', 4);
+    g.fx.text(hx, hy - 40, 'Parry', '#ffe3a0', 22);
+    if (navigator.vibrate && g.touch) navigator.vibrate(25);
+    return true;
+  }
+  quake(step) {
+    const g = this.game, a = this.actor, W = g.world;
+    const fx = a.c.x + a.facing * 40, fy = a.c.y - 4;
+    g.shake(0.5); g.hitstop(0.06); Audio.play('slam');
+    g.fx.ring(fx, fy, 10, 150, 0.45, '#ffd9a0', 6);
+    g.fx.dust(fx, fy, 16, '#e8e0d0', -Math.PI / 2, 260);
+    for (const e of g.targets()) {
+      if (e.mode === 'dead' || Math.abs(e.c.x - fx) > 150 || Math.abs(e.c.y - a.c.y) > 70) continue;
+      this.strike(e, e.cx, e.cy, sign(e.c.x - a.c.x) || a.facing, -0.9, 0.9, 'quake', { W: weaponOf(this.sv), step: { poise: 2, heavy: true } });
+    }
+    // the heavy slam cracks the blocks in front
+    if (step.breaks) {
+      const tx = Math.floor(fx / TILE), ty = Math.floor(fy / TILE);
+      for (const [dx, dy] of [[0, 0], [a.facing, 0], [0, -1], [a.facing, -1]]) {
+        const t = W.get(tx + dx, ty + dy);
+        if (t && TILES[t].hard < 2 && t !== T.STORE) this.breakTile(tx + dx, ty + dy);
+      }
+    }
+  }
+  fireSling(W, step) {
+    const g = this.game, a = this.actor;
+    const ammo = W.ammo.find(t => (this.sv.inv[t] || 0) > 0);
+    if (ammo === undefined) { g.ui && g.ui.toast('No stones for the sling: mine some stone or soil'); Audio.play('blip', { pitch: 0.5 }); return; }
+    this.take(ammo, 1);
+    const m = Input.mouse, wp = this.mouseAim ? g.screenToWorld(m.x, m.y) : { x: a.c.x + a.facing * 400, y: a.c.y - 80 };
+    const ox = a.c.x + a.facing * 14, oy = a.c.y - 64;
+    const ang = Math.atan2(wp.y - oy, wp.x - ox);
+    const sp = 1050 * (step.power || 1);
+    if (Math.abs(wp.x - a.c.x) > 6) a.face(sign(wp.x - a.c.x));
+    g.throwables.throw('shot', ox, oy, Math.cos(ang) * sp, Math.sin(ang) * sp, { dmg: W.dmg * (step.mult || 1) * (1 + this.sv.lvl.blade * 0.35), pierce: ammo === T.CRYSTAL, tile: ammo, poise: W.poise });
+    Audio.play('swing', { pitch: 1.5 });
   }
   plunge() {
     const a = this.actor;
@@ -514,6 +652,17 @@ export class Player {
   draw(ctx, al) {
     const a = this.actor, g = this.game;
     a.draw(ctx, al, { alpha: a.inv > 0 && !this.dead && (g.tick >> 3) % 2 && !(g.ui && g.ui.modal) ? 0.55 : 1 });
+    // charging a heavy: light gathers at the weapon hand, flickering when full
+    if (this.chargeK > 0 && !this.dead) {
+      const b = a.body, x = b.ipx(6, al), y = b.ipy(6, al), k = this.chargeK;
+      const col = a.look.infuse || '#ffe3a0';
+      ctx.save(); ctx.globalCompositeOperation = 'lighter';
+      const fl = k >= 1 ? 0.75 + Math.sin(g.time * 40) * 0.25 : 1;
+      const rg = ctx.createRadialGradient(x, y, 0, x, y, 12 + 30 * k);
+      rg.addColorStop(0, rgba('#ffffff', 0.5 * k * fl)); rg.addColorStop(0.4, rgba(col, 0.35 * k * fl)); rg.addColorStop(1, rgba(col, 0));
+      ctx.fillStyle = rg; ctx.beginPath(); ctx.arc(x, y, 12 + 30 * k, 0, TAU); ctx.fill();
+      ctx.restore();
+    }
     // the open satchel on the doll's lap
     const k = g.bagK || 0;
     if (k > 0.05) {

@@ -8,11 +8,33 @@ import { rgba, TAU, rand } from '../core/util.js';
 
 export class Throwables {
   constructor(game) { this.game = game; this.list = []; }
-  throw(kind, x, y, vx, vy) { this.list.push({ kind, x, y, vx, vy, rest: false, t: 0, life: kind === 'flare' ? 20 : 1.4, rot: 0 }); }
+  throw(kind, x, y, vx, vy, o = {}) { this.list.push(Object.assign({ kind, x, y, vx, vy, rest: false, t: 0, life: kind === 'flare' ? 20 : kind === 'shot' ? 1.6 : 1.4, rot: 0, hit: new Set() }, o)); }
+  // a sling stone: fast, slight arc, hits the first Hollow (crystal shot passes through)
+  updateShot(o, dt) {
+    const g = this.game;
+    o.vy += 700 * dt;
+    const steps = 3;
+    for (let k = 0; k < steps && !o.dead; k++) {
+      o.x += o.vx * dt / steps; o.y += o.vy * dt / steps;
+      if (g.world.solidAt(o.x, o.y)) { o.dead = true; g.fx.debris(o.x, o.y, o.tile || T.STONE, 3); Audio.play('place', { pitch: 1.8, vol: 0.4 }); return; }
+      for (const e of g.targets()) {
+        if (e.mode === 'dead' || o.hit.has(e.id)) continue;
+        const r = (e.hitR || 20) + 8;
+        if ((e.cx - o.x) ** 2 + (e.cy - o.y) ** 2 > r * r * 2.2) continue;
+        o.hit.add(e.id);
+        const dx = Math.sign(o.vx) || 1;
+        if (g.player) g.player.strike(e, o.x, o.y, dx, -0.2, 1, 'shot', { W: { dmg: o.dmg, poise: o.poise, knock: 0.8, speed: 1 }, step: {} });
+        if (e.kind === 'wisp' && e.mode !== 'dead') { e.stunT = 1.4; e.vy = 260; }   // knocked out of the air
+        if (!o.pierce) { o.dead = true; return; }
+      }
+    }
+    o.rot += dt * 20;
+  }
   update(dt) {
     const g = this.game, W = g.world;
     for (const o of this.list) {
       o.t += dt;
+      if (o.kind === 'shot') { this.updateShot(o, dt); if (o.t > o.life) o.dead = true; continue; }
       if (!o.rest) {
         o.vy += 1500 * dt;
         const nx = o.x + o.vx * dt, ny = o.y + o.vy * dt;
@@ -59,6 +81,7 @@ export class Throwables {
   }
   lights(arr) {
     for (const o of this.list) {
+      if (o.kind === 'shot') continue;
       if (o.kind === 'flare') { const k = Math.min(1, (o.life - o.t) / 3); arr.push({ x: o.x, y: o.y - 6, c: [1.0, 0.62, 0.34], s: 1.9 * k + 0.1 }); }
       else arr.push({ x: o.x, y: o.y, c: [1.0, 0.5, 0.25], s: 0.25 + 0.2 * Math.sin(o.t * 30) });
     }
@@ -67,6 +90,13 @@ export class Throwables {
     if (layer !== 'mid') return;
     const g = this.game;
     for (const o of this.list) {
+      if (o.kind === 'shot') {
+        ctx.save(); ctx.globalCompositeOperation = 'lighter';
+        ctx.strokeStyle = rgba(o.pierce ? '#9ff3ff' : '#fff1d8', 0.45); ctx.lineWidth = 3; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(o.x - o.vx * 0.03, o.y - o.vy * 0.03); ctx.lineTo(o.x, o.y); ctx.stroke(); ctx.restore();
+        ctx.fillStyle = o.pierce ? '#8ff7ff' : '#9a96a0'; ctx.beginPath(); ctx.arc(o.x, o.y, 3.5, 0, TAU); ctx.fill();
+        continue;
+      }
       ctx.save(); ctx.translate(o.x, o.y); ctx.rotate(o.rot);
       if (o.kind === 'flare') {
         ctx.fillStyle = '#c0453a'; ctx.beginPath(); ctx.roundRect(-2.5, -2, 5, 14, 2); ctx.fill();

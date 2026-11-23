@@ -49,7 +49,7 @@ export class FX {
     const col = T.k && T.k[0] === '#' ? T.k : '#8a7f78';
     for (let i = 0; i < n; i++) this.spawn({ x: x + rand(-8, 8), y: y + rand(-8, 8), vx: rand(-160, 160), vy: rand(-320, -80), life: rand(0.5, 0.9), size: rand(2.5, 5), size1: 1.5, col, grav: 1800, drag: 0.8, kind: 'chunk', vr: rand(-12, 12), bounce: 0.35 });
   }
-  slash(pts, col, width = 1) { if (pts.length > 1) this.slashes.push({ pts: pts.map(p => [p[0], p[1], p[2], p[3]]), life: 0.16, max: 0.16, col, width }); }
+  slash(pts, col, width = 1) { if (pts.length > 1) { const life = 0.17 + (width - 1) * 0.12; this.slashes.push({ pts: pts.map(p => [p[0], p[1], p[2], p[3]]), life, max: life, col, width }); } }
   flash(name, x, y, size, rot = 0, life = 0.22) { this.flashes.push({ name, x, y, size, rot, life, max: life }); }
   text(x, y, str, col = '#ffffff', size = 18, life = 0.9) { this.texts.push({ x, y, str, col, size, life, max: life, vy: -60 }); }
   souls(x, y, n, target, col = '#bff6ff', onArrive) {
@@ -172,7 +172,7 @@ export class FX {
         ctx.beginPath();
         ctx.moveTo(pts[0][2], pts[0][3]);
         for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][2], pts[i][3]);
-        for (let i = pts.length - 1; i >= 0; i--) ctx.lineTo(lerp(pts[i][0], pts[i][2], 0.45 + u * 0.3), lerp(pts[i][1], pts[i][3], 0.45 + u * 0.3));
+        for (let i = pts.length - 1; i >= 0; i--) { const k = (s.width > 1 ? 0.2 : 0.45) + u * 0.35; ctx.lineTo(lerp(pts[i][0], pts[i][2], k), lerp(pts[i][1], pts[i][3], k)); }
         ctx.closePath(); ctx.fill();
       }
       ctx.globalAlpha = 1;

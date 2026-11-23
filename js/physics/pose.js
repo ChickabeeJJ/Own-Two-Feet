@@ -13,11 +13,33 @@ const ATK = {
   up: [[0, 0.5, 0.8], [0.18, 0.7, 1.1], [0.38, -1.5, -1.55], [0.62, -2.05, -2.3], [1, -1.0, -1.2]],
   down: [[0, -1.6, -1.9], [0.18, -1.85, -2.2], [0.38, 1.35, 1.4], [0.62, 1.62, 1.66], [1, 1.3, 1.35]],
   slam: [[0, -1.6, -1.6], [0.3, -1.75, -1.85], [0.5, 1.2, 1.3], [1, 1.3, 1.35]],
+  // spear: draw back, drive forward
+  thrust: [[0, 1.9, 1.3], [0.22, 2.2, 1.9], [0.42, 0.1, 0.0], [0.7, 0.05, -0.05], [1, 1.1, 0.8]],
+  thrust2: [[0, 1.7, 1.1], [0.22, 2.1, 1.7], [0.42, -0.3, -0.35], [0.7, -0.25, -0.3], [1, 0.9, 0.7]],
+  // a wide finishing sweep
+  sweep: [[0, -2.0, -2.5], [0.25, -2.5, -3.0], [0.5, 0.2, 0.3], [0.68, 1.35, 1.5], [1, 1.1, 1.0]],
+  cleave: [[0, 1.6, 1.9], [0.3, 1.9, 2.3], [0.5, -1.1, -1.2], [0.66, -2.2, -2.5], [1, -1.0, -1.2]],
+  lunge: [[0, 1.8, 1.4], [0.3, 2.3, 2.0], [0.45, 0.05, -0.05], [0.8, 0.0, -0.05], [1, 1.0, 0.7]],
+  // hammer: heavy overhead and a rising swing
+  hsmash: [[0, -2.2, -2.5], [0.38, -2.7, -3.0], [0.58, 0.8, 0.9], [0.75, 1.15, 1.2], [1, 1.0, 1.05]],
+  hsmash2: [[0, 1.3, 1.5], [0.35, 1.8, 2.1], [0.58, -1.1, -1.3], [0.75, -1.6, -1.8], [1, -0.6, -0.7]],
+  // daggers: short jabs, then a whirling flurry
+  dag1: [[0, 1.3, 0.7], [0.3, 0.15, 0.0], [0.6, 0.05, -0.1], [1, 1.0, 0.7]],
+  dag2: [[0, 0.9, 1.5], [0.3, -0.25, -0.45], [0.6, -0.35, -0.55], [1, 0.6, 0.6]],
+  flurry: [[0, -1.5, -2.0], [0.18, 0.6, 0.8], [0.36, -1.4, -1.9], [0.54, 0.7, 0.9], [0.72, -1.2, -1.6], [0.9, 0.8, 1.0], [1, 1.0, 0.9]],
+  // sling: windmill and release
+  sling: [[0, 1.0, 1.3], [0.25, -1.6, -2.2], [0.42, -2.6, -2.9], [0.55, -0.5, -0.3], [1, 0.9, 1.0]],
   // mining: a short overhead chop with the pommel, not a sweeping slash
   mine: [[0, -1.2, -2.0], [0.3, -1.55, -2.5], [0.55, 0.35, 0.15], [0.72, 0.55, 0.45], [1, 0.1, -0.5]],
 };
-function keyArm(kind, t) {
-  const K = ATK[kind] || ATK.side;
+// back-arm keyframes for weapons held in both hands (daggers)
+const ATKB = {
+  dag1: [[0, 1.6, 1.0], [0.3, 1.9, 1.5], [1, 1.6, 1.0]],
+  dag2: [[0, 1.9, 1.5], [0.3, 0.1, -0.1], [0.6, 0.0, -0.2], [1, 1.5, 1.0]],
+  flurry: [[0, 0.7, 0.9], [0.18, -1.4, -1.9], [0.36, 0.7, 0.9], [0.54, -1.3, -1.8], [0.72, 0.8, 1.0], [0.9, -1.0, -1.4], [1, 1.5, 1.0]],
+};
+function keyArm(kind, t, table = ATK) {
+  const K = table[kind] || ATK.side;
   for (let i = 1; i < K.length; i++) {
     if (t <= K[i][0]) {
       const a = K[i - 1], b = K[i];
@@ -324,7 +346,11 @@ export class Animator {
       armF = armF ? [lerp(armF[0], ua, w), lerp(armF[1], fa, w)] : [ua, fa];
       const strike = a.t > 0.18 && a.t < 0.62 ? 1 : 0;
       torso += (a.kind === 'up' ? -0.1 : a.kind === 'down' ? 0.25 : a.kind === 'mine' ? 0.3 : 0.22) * strike * w;
-      armB = [lerp(armB ? armB[0] : 1.5, 2.2, 0.6 * w), lerp(armB ? armB[1] : 1.2, 1.8, 0.6 * w)];
+      if (ATKB[a.kind]) { const [ub, fb] = keyArm(a.kind, a.t, ATKB); armB = [ub, fb]; }
+      else armB = [lerp(armB ? armB[0] : 1.5, 2.2, 0.6 * w), lerp(armB ? armB[1] : 1.2, 1.8, 0.6 * w)];
+      // the body throws itself into big swings
+      const lean = { sweep: 0.35, cleave: -0.15, lunge: 0.45, hsmash: 0.4, slam: 0.45, thrust: 0.3, thrust2: 0.2, flurry: 0.15 }[a.kind] || 0;
+      torso += lean * strike * w;
       rate = 60;
       // standing strikes step into the blow: front foot plants forward, back heel lifts, hips drop
       if (mode === 'ground' && fF && fB && speed < 60) {

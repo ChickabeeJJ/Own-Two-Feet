@@ -215,6 +215,77 @@ export default ({ page, sleep, key, shot, evalg }) => ({
     await shot('moves-end');
     if (r.airFrames > 4 || !r.mantled || !r.onTop || !r.through) throw new Error('movement broken');
   },
+  // every weapon: craft at a bench, equip, chain, charge; parry; finisher; sling knocks a wisp down
+  async weapons() {
+    await page.waitForFunction(() => window.__game && window.__game.story);
+    await sleep(600);
+    const res = await evalg(async () => {
+      const g = window.__game, p = g.player, a = p.actor, I = window.__input, W = g.world; const wait = ms => new Promise(r => setTimeout(r, ms));
+      g.story.skipBirth(); g.story.skipTutorial && g.story.skipTutorial(); g.enemies.calm = 999; g.story.firstFoeDown = true; g.save.tut.foe = 1;
+      for (const [t, n] of [[9, 40], [3, 60], [8, 20], [17, 20], [15, 10], [2, 30]]) p.give(t, n);
+      const out = {};
+      const items = await import('/js/game/items.js');
+      const near = { hand: true, bench: true, forge: true, loom: true };
+      for (const id of ['w_spear', 'w_hammer', 'w_daggers', 'w_sling']) { const r = items.RECIPES.find(r => r.out === id); out[id + '_craftable'] = items.canCraft(p.sv, r, near); for (const [t, n] of r.need) p.take(t, n); p.give(id, 1); }
+      const arena = () => { for (const e of g.actors) if (e.team === 'enemy') e.removed = true; const x = Math.floor(p.x / 32); for (let tx = x - 12; tx < x + 12; tx++) { for (let ty = 0; ty < 60; ty++) W.set(tx, ty, ty >= 40 ? 3 : 0); } p.respawnAt(x * 32 + 16, 40 * 32); };
+      for (const id of ['w_blade', 'w_spear', 'w_hammer', 'w_daggers']) {
+        arena(); await wait(200);
+        p.sv.equip.weapon = id; p.refreshLook();
+        const e = g.enemies.spawn('husk', p.x + 70, 40 * 32, 0); e.ai.cd = 99; e.hp = e.maxHp = 400; a.face(1);
+        const hp0 = e.hp; let swings = 0;
+        for (let i = 0; i < 6; i++) { I.keys.add('KeyJ'); await wait(60); I.keys.delete('KeyJ'); await wait(150); }
+        // a charged heavy
+        I.keys.add('KeyJ'); await wait(900); I.keys.delete('KeyJ'); await wait(700);
+        out[id] = { dealt: Math.round(hp0 - e.hp), staggered: !!e.staggered || e.poise < e.maxPoise };
+        e.removed = true;
+      }
+      // parry: start a strike just as a husk's claw lands
+      arena(); await wait(200); p.sv.equip.weapon = 'w_blade'; p.refreshLook();
+      const h = g.enemies.spawn('husk', p.x + 40, 40 * 32, 0); p.hp = 5; a.inv = 0;
+      a.startAttack('side', 0.28); a.attack.W = (await import('/js/game/weapons.js')).WEAPONS.w_blade;
+      g.enemies.hitTarget(a, 1, h.c.x, h.c.y - 50, undefined, h);
+      out.parry = { hp: p.hp, counter: p.counterT > 0, enemyStaggered: !!h.staggered };
+      h.removed = true;
+      // finisher on a staggered husk
+      const f = g.enemies.spawn('husk', p.x + 60, 40 * 32, 0); g.enemies.stagger(f, 2); f.hp = f.maxHp = 200;
+      p.strike(f, f.cx, f.cy, 1, -0.2, 1, 'side', {});
+      out.finisher = { zoom: g.cam.zoomT, hpLeft: Math.round(f.hp) };
+      f.removed = true;
+      // sling vs a wisp
+      p.sv.equip.weapon = 'w_sling'; p.refreshLook();
+      const w = g.enemies.spawnWisp(p.x + 160, p.y - 70, 0, '#c4b5ff'); w.hp = 999;
+      g.throwables.throw('shot', p.x + 20, p.y - 64, 900, -60, { dmg: 8, poise: 6, tile: 3 });
+      await wait(700);
+      out.sling = { stunned: (w.stunT || 0) > 0 || w.hp < 999 };
+      w.removed = true;
+      return out;
+    });
+    console.log('weapons', JSON.stringify(res));
+    await shot('weapons-end');
+    const bad = ['w_blade', 'w_spear', 'w_hammer', 'w_daggers'].filter(k => !(res[k].dealt > 0)).concat(res.parry.hp === 5 && res.parry.counter ? [] : ['parry']).concat(res.finisher.zoom > 1.1 ? [] : ['finisher']).concat(res.sling.stunned ? [] : ['sling']);
+    if (bad.length) throw new Error('combat broken: ' + bad.join(','));
+  },
+  async wfilm() {
+    await page.waitForFunction(() => window.__game && window.__game.story);
+    await evalg(() => { const g = window.__game, p = g.player; g.story.skipBirth(); g.story.skipTutorial && g.story.skipTutorial(); g.enemies.calm = 999; g.story.firstFoeDown = true; g.save.tut.foe = 1; for (const id of ['w_spear', 'w_hammer', 'w_daggers']) p.give(id, 1); });
+    await sleep(1500);
+    await evalg(() => { window.__game.hitstopT = 1e9; });
+    let f = 0;
+    for (const wid of ['w_spear', 'w_hammer', 'w_daggers']) {
+      await evalg((wid) => { const g = window.__game, p = g.player; p.sv.equip.weapon = wid; p.refreshLook(); }, wid);
+      for (let i = 0; i < 20; i++) {
+        const keys = (i % 5 === 0 && i < 15) ? ['KeyJ'] : [];
+        await page.evaluate((keys) => {
+          const g = window.__game, I = window.__input;
+          I.keys.clear(); for (const k of keys) I.keys.add(k);
+          for (let s = 0; s < 4; s++) { I.poll(); g.step(1 / 120); I.endTick(); }
+          g.updateCamera(1 / 30); g.render(0);
+          const c = g.cam, sc = g.baseZoom * c.zoom, p = g.player.actor.c;
+          return [(p.x - c.rx) * sc + innerWidth / 2, (p.y - c.ry) * sc + innerHeight / 2, sc];
+        }, keys).then(([x, y, sc]) => page.screenshot({ path: `/tmp/otf-shots/film-${String(f++).padStart(3, '0')}.png`, clip: { x: Math.max(0, x - 70 * sc), y: Math.max(0, y - 95 * sc), width: 140 * sc, height: 120 * sc } }));
+      }
+    }
+  },
   async doll() {
     await page.waitForFunction(() => window.__game && window.__game.story);
     await sleep(600);

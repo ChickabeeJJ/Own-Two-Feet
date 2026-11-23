@@ -1,4 +1,5 @@
 // Save data, cosmetics catalog, unlocks, recipes, upgrade costs.
+import { WEAPONS, INFUSE, weaponId } from './weapons.js';
 import { T } from '../world/tiles.js';
 import { hashStr, mulberry } from '../core/util.js';
 import { Platform } from '../platform.js';
@@ -108,7 +109,7 @@ export function newSave(seed) {
     edits: {}, stats: { kills: 0, blocks: 0, placed: 0, deaths: 0, far: 0, time: 0 },
     settings: null, tut: {},
     lights: 0, rescued: {}, chests: {}, stitches: {}, nests: {}, lore: [], requests: [], bossSeen: {}, coopRelics: 0,
-    equip: {}, stores: {}, crafted: 0,
+    equip: {}, stores: {}, crafted: 0, infuse: {}, quests: {}, qtrack: null, daily: null,
   };
 }
 export function lookFromSave(sv) {
@@ -125,6 +126,7 @@ export function lookFromSave(sv) {
     thread: true, threadCol: eyes[0] === '#ffffff' ? '#e8f4ff' : eyes[0], bootCol: mat === 'shadow' ? '#1a171f' : '#6b4a32',
     coat: mat === 'shadow' ? '#2b2633' : mat === 'metal' ? '#d8c9a8' : '#ece6dc', hoodCol: '#5f7a4a',
     gearLamp: !!(sv.equip && sv.equip.lamp), gearPick: (sv.equip && sv.equip.pick) || null,
+    weapon: weaponId(sv), weaponLen: WEAPONS[weaponId(sv)].len, infuse: sv.infuse && sv.infuse[weaponId(sv)] ? INFUSE[sv.infuse[weaponId(sv)]].col : null,
   };
 }
 
@@ -142,6 +144,9 @@ export const Save = {
     for (const k in base.abil) if (d.abil[k] === undefined) d.abil[k] = false;
     for (const k in base.lvl) if (d.lvl[k] === undefined) d.lvl[k] = 0;
     for (const k in base.stats) if (d.stats[k] === undefined) d.stats[k] = 0;
+    // the blade from the stone is a weapon you carry and wear
+    if (d.hasBlade && !(d.inv.w_blade > 0)) d.inv.w_blade = 1;
+    if (d.hasBlade && !d.equip.weapon) d.equip.weapon = 'w_blade';
     this.data = d;
     return d;
   },

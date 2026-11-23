@@ -35,7 +35,8 @@ export class Bosses {
   // apply an attack to every player it reaches (host player locally, friends over the network)
   hitAll(test, n, x, y, o) {
     const g = this.game;
-    if (!g.player.dead && test(g.player.actor)) g.player.takeHit(n, x, y, o);
+    // melee blows (not waves or orbs) can be parried
+    if (!g.player.dead && test(g.player.actor)) { if (!(o && o.melee && g.player.tryParry(null))) g.player.takeHit(n, x, y, o); }
     if (g.net && g.net.isHost) for (const r of g.net.remotes.values()) if (!r.dead && test(r.actor)) { g.net.hitRemote(r.actor, n, x, y, o); r.actor.takeImpulse(x, y, sign(r.actor.c.x - x) * 500, -300, 0.7); }
   }
   update(dt) {
@@ -300,7 +301,7 @@ class Warden extends BossBase {
         a.c.vx = this.cdir * (720 + this.tier * 40);
         I.mx = this.cdir; a.face(this.cdir);
         if ((g.tick % 4) === 0) g.fx.dust(a.c.x - this.cdir * 30, a.c.y - 4, 2, '#e8dccb', -Math.PI / 2 - this.cdir * 0.8, 160);
-        this.mgr.hitAll(q => Math.abs(q.c.x - a.c.x) < 50 && Math.abs(q.c.y - a.c.y) < 140, 1, a.c.x, a.cy, { knock: 720, lift: 420, heavy: true });
+        this.mgr.hitAll(q => Math.abs(q.c.x - a.c.x) < 50 && Math.abs(q.c.y - a.c.y) < 140, 1, a.c.x, a.cy, { knock: 720, lift: 420, heavy: true, melee: true });
         const A = this.mgr.arena;
         const atWall = (this.cdir > 0 && a.c.x > A.x1 - 70) || (this.cdir < 0 && a.c.x < A.x0 + 70);
         if (atWall || this.t <= 0) {
@@ -438,7 +439,7 @@ class Wraith extends BossBase {
       }
       case 'dive': {
         a.c.vx = this.dv.x; a.c.vy = this.dv.y;
-        this.mgr.hitAll(q => Math.hypot(q.c.x - a.c.x, q.cy - a.cy) < 60, 1, a.c.x, a.cy, { knock: 560, lift: 380 });
+        this.mgr.hitAll(q => Math.hypot(q.c.x - a.c.x, q.cy - a.cy) < 60, 1, a.c.x, a.cy, { knock: 560, lift: 380, melee: true });
         if (a.c.y > A.gy - 90 || this.t <= 0) {
           a.c.vy = -200; this.state = 'tired'; this.t = 1.1;
           g.fx.dust(a.c.x, A.gy - 4, 10, '#e8dccb', -Math.PI / 2, 220); Audio.play('land', { pitch: 0.5 }); g.shake(0.3);

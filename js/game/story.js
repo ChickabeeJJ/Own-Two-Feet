@@ -331,7 +331,7 @@ export class Story {
   }
   skipTutorial() {
     const g = this.game;
-    if (!this.sv.hasBlade) { this.sv.hasBlade = true; g.player.actor.blade = true; }
+    if (!this.sv.hasBlade) { this.sv.hasBlade = true; g.player.actor.blade = true; } if (!(this.sv.inv.w_blade > 0)) this.sv.inv.w_blade = 1; this.sv.equip.weapon = this.sv.equip.weapon || 'w_blade';
     this.finishTutorial(true);
   }
   finishTutorial(skipped) {
@@ -428,6 +428,8 @@ export class Story {
     const g = this.game, p = g.player;
     if (this.sv.hasBlade) return;
     this.sv.hasBlade = true; p.actor.blade = true;
+    if (!(this.sv.inv.w_blade > 0)) this.sv.inv.w_blade = 1;
+    this.sv.equip.weapon = this.sv.equip.weapon || 'w_blade'; p.refreshLook();
     g.slowmo(0.3, 0.8); g.flash([1, 0.95, 0.85], 0.35); g.shake(0.25);
     Audio.play('clang', { pitch: 0.7 }); Audio.play('chime', { vol: 0.7 });
     g.fx.ring(BLADE_X * TILE + 16, this.bladeY - 20, 6, 140, 0.7, '#9ff3ff', 5);

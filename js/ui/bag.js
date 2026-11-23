@@ -13,7 +13,7 @@ const $ = (s, r = document) => r.querySelector(s);
 const esc = (s) => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 function el(tag, cls, html) { const e = document.createElement(tag); if (cls) e.className = cls; if (html !== undefined) e.innerHTML = html; return e; }
 const CATS = [['all', 'All'], ['block', 'Blocks'], ['part', 'Parts'], ['use', 'Use'], ['gear', 'Gear']];
-const GEAR_SLOTS = [['lamp', 'Lamp'], ['pick', 'Pick'], ['charm', 'Charm']];
+const GEAR_SLOTS = [['weapon', 'Weapon'], ['lamp', 'Lamp'], ['pick', 'Pick'], ['charm', 'Charm']];
 
 export class Bag {
   constructor(ui) {
@@ -197,7 +197,8 @@ export class Bag {
       add(worn ? 'Take off' : 'Wear', () => this.equip(id, worn ? null : slot), true);
     }
     if (id === 'i_draught') add('Drink', () => { this.game.player.useItem(id, null); this.render(); }, true);
-    if (usable(id) && id !== 'i_draught') add('Take in hand', () => { this.assign(id, this.hotIndex(id)); this.selectHot(id); this.close(); }, true);
+    if (id === 'i_infuse_ember' || id === 'i_infuse_frost') add('Infuse your weapon', () => { this.game.player.useItem(id, null); this.render(); }, true);
+    if (usable(id) && id !== 'i_draught' && !String(id).startsWith('i_infuse')) add('Take in hand', () => { this.assign(id, this.hotIndex(id)); this.selectHot(id); this.close(); }, true);
     if (placeable(id)) add('Take in hand', () => { this.assign(id, this.hotIndex(id)); this.selectHot(id); this.close(); });
     d.appendChild(acts);
   }
