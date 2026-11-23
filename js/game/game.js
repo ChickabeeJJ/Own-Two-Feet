@@ -272,11 +272,11 @@ export class Game {
     const gi = gateNear(ctx);
     if (this.bosses.defeated(gi.k)) return null;
     const d = Math.abs(gi.gx - ctx);
-    if (d > 150 || d < 34) return null;
+    if (d > 210 || d < 34) return null;
     const B = biomeOf(gi.guard);
     const arch = { meadow: 'warden', ember: 'warden', glass: 'wraith', frost: 'wraith', hollow: 'golem' }[B.id];
     const eye = { meadow: '#ffb36b', ember: '#ff7a3a', glass: '#8ff7ff', frost: '#dff6ff', hollow: '#c4b5ff' }[B.id];
-    const k = Math.min(1, (150 - d) / 60) * Math.min(1, (d - 34) / 20) * (1 - depth);
+    const k = Math.min(1, (210 - d) / 50) * Math.min(1, (d - 34) / 20) * (1 - depth);
     return { x: gi.gx * TILE, k, arch, eye, col: mix(B.fog, B.deep, 0.55) };
   }
   // helpers for systems

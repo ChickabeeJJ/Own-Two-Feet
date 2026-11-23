@@ -191,10 +191,13 @@ export class World {
         put(tx, top - 1, T.LEAVES);
       } else {
         for (let y = tr.base - 1; y > top; y--) put(tx, y, T.LOG);
-        const r = tr.kind === 'crystal' ? 2 : 2.6;
-        for (let y = -3; y <= 2; y++) for (let x = -3; x <= 3; x++) {
-          const dd = Math.hypot(x, y * 1.15);
-          if (dd <= r + hash2(tx + x, top + y, this.seed) * 0.9) put(tx + x, top + y, T.LEAVES);
+        // a cloud-shaped crown: a main dome plus two lower side clumps
+        const big = tr.h > 7 ? 1 : 0;
+        const blobs = tr.kind === 'crystal' ? [[0, -1, 2.1]] : [[0, -1, 2.3 + big * 0.5], [-2 - big, 1, 1.5], [2 + big, 1, 1.5], [0, 1, 1.8]];
+        for (let y = -4; y <= 3; y++) for (let x = -4; x <= 4; x++) {
+          let inside = false;
+          for (const [bx, by, r] of blobs) if (Math.hypot(x - bx, (y - by) * 1.1) <= r + hash2(tx + x, top + y, this.seed) * 0.55) { inside = true; break; }
+          if (inside) put(tx + x, top + y, T.LEAVES);
         }
         if (tr.kind === 'crystal' && hash2(tx, 5, this.seed) < 0.5) put(tx, top - 3, T.CRYSTAL);
       }

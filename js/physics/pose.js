@@ -188,6 +188,17 @@ export class Animator {
       armF = [0.9, -1.6]; armB = [0.9, -1.4];
       spine = [0.4, 0.4];
       rate = 6;
+    } else if (mode === 'skydive') {
+      // belly down, arms spread, legs trailing: the long fall
+      rootY = null;
+      const fl = Math.sin(this.time * 7) * 0.25, fl2 = Math.cos(this.time * 5.3) * 0.2;
+      torso = -HALF_PI + 1.35 + Math.sin(this.time * 1.7) * 0.12;
+      fF = [rootX - 26 * s * f, st.py + 6 * s + Math.sin(this.time * 6) * 3 * s, 1.0];
+      fB = [rootX - 30 * s * f, st.py - 4 * s, 1.1];
+      armF = [-1.2 + fl, -1.7 + fl]; armB = [-0.6 + fl2, -1.2 + fl2];
+      head = -0.2;
+      spine = [-0.15, -0.1];
+      rate = 14;
     } else if (mode === 'emote') {
       rootY = st.gy - standH;
       const e = st.emote || 'wave';

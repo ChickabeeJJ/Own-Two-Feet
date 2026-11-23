@@ -503,7 +503,7 @@ export class Net {
       return o;
     }
     const boss = kind === 'boss';
-    const look = boss && extra && extra.look ? extra.look : { body: '#2d2935', shade: '#1e1b25', mat: kind === 'brute' ? 'metal' : 'cloth', eyes: '#ffb36b', eyeStyle: 'none', head: 'mask', maskCol: '#ece6da', maskHorns: kind === 'brute', cape: kind === 'brute' ? { col: '#4a3a3a', style: 'cape', len: 6 } : null, blade: null, marks: [], rim: '#ffcf9e' };
+    const look = boss && extra && extra.look ? extra.look : { body: '#2d2935', shade: '#1e1b25', mat: 'cloth', eyes: '#ffb36b', eyeStyle: 'none', head: 'mask', maskCol: '#ece6da', maskHorns: kind === 'brute', cape: kind === 'brute' ? { col: '#4a3a3a', style: 'cape', len: 6 } : null, blade: null, marks: [], rim: '#ffcf9e', cloak: '#231e2b', claws: '#e6dfd2', seams: false, armor: kind === 'brute' ? '#4f4856' : null, gaunt: kind === 'brute', bulk: kind === 'brute' ? 1.18 : 1 };
     const a = new Actor(g, { x, y, team: 'enemy', scale: scale || (kind === 'brute' ? 1.32 : 0.92), look, blade: boss, facing: -1 });
     a.kind = kind; a.isBoss = boss; a.noCrumple = true; a.glowEye = boss && extra ? extra.spec : '#ffb36b';
     a.puppet = { x, y, vx: 0, vy: 0, t: 0 };

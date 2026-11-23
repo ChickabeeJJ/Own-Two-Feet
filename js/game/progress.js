@@ -120,6 +120,7 @@ export function lookFromSave(sv) {
     eyes: eyes[0], eyeStyle: eyes[1], head: (cosmetic(sv.look.head) || cosmetic('h_none')).v,
     cape: cape ? Object.assign({}, cape) : null, blade: Object.assign({}, blade),
     marks: (sv.marks || []).map(c => ({ col: c })), rim: '#ffe2bd', accent: '#f2c86a', trailCol: eyes[0] === '#ffffff' ? '#9ff3ff' : eyes[0],
+    thread: true, threadCol: '#9ff3ff', sash: cape ? cape.col : '#c8473d', bootCol: mat === 'shadow' ? '#1a171f' : '#6b5446',
   };
 }
 

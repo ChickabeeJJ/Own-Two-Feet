@@ -279,6 +279,14 @@ export class Actor {
   }
   updateScript(dt) {
     const c = this.c, sp = this.scriptPose || { mode: 'sit' };
+    if (sp.mode === 'skydive') {
+      c.vx = sp.vx || 0; c.vy = sp.vy || 0;
+      this.moveX(c.vx * dt);
+      if (this.moveY(c.vy * dt) === 1) sp.landed = true;
+      if (c.vx > 30) this.face(1); else if (c.vx < -30) this.face(-1);
+      this.anim.update(dt, { mode: 'skydive', x: c.x, gy: c.y, py: c.y - this.pelvisH, vx: c.vx, vy: c.vy }, this.world);
+      return;
+    }
     c.vy = Math.min(c.vy + PHYS.grav * dt, PHYS.maxFall);
     const hitY = this.moveY(c.vy * dt);
     if (hitY === 1) { c.vy = 0; c.ground = true; }
@@ -289,6 +297,16 @@ export class Actor {
     c.x += c.vx * dt; c.y += c.vy * dt;
     if (c.vx > 20) this.face(1); else if (c.vx < -20) this.face(-1);
     this.anim.update(dt, { mode: 'air', x: c.x, gy: c.y, py: c.y - this.pelvisH, vx: c.vx, vy: 200 + c.vy * 0.2, attack: this.attack, look: this.look_at }, this.world);
+  }
+  // take control back from a limp body without standing up yet (scripted wake-ups)
+  scriptFromLimp(pose) {
+    const b = this.body, c = this.c;
+    const gy = this.world.groundBelow(b.x[P.PELVIS], b.y[P.PELVIS] - 6, 160);
+    c.x = b.x[P.PELVIS]; c.y = gy === null ? b.y[P.PELVIS] + 20 : gy;
+    this.unstick(); c.vx = c.vy = 0;
+    const hx = b.x[P.HEAD] - b.x[P.PELVIS];
+    if (Math.abs(hx) > 4 && sign(hx) !== this.facing) { this.facing = sign(hx); b.facing = this.facing; }
+    this.mode = 'script'; this.scriptPose = pose;
   }
   doEmote(e, t = 1.6) {
     if (this.mode !== 'ctrl' || !this.c.ground) return;
@@ -345,7 +363,7 @@ export class Actor {
     this.glows.length = 0;
     drawBody(ctx, b, this.look, a, {
       alpha, flash: this.flash, cape: this.cape, blade: this.blade, glows: this.glows, time: this.game.time,
-      bladeHot: this.attack ? 1 - this.attack.t : 0, tint: opts.tint, rim: opts.rim,
+      bladeHot: this.attack ? 1 - this.attack.t : 0, tint: opts.tint, rim: opts.rim, vx: this.c.vx,
     });
   }
 }

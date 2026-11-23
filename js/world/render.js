@@ -2,6 +2,10 @@
 // Style: no outlines. Shape comes from rounded exposed corners, rim light on top faces and the lightmap.
 import { TILE, T, TILES, BIOMES, BIOME_W, biomeIndexAt, biomeLocal, biomeOf } from './tiles.js';
 import { hash2, mix, rgba, shade, clamp, lerp, smooth, fbm1, TAU } from '../core/util.js';
+import { pattern, grassLip, snowLip } from '../art/tex.js';
+import { drawLantern, drawHearth } from '../art/props.js';
+import { capsule } from '../art/paint.js';
+import { makeLayers, drawClouds, drawSkyFeature } from '../art/bg.js';
 
 const RC = 16;           // render block size in tiles
 const PAD = 14;          // world px of overdraw around a block (grass, caps, rounded bits)
@@ -17,7 +21,7 @@ export function paletteAt(tx) {
   const edge = 24;
   if (local < edge) { B = biomeOf(bi - 1); k = 0.5 - local / edge / 2; }
   else if (local > BIOME_W - edge) { B = biomeOf(bi + 1); k = (local - (BIOME_W - edge)) / edge / 2; }
-  k = smooth(clamp(k, 0, 1));
+  k = Math.round(smooth(clamp(k, 0, 1)) * 4) / 4;
   const keys = ['grass', 'grassHi', 'dirt', 'stone', 'deep', 'leaf', 'log', 'moss', 'fog', 'accent'];
   p = { id: k < 0.5 ? A.id : B.id, flower: A.flower };
   for (const key of keys) p[key] = k > 0 ? mix(A[key], B[key], k) : A[key];
@@ -25,6 +29,29 @@ export function paletteAt(tx) {
   if (palCache.size > 20000) palCache.clear();
   return p;
 }
+// material + colour for the texture of a tile
+const MAT = {};
+function matOf(t, p) {
+  switch (t) {
+    case T.GRASS: case T.DIRT: return ['soil', p.dirt];
+    case T.STONE: return p.id === 'meadow' || p.id === 'glass' ? ['moss', p.stone, mix(p.moss, p.grass, 0.4)] : ['stone', p.stone];
+    case T.DEEP: return ['deep', p.deep];
+    case T.MOSS: return ['moss', p.stone, mix(p.moss, p.grass, 0.4)];
+    case T.SAND: return ['sand', '#a6927a'];
+    case T.SNOW: return ['snow', '#eef4fa'];
+    case T.ICE: return ['ice', '#a9d8f5'];
+    case T.PLANK: return ['plank', '#9b7653'];
+    case T.BRICK: return ['brick', '#8f8a96'];
+    case T.RUIN: case T.GATE: return ['ruin', t === T.GATE ? '#4a4652' : '#a39d93'];
+    case T.MARBLE: return ['marble', '#e9e4dc'];
+    case T.OBSIDIAN: return ['obsidian', '#2a2440'];
+    case T.EMBER: return ['ember', '#ff7a3a'];
+    case T.CRYSTAL: return ['deep', mix(p.stone, '#000000', 0.15)];
+    case T.GOLD: return ['stone', p.stone];
+    default: return ['stone', p.stone];
+  }
+}
+void MAT;
 function tileColor(t, p) {
   const k = TILES[t].k;
   return k && k[0] === '#' ? k : p[k] || '#ff00ff';
@@ -80,41 +107,41 @@ export class WorldRenderer {
     const col = kind === 'glass' ? '#6fdccb' : p.leaf;
     const h = hash2(tx, ty, 1), h2 = hash2(tx, ty, 2);
     const up = W.get(tx, ty - 1) === T.LEAVES, dn = W.get(tx, ty + 1) === T.LEAVES;
-    const ox = (h - 0.5) * 8, oy = (h2 - 0.5) * 6;
     const lf = W.get(tx - 1, ty) === T.LEAVES, rt = W.get(tx + 1, ty) === T.LEAVES;
+    const ox = (h - 0.5) * 8, oy = (h2 - 0.5) * 6;
     if (pass === 0) {
-      // underside shade: only where the canopy ends below
-      if (!dn) { g.fillStyle = shade(col, -0.2); g.beginPath(); g.arc(x + 16, y + 20, 22, 0, TAU); g.fill(); }
+      // underside: a darker skirt where the canopy ends
+      if (!dn) { g.fillStyle = shade(col, -0.32); g.beginPath(); g.arc(x + 16, y + 21, 22, 0, TAU); g.fill(); }
     } else if (pass === 1) {
-      // one merged mass: big overlapping discs in a single colour, small clumps on the outer rim
-      g.fillStyle = col;
+      // one merged mass filled with painted foliage
+      g.fillStyle = pattern(g, 'leaf', col);
       g.beginPath(); g.arc(x + 16, y + 16, 23.5, 0, TAU); g.fill();
-      if (!up || !lf || !rt) {
-        const disc = (cx, cy, r) => { g.beginPath(); g.arc(cx, cy, r, 0, TAU); g.fill(); };
-        if (!up) disc(x + 16 + ox * 1.5, y + 2 + oy, 11 + h * 5);
-        if (!lf) disc(x + 1, y + 14 + oy, 10 + h2 * 4);
-        if (!rt) disc(x + 31, y + 14 - oy, 10 + h * 4);
-      }
+      const disc = (cx, cy, r) => { g.beginPath(); g.arc(cx, cy, r, 0, TAU); g.fill(); };
+      if (!up) disc(x + 16 + ox * 1.5, y + 2 + oy, 11 + h * 5);
+      if (!lf) disc(x + 1, y + 14 + oy, 10 + h2 * 4);
+      if (!rt) disc(x + 31, y + 14 - oy, 10 + h * 4);
+      if (!dn) { g.fillStyle = rgba('#000000', 0.18); disc(x + 16, y + 30, 14); }
     } else if (!up) {
-      // sunlit crown, kept soft
-      g.fillStyle = rgba(shade(col, kind === 'frost' ? 0.75 : 0.25), kind === 'frost' ? 0.9 : 0.55);
-      g.beginPath(); g.ellipse(x + 16 + ox * 1.5, y + 2 + oy, 9 + h * 4, 5, 0, Math.PI, TAU); g.fill();
-      if (kind === 'glass' && h < 0.3) { g.fillStyle = rgba('#ffffff', 0.5); g.beginPath(); g.arc(x + 12 + ox, y + 6, 2, 0, TAU); g.fill(); }
+      // sunlit crown
+      const lg = g.createLinearGradient(0, y - 12, 0, y + 14);
+      lg.addColorStop(0, rgba(shade(col, kind === 'frost' ? 0.8 : 0.35), kind === 'frost' ? 0.95 : 0.6)); lg.addColorStop(1, rgba(col, 0));
+      g.fillStyle = lg;
+      g.beginPath(); g.ellipse(x + 16 + ox * 1.5, y + 4 + oy, 15 + h * 4, 12, 0, Math.PI, TAU); g.fill();
+      if (kind === 'glass' && h < 0.35) { g.fillStyle = rgba('#ffffff', 0.65); g.beginPath(); g.arc(x + 12 + ox, y + 6, 1.8, 0, TAU); g.fill(); }
     }
   }
   drawWall(g, tx, ty, w, x, y) {
     const p = paletteAt(tx);
     const W = this.world;
-    let c = tileColor(w, p);
-    c = mix(mix(c, '#000000', 0.55), p.fog, 0.1);
+    const [mat, col, extra] = matOf(w, p);
     const n = !W.wall(tx, ty - 1), s = !W.wall(tx, ty + 1), e = !W.wall(tx + 1, ty), wv = !W.wall(tx - 1, ty);
-    g.fillStyle = c;
-    roundTile(g, x, y, TILE, TILE, n && wv ? 8 : 0, n && e ? 8 : 0, s && e ? 8 : 0, s && wv ? 8 : 0);
-    if (w === T.RUIN || w === T.BRICK || w === T.PLANK) {
-      g.fillStyle = rgba('#000000', 0.12);
-      if (w === T.PLANK) g.fillRect(x, y + 15, TILE, 2);
-      else g.fillRect(x + ((ty & 1) ? 0 : 15), y, 2, TILE);
-    }
+    const R = 9;
+    g.fillStyle = pattern(g, mat, col, extra);
+    roundTile(g, x, y, TILE, TILE, n && wv ? R : 0, n && e ? R : 0, s && e ? R : 0, s && wv ? R : 0);
+    // back walls sit in shadow and haze
+    g.fillStyle = rgba(mix('#05040a', p.fog, 0.18), 0.62);
+    roundTile(g, x, y, TILE, TILE, n && wv ? R : 0, n && e ? R : 0, s && e ? R : 0, s && wv ? R : 0);
+    if (n) { g.fillStyle = rgba('#ffffff', 0.05); g.fillRect(x + (n && wv ? R : 0), y, TILE - (n && wv ? R : 0) - (n && e ? R : 0), 2); }
   }
   drawTile(g, tx, ty, t, x, y) {
     const W = this.world, p = paletteAt(tx);
@@ -126,113 +153,68 @@ export class WorldRenderer {
     const n = !sol(tx, ty - 1), s = !sol(tx, ty + 1), e = !sol(tx + 1, ty), w = !sol(tx - 1, ty);
     const R = 10;
     const rNW = n && w ? R : 0, rNE = n && e ? R : 0, rSE = s && e ? R : 0, rSW = s && w ? R : 0;
-    let c = shade(base, (h - 0.5) * 0.06);
     if (t === T.GLASS) {
-      g.fillStyle = rgba(base, 0.22);
+      g.fillStyle = rgba(base, 0.2);
       roundTile(g, x, y, TILE, TILE, rNW, rNE, rSE, rSW);
+      g.strokeStyle = rgba('#e8f8ff', 0.5); g.lineWidth = 1.5;
+      g.strokeRect(x + 1.5, y + 1.5, TILE - 3, TILE - 3);
       g.fillStyle = rgba('#ffffff', 0.35);
-      if (n) g.fillRect(x + 2, y + 1, TILE - 4, 2);
-      g.beginPath(); g.moveTo(x + 6, y + 26); g.lineTo(x + 20, y + 6); g.lineTo(x + 24, y + 6); g.lineTo(x + 10, y + 26); g.fill();
+      g.beginPath(); g.moveTo(x + 6, y + 26); g.lineTo(x + 20, y + 6); g.lineTo(x + 25, y + 6); g.lineTo(x + 11, y + 26); g.fill();
       return;
     }
-    if (t === T.ICE) {
-      g.fillStyle = rgba(base, 0.75);
-      roundTile(g, x, y, TILE, TILE, rNW, rNE, rSE, rSW);
-      g.fillStyle = rgba('#ffffff', 0.35);
-      g.beginPath(); g.moveTo(x + 4, y + 22); g.lineTo(x + 16, y + 4); g.lineTo(x + 21, y + 4); g.lineTo(x + 9, y + 22); g.fill();
-      if (n) { g.fillStyle = rgba('#ffffff', 0.7); g.fillRect(x + (rNW ? 6 : 0), y, TILE - (rNW ? 6 : 0) - (rNE ? 6 : 0), 2); }
-      return;
-    }
-    g.fillStyle = c;
+    const [mat, col, extra] = matOf(t, p);
+    g.fillStyle = pattern(g, mat, col, extra);
+    if (t === T.ICE) g.globalAlpha = 0.85;
     roundTile(g, x, y, TILE, TILE, rNW, rNE, rSE, rSW);
-    // material detail (low contrast; no outlines)
-    switch (t) {
-      case T.PLANK: {
-        g.fillStyle = shade(c, -0.14);
-        g.fillRect(x, y + 10, TILE, 1.5); g.fillRect(x, y + 21, TILE, 1.5);
-        g.fillRect(x + ((ty * 7) % 3) * 9 + 4, y, 1.5, 10);
-        g.fillStyle = shade(c, 0.1); g.fillRect(x, y + 1, TILE, 1.5);
-        break;
+    g.globalAlpha = 1;
+    // ore and veins
+    if (t === T.CRYSTAL) {
+      for (let k = 0; k < 3; k++) {
+        const hx = hash2(tx, ty, 10 + k), hy = hash2(tx, ty, 20 + k);
+        const cx = x + 6 + hx * 20, cy = y + 6 + hy * 20, r = 4 + hash2(tx, ty, 30 + k) * 5;
+        g.fillStyle = shade(base, -0.25); g.beginPath(); g.moveTo(cx, cy - r * 1.4); g.lineTo(cx + r * 0.7, cy); g.lineTo(cx, cy + r); g.lineTo(cx - r * 0.7, cy); g.closePath(); g.fill();
+        g.fillStyle = mix(base, '#ffffff', 0.15 * k); g.beginPath(); g.moveTo(cx, cy - r * 1.4); g.lineTo(cx + r * 0.7, cy); g.lineTo(cx, cy + r * 0.2); g.closePath(); g.fill();
+        g.fillStyle = rgba('#ffffff', 0.8); g.beginPath(); g.moveTo(cx, cy - r * 1.4); g.lineTo(cx + r * 0.25, cy - r * 0.2); g.lineTo(cx, cy); g.closePath(); g.fill();
       }
-      case T.BRICK: case T.RUIN: case T.MARBLE: {
-        const off = (ty & 1) ? 0 : 16;
-        g.fillStyle = shade(c, t === T.MARBLE ? -0.06 : -0.16);
-        g.fillRect(x, y + 15, TILE, 2);
-        g.fillRect(x + off, y, 2, 15);
-        g.fillRect(x + ((off + 16) % 32), y + 17, 2, 15);
-        if (t === T.MARBLE) { g.strokeStyle = rgba('#a9a39a', 0.5); g.lineWidth = 1; g.beginPath(); g.moveTo(x + 3, y + 5 + h * 8); g.quadraticCurveTo(x + 16, y + 20, x + 29, y + 12 + h * 10); g.stroke(); }
-        if (t === T.RUIN && h > 0.7) { g.fillStyle = shade(c, -0.2); g.fillRect(x + 6 + h * 10, y + 4, 2, 9); }
-        break;
-      }
-      case T.CRYSTAL: {
-        g.fillStyle = mix(p.stone, '#000000', 0.15);
-        roundTile(g, x, y, TILE, TILE, rNW, rNE, rSE, rSW);
-        const cc = base;
-        for (let k = 0; k < 3; k++) {
-          const hx = hash2(tx, ty, 10 + k), hy = hash2(tx, ty, 20 + k);
-          const cx = x + 6 + hx * 20, cy = y + 6 + hy * 20, r = 4 + hash2(tx, ty, 30 + k) * 5;
-          g.fillStyle = mix(cc, '#ffffff', 0.15 * k);
-          g.beginPath(); g.moveTo(cx, cy - r * 1.4); g.lineTo(cx + r * 0.7, cy); g.lineTo(cx, cy + r); g.lineTo(cx - r * 0.7, cy); g.closePath(); g.fill();
-          g.fillStyle = rgba('#ffffff', 0.7); g.beginPath(); g.moveTo(cx, cy - r * 1.4); g.lineTo(cx + r * 0.25, cy - r * 0.2); g.lineTo(cx, cy); g.closePath(); g.fill();
-        }
-        break;
-      }
-      case T.GOLD: {
-        g.fillStyle = mix(p.stone, '#000000', 0.05);
-        roundTile(g, x, y, TILE, TILE, rNW, rNE, rSE, rSW);
-        g.fillStyle = base;
-        for (let k = 0; k < 5; k++) { const hx = hash2(tx, ty, 40 + k), hy = hash2(tx, ty, 50 + k); g.beginPath(); g.arc(x + 4 + hx * 24, y + 4 + hy * 24, 1.5 + hash2(tx, ty, 60 + k) * 2.5, 0, TAU); g.fill(); }
-        break;
-      }
-      case T.EMBER: {
-        g.fillStyle = '#2b1714';
-        roundTile(g, x, y, TILE, TILE, rNW, rNE, rSE, rSW);
-        g.strokeStyle = base; g.lineWidth = 2; g.lineCap = 'round';
-        g.beginPath(); g.moveTo(x + 3, y + 8 + h * 12); g.lineTo(x + 13, y + 14); g.lineTo(x + 19, y + 6 + h * 6); g.lineTo(x + 29, y + 18); g.stroke();
-        g.lineWidth = 1; g.strokeStyle = '#ffd2a0';
-        g.beginPath(); g.moveTo(x + 13, y + 14); g.lineTo(x + 15, y + 26); g.stroke();
-        break;
-      }
-      case T.OBSIDIAN: {
-        g.fillStyle = rgba('#b8a8ff', 0.18); g.beginPath(); g.moveTo(x + 4, y + 28); g.lineTo(x + 22, y + 4); g.lineTo(x + 27, y + 4); g.lineTo(x + 9, y + 28); g.fill();
-        break;
-      }
-      default: {
-        // natural mass: a few soft specks and strata
-        g.fillStyle = shade(c, -0.08);
-        const ns = t === T.DIRT || t === T.GRASS ? 3 : 2;
-        for (let k = 0; k < ns; k++) {
-          const hx = hash2(tx, ty, 70 + k), hy = hash2(tx, ty, 80 + k);
-          g.beginPath(); g.ellipse(x + 3 + hx * 26, y + 3 + hy * 26, 2 + hx * 3, 1.3 + hy * 1.5, 0, 0, TAU); g.fill();
-        }
-        if (t === T.MOSS) { g.fillStyle = rgba('#a8d8a0', 0.25); g.beginPath(); g.arc(x + 10 + h * 12, y + 10, 6, 0, TAU); g.fill(); }
+    } else if (t === T.GOLD) {
+      for (let k = 0; k < 6; k++) {
+        const hx = hash2(tx, ty, 40 + k), hy = hash2(tx, ty, 50 + k), r = 1.4 + hash2(tx, ty, 60 + k) * 2.6;
+        g.fillStyle = shade(base, -0.3); g.beginPath(); g.arc(x + 4 + hx * 24, y + 5 + hy * 24, r, 0, TAU); g.fill();
+        g.fillStyle = base; g.beginPath(); g.arc(x + 4 + hx * 24 - 0.4, y + 4 + hy * 24, r * 0.85, 0, TAU); g.fill();
+        g.fillStyle = rgba('#fff6d8', 0.8); g.fillRect(x + 3.4 + hx * 24, y + 3 + hy * 24, 1, 1);
       }
     }
-    // exposed faces: rim light on top, soft shade underneath
-    const topCol = t === T.GRASS ? p.grass : t === T.SNOW ? '#ffffff' : null;
+    // exposed faces: turf / snow cap on top, lit rim, shade underneath and on the far side
     if (n) {
-      if (topCol) {
-        g.fillStyle = topCol;
-        g.beginPath();
-        const yb = y + 8 + h * 2;
-        g.moveTo(x + (rNW ? 1 : 0), y + (rNW ? R * 0.6 : 0));
-        if (rNW) g.quadraticCurveTo(x, y, x + R, y); else g.lineTo(x, y);
-        g.lineTo(x + TILE - rNE, y);
-        if (rNE) g.quadraticCurveTo(x + TILE, y, x + TILE - 1, y + R * 0.6); else g.lineTo(x + TILE, y);
-        g.lineTo(x + TILE - (e ? 1 : 0), e ? y + 13 : yb);
-        g.quadraticCurveTo(x + 22, yb + 3, x + 16, yb);
-        g.quadraticCurveTo(x + 8, yb - 3, x + (w ? 1 : 0), w ? y + 13 : yb);
-        g.closePath(); g.fill();
-        g.fillStyle = t === T.GRASS ? p.grassHi : '#ffffff';
-        g.globalAlpha = 0.55;
-        g.fillRect(x + (rNW ? 6 : 0), y, TILE - (rNW ? 6 : 0) - (rNE ? 6 : 0), 2);
-        g.globalAlpha = 1;
+      if (t === T.GRASS) {
+        const lip = grassLip(p.grass, p.grassHi);
+        g.drawImage(lip, ((tx % 4) + 4) % 4 * 32, 0, 32, lip.height, x - 0.3, y - 7, 32.6, lip.height);
+      } else if (t === T.SNOW || (p.id === 'frost' && (t === T.STONE || t === T.DIRT))) {
+        const lip = snowLip();
+        g.drawImage(lip, ((tx % 4) + 4) % 4 * 32, 0, 32, lip.height, x - 0.3, y - 5, 32.6, lip.height);
       } else {
-        g.fillStyle = rgba('#ffffff', 0.13);
-        g.fillRect(x + (rNW ? 7 : 0), y, TILE - (rNW ? 7 : 0) - (rNE ? 7 : 0), 3);
+        const lg = g.createLinearGradient(0, y, 0, y + 6);
+        lg.addColorStop(0, rgba('#ffffff', 0.22)); lg.addColorStop(1, rgba('#ffffff', 0));
+        g.fillStyle = lg; g.fillRect(x + (rNW ? 6 : 0), y, TILE - (rNW ? 6 : 0) - (rNE ? 6 : 0), 6);
       }
     }
-    if (s) { g.fillStyle = rgba('#000000', 0.16); g.fillRect(x + (rSW ? 8 : 0), y + TILE - 4, TILE - (rSW ? 8 : 0) - (rSE ? 8 : 0), 4); }
+    if (s) {
+      const sg = g.createLinearGradient(0, y + TILE - 9, 0, y + TILE);
+      sg.addColorStop(0, rgba('#000000', 0)); sg.addColorStop(1, rgba('#000000', 0.38));
+      g.fillStyle = sg; g.fillRect(x + (rSW ? 7 : 0), y + TILE - 9, TILE - (rSW ? 7 : 0) - (rSE ? 7 : 0), 9);
+      if ((t === T.DIRT || t === T.GRASS) && h < 0.45) {
+        // roots dangle from soil ceilings
+        g.strokeStyle = rgba(shade(base, -0.4), 0.9); g.lineWidth = 1.3; g.lineCap = 'round';
+        const rx = x + 6 + h * 40, len = 6 + hash2(tx, ty, 7) * 12;
+        g.beginPath(); g.moveTo(rx, y + TILE - 1); g.quadraticCurveTo(rx + 3, y + TILE + len * 0.5, rx - 1, y + TILE + len); g.stroke();
+      }
+      if ((t === T.MOSS || (p.id === 'glass' || p.id === 'meadow') && t === T.STONE) && h > 0.7) {
+        g.fillStyle = rgba('#7fa36b', 0.9);
+        for (let k = 0; k < 3; k++) { const mx = x + 5 + k * 9 + h * 4, ml = 4 + hash2(tx, ty, 80 + k) * 8; g.beginPath(); g.moveTo(mx - 2, y + TILE - 1); g.lineTo(mx + 2, y + TILE - 1); g.lineTo(mx, y + TILE + ml); g.closePath(); g.fill(); }
+      }
+    }
+    if (w) { const wg = g.createLinearGradient(x, 0, x + 5, 0); wg.addColorStop(0, rgba('#ffffff', 0.1)); wg.addColorStop(1, rgba('#ffffff', 0)); g.fillStyle = wg; g.fillRect(x, y + (rNW ? 7 : 0), 5, TILE - (rNW ? 7 : 0) - (rSW ? 7 : 0)); }
+    if (e) { const eg = g.createLinearGradient(x + TILE - 7, 0, x + TILE, 0); eg.addColorStop(0, rgba('#000000', 0)); eg.addColorStop(1, rgba('#000000', 0.26)); g.fillStyle = eg; g.fillRect(x + TILE - 7, y + (rNE ? 7 : 0), 7, TILE - (rNE ? 7 : 0) - (rSE ? 7 : 0)); }
   }
   drawPassable(g, tx, ty, t, x, y, p, base, h) {
     const W = this.world;
@@ -242,36 +224,22 @@ export class WorldRenderer {
       let col = base;
       if (kind === 'glass') col = '#5d7d88';
       if (kind === 'hollow') col = '#cfc6ee';
-      const wTop = above === T.LOG ? 12 : 9, wBot = below === T.LOG ? 12 : 15;
-      g.fillStyle = col;
+      const top = above === T.LOG, foot = TILES[below].solid;
+      const wTop = top ? 12 : 8, wBot = foot ? 24 : below === T.LOG ? 12 : 14;
       g.beginPath();
-      g.moveTo(x + 16 - wTop / 2, y); g.lineTo(x + 16 + wTop / 2, y);
-      g.lineTo(x + 16 + wBot / 2, y + TILE + 0.5); g.lineTo(x + 16 - wBot / 2, y + TILE + 0.5); g.fill();
-      g.fillStyle = rgba('#ffffff', 0.14); g.fillRect(x + 16 - wTop / 2 + 1, y, 3, TILE);
-      g.fillStyle = rgba('#000000', 0.18); g.fillRect(x + 16 + wTop / 2 - 4, y, 3, TILE);
-      if (TILES[below].solid) { g.fillStyle = col; g.beginPath(); g.ellipse(x + 16, y + TILE - 2, 12, 4, 0, 0, TAU); g.fill(); }
+      g.moveTo(x + 16 - wTop / 2, y);
+      g.lineTo(x + 16 + wTop / 2, y);
+      if (foot) { g.quadraticCurveTo(x + 16 + 6, y + TILE - 6, x + 16 + wBot / 2, y + TILE + 0.5); g.lineTo(x + 16 - wBot / 2, y + TILE + 0.5); g.quadraticCurveTo(x + 16 - 6, y + TILE - 6, x + 16 - wTop / 2, y); }
+      else { g.lineTo(x + 16 + wBot / 2, y + TILE + 0.5); g.lineTo(x + 16 - wBot / 2, y + TILE + 0.5); }
+      g.closePath();
+      g.fillStyle = pattern(g, 'bark', col); g.fill();
+      const sh = g.createLinearGradient(x + 16 - 9, 0, x + 16 + 9, 0);
+      sh.addColorStop(0, rgba('#ffffff', 0.12)); sh.addColorStop(0.45, rgba('#000000', 0)); sh.addColorStop(1, rgba('#000000', 0.42));
+      g.fillStyle = sh; g.fill();
+      if (!top && hash2(tx, ty, 9) < 0.5) { g.strokeStyle = col; g.lineWidth = 3; g.lineCap = 'round'; const d = hash2(tx, ty, 8) < 0.5 ? -1 : 1; g.beginPath(); g.moveTo(x + 16, y + 8); g.quadraticCurveTo(x + 16 + d * 8, y + 2, x + 16 + d * 14, y - 4); g.stroke(); }
       return;
     }
-    if (t === T.LEAVES) {
-      const kind = p.id;
-      const col = kind === 'glass' ? '#73e6d4' : kind === 'frost' ? '#55788a' : p.leaf;
-      const alpha = kind === 'glass' ? 0.78 : 1;
-      g.globalAlpha = alpha;
-      const up = W.get(tx, ty - 1) === T.LEAVES;
-      const dn = W.get(tx, ty + 1) === T.LEAVES;
-      const lf = W.get(tx - 1, ty) === T.LEAVES, rt = W.get(tx + 1, ty) === T.LEAVES;
-      g.fillStyle = dn ? col : shade(col, -0.16);
-      g.beginPath(); g.arc(x + 16 + (h - 0.5) * 6, y + 17, 19, 0, TAU); g.fill();
-      if (!dn) { g.fillStyle = shade(col, -0.16); g.beginPath(); g.arc(x + 16, y + 22, 15, 0, TAU); g.fill(); }
-      g.fillStyle = col;
-      g.beginPath(); g.arc(x + 16 + (h - 0.5) * 6, y + 14, 16, 0, TAU); g.fill();
-      if (!up) {
-        g.fillStyle = shade(col, kind === 'frost' ? 0.55 : 0.14);
-        g.beginPath(); g.ellipse(x + 16 + (h - 0.5) * 8, y + 8, lf && rt ? 18 : 13, 9, 0, Math.PI, TAU); g.fill();
-      }
-      g.globalAlpha = 1;
-      return;
-    }
+    if (t === T.LEAVES) return;
     if (t === T.CAP) {
       const up = W.get(tx, ty - 1) === T.CAP;
       g.fillStyle = up ? shade(base, -0.15) : base;
@@ -289,19 +257,11 @@ export class WorldRenderer {
     }
     if (t === T.LANTERN) {
       const hang = TILES[W.get(tx, ty - 1)].solid && !TILES[W.get(tx, ty + 1)].solid;
-      g.fillStyle = '#2d2a30';
-      if (hang) g.fillRect(x + 15, y, 2, 10);
-      else g.fillRect(x + 14, y + 16, 4, 16);
-      g.fillStyle = '#3a3540'; g.beginPath(); g.roundRect(x + 9, y + 6, 14, 14, 4); g.fill();
-      g.fillStyle = base; g.beginPath(); g.roundRect(x + 11.5, y + 8.5, 9, 9, 3); g.fill();
-      g.fillStyle = '#fff3d8'; g.beginPath(); g.arc(x + 16, y + 13, 2.6, 0, TAU); g.fill();
+      if (hang) { g.strokeStyle = '#2d2a30'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(x + 16, y); g.lineTo(x + 16, y + 8); g.stroke(); drawLantern(g, x + 16, y + 17, 1, 0); }
+      else { capsule(g, x + 16, y + TILE, x + 16, y + 20, 2.2, 2, '#3a3036', { dark: 0.5 }); drawLantern(g, x + 16, y + 12, 1, 0); }
       return;
     }
-    if (t === T.HEARTH) {
-      g.fillStyle = '#4a4048'; g.beginPath(); g.roundRect(x + 2, y + 20, 28, 12, [4, 4, 2, 2]); g.fill();
-      g.fillStyle = '#5c5058'; g.fillRect(x + 4, y + 20, 24, 3);
-      return;
-    }
+    if (t === T.HEARTH) { drawHearth(g, x + 16, y + TILE, 0.62, 0.5); return; }
   }
 
   ensureScale(s) {
@@ -417,8 +377,13 @@ export class WorldRenderer {
       }
       ctx.globalAlpha = 1;
     }
-    // parallax silhouettes
+    // set pieces and clouds behind the flats
     const LA = this.layerSet(A), LB = k > 0 ? this.layerSet(B) : null;
+    drawSkyFeature(ctx, A, W, H, camX, camY, zoom, time, 1 - k);
+    if (LB) drawSkyFeature(ctx, B, W, H, camX, camY, zoom, time, k);
+    drawClouds(ctx, LA, W, H, camX, camY, zoom, time, 1 - k);
+    if (LB) drawClouds(ctx, LB, W, H, camX, camY, zoom, time, k);
+    // parallax silhouettes
     const factors = [0.06, 0.14, 0.26, 0.42];
     for (let i = 0; i < 4; i++) {
       const f = factors[i];
@@ -440,6 +405,7 @@ export class WorldRenderer {
       drawL(LA, 1);
       if (LB) drawL(LB, k);
       if (i === 1 && tease) this.drawTease(ctx, W, H, camX, camY, zoom, time, tease);
+      if (i === 1) { drawClouds(ctx, LA, W, H, camX, camY, zoom, time, 1 - k, 1); if (LB) drawClouds(ctx, LB, W, H, camX, camY, zoom, time, k, 1); }
     }
     // underground: the sky fades into cave dark
     if (depth > 0) {
@@ -532,103 +498,3 @@ function roundTile(g, x, y, w, h, a, b, c, d) {
   g.closePath(); g.fill();
 }
 
-// ---------------- procedural parallax layers per biome ----------------
-function makeLayers(B) {
-  const out = [];
-  out.fills = [];
-  const LW = 1800, LH = 640;
-  const cols = [
-    mix(B.sky[2], B.fog, 0.35),
-    mix(B.fog, B.sky[1], 0.35),
-    mix(mix(B.fog, B.deep, 0.4), B.sky[1], 0.15),
-    mix(mix(B.deep, B.fog, 0.28), B.sky[1], 0.1),
-  ];
-  for (let i = 0; i < 4; i++) {
-    const cv = document.createElement('canvas');
-    cv.width = LW; cv.height = LH;
-    const g = cv.getContext('2d');
-    const col = cols[i];
-    const seed = i * 101 + B.id.length * 13;
-    const ridge = (amp, freq, base, oct = 4) => {
-      g.beginPath(); g.moveTo(0, LH);
-      for (let x = 0; x <= LW; x += 6) {
-        // seamless: blend the noise with its wrapped copy
-        const u = x / LW;
-        const n = fbm1(x * freq, seed, oct) * (1 - u) + fbm1((x - LW) * freq, seed, oct) * u;
-        g.lineTo(x, base - n * amp);
-      }
-      g.lineTo(LW, LH); g.closePath(); g.fill();
-    };
-    g.fillStyle = col;
-    const base = LH * (0.55 + i * 0.08);
-    if (i === 0) {
-      ridge(200, 0.0028, base, 5);
-    } else if (i === 1) {
-      ridge(110, 0.005, base + 30, 4);
-      feature(g, B, i, LW, base + 10, col, seed);
-    } else {
-      ridge(60 + i * 10, 0.008 + i * 0.002, base + 40, 3);
-      feature(g, B, i, LW, base + 30, col, seed);
-    }
-    // atmospheric haze at the foot of each layer
-    const hz = g.createLinearGradient(0, base - 80, 0, LH);
-    hz.addColorStop(0, rgba(B.fog, 0)); hz.addColorStop(1, rgba(B.fog, i < 2 ? 0.55 : 0.32));
-    g.globalCompositeOperation = 'source-atop';
-    g.fillStyle = hz; g.fillRect(0, 0, LW, LH);
-    g.globalCompositeOperation = 'source-over';
-    out.push(cv);
-    out.fills.push(mix(col, B.fog, i < 2 ? 0.55 : 0.32));
-  }
-  return out;
-}
-function feature(g, B, layer, LW, base, col, seed) {
-  const count = layer === 1 ? 6 : 10;
-  for (let k = 0; k < count; k++) {
-    const x = (hash2(k, layer, seed) * LW) | 0;
-    const s = (0.6 + hash2(k, 7, seed) * 0.8) * (layer === 1 ? 1.3 : 1);
-    const drawAt = (xx) => {
-      g.save(); g.translate(xx, base + 4); g.scale(s, s); g.fillStyle = col;
-      switch (B.id) {
-        case 'meadow': {
-          if (k % 5 === 0) {
-            // a ruined arch
-            g.strokeStyle = g.fillStyle; g.lineWidth = 22; g.lineCap = 'butt';
-            g.beginPath(); g.moveTo(-38, 0); g.lineTo(-38, -70); g.arc(0, -70, 38, Math.PI, TAU); g.lineTo(38, 0); g.stroke();
-            g.fillRect(-52, -8, 30, 8); g.fillRect(28, -6, 22, 6);
-          } else {
-            g.fillRect(-3, -60, 6, 60);
-            for (const [ex, ey, rx, ry] of [[0, -76, 30, 26], [-20, -60, 20, 15], [20, -62, 22, 16]]) { g.beginPath(); g.ellipse(ex, ey, rx, ry, 0, 0, TAU); g.fill(); }
-            if (k % 3 === 0) { g.fillRect(34, -40, 4, 40); g.beginPath(); g.ellipse(36, -50, 16, 14, 0, 0, TAU); g.fill(); }
-          }
-          break;
-        }
-        case 'glass': {
-          g.fillRect(-5, -160, 10, 160);
-          g.beginPath(); g.moveTo(0, -240); g.lineTo(26, -150); g.lineTo(0, -120); g.lineTo(-26, -150); g.closePath(); g.fill();
-          g.beginPath(); g.moveTo(-20, -110); g.lineTo(-44, -96); g.lineTo(-20, -90); g.fill();
-          break;
-        }
-        case 'hollow': {
-          g.fillRect(-6, -90, 12, 90);
-          g.beginPath(); g.ellipse(0, -92, 46, 22, 0, Math.PI, TAU); g.fill();
-          g.beginPath(); g.moveTo(-30 + k * 5, -620); g.lineTo(-10, -620); g.lineTo(-18 + k, -380 - k * 20); g.fill();
-          break;
-        }
-        case 'ember': {
-          g.beginPath(); g.moveTo(-40, 0); g.lineTo(-18, -120); g.lineTo(-6, -90); g.lineTo(8, -170); g.lineTo(30, 0); g.fill();
-          g.fillRect(40, -60, 4, 60); g.fillRect(30, -48, 24, 3);
-          break;
-        }
-        case 'frost': {
-          g.beginPath(); g.moveTo(-30, 0); g.lineTo(0, -260); g.lineTo(30, 0); g.fill();
-          g.beginPath(); g.moveTo(14, 0); g.lineTo(34, -140); g.lineTo(52, 0); g.fill();
-          break;
-        }
-      }
-      g.restore();
-    };
-    drawAt(x);
-    if (x > LW - 300) drawAt(x - LW);
-    if (x < 300) drawAt(x + LW);
-  }
-}

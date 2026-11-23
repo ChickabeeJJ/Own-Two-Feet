@@ -18,7 +18,7 @@ async function boot() {
   const pInit = Platform.init();
   const canvas = document.getElementById('game');
   Input.init(canvas);
-  await Promise.race([pInit, new Promise(r => setTimeout(r, 3000))]);
+  void pInit;   // the SDK finishes initialising in the background; the game starts on the first frame
   const sv = Save.load();
   const game = new Game(canvas);
   window.__game = game;
@@ -93,7 +93,6 @@ async function boot() {
 
   game.start();
   Platform.loadingStop();
-  document.getElementById('boot').classList.add('gone');
   if (!sv.born) game.story.startBirth(); else game.story.quickStart();
 }
-boot().catch(e => { console.error(e); const b = document.querySelector('.boot-title'); if (b) b.textContent = 'Something went wrong'; });
+boot().catch(e => console.error(e));

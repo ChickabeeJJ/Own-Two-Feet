@@ -75,7 +75,7 @@ export const BIOMES = [
   },
   {
     id: 'frost', name: 'The Frost Spires', sub: 'silence, sharpened',
-    sky: ['#34547f', '#98b4d4', '#e7f1fa'], fog: '#cddff0', sun: [0.95, 0.98, 1.0], amb: [0.08, 0.1, 0.14], sunCol: '#ffffff',
+    sky: ['#2f4c74', '#8aa6c6', '#d4e2ef'], fog: '#bccfe2', sun: [0.9, 0.94, 1.0], amb: [0.08, 0.1, 0.14], sunCol: '#ffffff',
     grass: '#e8f0f6', grassHi: '#ffffff', dirt: '#6b7a8e', stone: '#7b89a1', deep: '#4b576f', leaf: '#7f9fae', log: '#4c4a50', moss: '#8fa7b5',
     accent: '#dff6ff', amp: 16, freq: 0.02, rough: 0.55, trees: 0.13, tree: 'pine', parts: 'snow', grade: [0.97, 1.0, 1.05],
     flower: ['#ffffff', '#dff6ff', '#c9e6ff'],

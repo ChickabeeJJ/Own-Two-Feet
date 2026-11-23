@@ -139,38 +139,64 @@ export class Wisp {
     if (this.hp <= 0) g.enemies.kill(this, info);
   }
   draw(ctx) {
-    const c = this.c, g = this.game;
-    const a = this.mode === 'dead' ? 1 - this.deadT / 0.6 : 1;
-    ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
-    const rgb = hexRgb(this.col);
-    drawGlow(ctx, c.x, c.y, 46 + (this.windup ? (0.6 - this.windup) * 60 : 0), rgb, 0.45 * a);
-    // trailing tendrils
-    ctx.strokeStyle = rgba(this.col, 0.45 * a); ctx.lineWidth = 3; ctx.lineCap = 'round';
-    for (let i = 0; i < 3; i++) {
-      ctx.beginPath(); ctx.moveTo(c.x, c.y);
-      const ph = this.t * 3 + i * 2;
-      ctx.quadraticCurveTo(c.x - c.vx * 0.06 + Math.sin(ph) * 10, c.y + 14, c.x - c.vx * 0.12 + Math.sin(ph + 1) * 16, c.y + 30 + i * 4);
-      ctx.stroke();
-    }
-    ctx.globalCompositeOperation = 'source-over';
-    ctx.globalAlpha = a;
-    ctx.fillStyle = this.flash > 0 ? '#ffffff' : '#1e1a28';
-    ctx.beginPath(); ctx.ellipse(c.x, c.y, 11, 13, 0, 0, TAU); ctx.fill();
-    ctx.fillStyle = '#f4f1ea';
-    ctx.beginPath(); ctx.ellipse(c.x, c.y - 2, 8, 9, 0, 0, TAU); ctx.fill();
-    ctx.fillStyle = this.windup ? this.col : '#141118';
-    const px = g.player ? clamp((g.player.x - c.x) * 0.01, -2, 2) : 0;
-    ctx.beginPath(); ctx.ellipse(c.x - 3 + px, c.y - 2, 1.8, 2.6, 0, 0, TAU); ctx.ellipse(c.x + 3 + px, c.y - 2, 1.8, 2.6, 0, 0, TAU); ctx.fill();
-    ctx.restore();
+    drawWispSprite(ctx, this.c.x, this.c.y, this.t, this.col, {
+      alpha: this.mode === 'dead' ? 1 - this.deadT / 0.6 : 1, flash: this.flash, windup: this.windup, vx: this.c.vx,
+      look: this.game.player ? clamp((this.game.player.x - this.c.x) * 0.01, -2, 2) : 0,
+    });
     this.glows.length = 0;
   }
   lightsInto(arr) { arr.push({ x: this.c.x, y: this.c.y, c: hexRgb(this.col), s: 0.5 }); }
 }
 
+// a moth with a paper-lantern body and a mask for a face
+export function drawWispSprite(ctx, x, y, t, col, o = {}) {
+  const a = o.alpha ?? 1;
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.globalCompositeOperation = 'lighter';
+  const rgb = hexRgb(col);
+  drawGlow(ctx, x, y, 50 + (o.windup ? (0.6 - o.windup) * 70 : 0), rgb, 0.4);
+  // trailing filaments
+  ctx.strokeStyle = rgba(col, 0.4); ctx.lineWidth = 1.6; ctx.lineCap = 'round';
+  for (let i = 0; i < 4; i++) {
+    const ph = t * 3 + i * 1.7;
+    ctx.beginPath(); ctx.moveTo(x + (i - 1.5) * 3, y + 10);
+    ctx.bezierCurveTo(x - (o.vx || 0) * 0.05 + Math.sin(ph) * 8, y + 22, x - (o.vx || 0) * 0.1 + Math.sin(ph + 1) * 12, y + 32, x - (o.vx || 0) * 0.12 + Math.sin(ph + 2) * 6, y + 42 + i * 3);
+    ctx.stroke();
+  }
+  ctx.globalCompositeOperation = 'source-over';
+  // wings
+  const flap = Math.sin(t * 16) * 0.5 + 0.5;
+  for (const sd of [-1, 1]) {
+    ctx.save(); ctx.translate(x, y - 2); ctx.scale(sd, 1);
+    const wg = ctx.createLinearGradient(0, 0, 22, -10);
+    wg.addColorStop(0, rgba('#2a2436', 0.95)); wg.addColorStop(1, rgba(col, 0.35));
+    ctx.fillStyle = wg;
+    ctx.beginPath(); ctx.moveTo(2, -2); ctx.quadraticCurveTo(14, -18 - flap * 8, 24, -8 - flap * 6); ctx.quadraticCurveTo(18, 0, 4, 2); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(2, 3); ctx.quadraticCurveTo(14, 12 + flap * 4, 16, 6); ctx.quadraticCurveTo(10, 3, 3, 4); ctx.fill();
+    ctx.fillStyle = rgba(col, 0.7); ctx.beginPath(); ctx.arc(15, -9 - flap * 5, 2, 0, TAU); ctx.fill();
+    ctx.restore();
+  }
+  // lantern body: ribbed paper glowing from within
+  const lg = ctx.createRadialGradient(x - 3, y - 4, 2, x, y, 15);
+  lg.addColorStop(0, o.flash > 0 ? '#ffffff' : '#fff3e0'); lg.addColorStop(0.45, col); lg.addColorStop(1, '#2a2436');
+  ctx.fillStyle = lg;
+  ctx.beginPath(); ctx.ellipse(x, y, 11, 14, 0, 0, TAU); ctx.fill();
+  ctx.strokeStyle = rgba('#2a2436', 0.45); ctx.lineWidth = 1;
+  for (const k of [-6, 0, 6]) { ctx.beginPath(); ctx.ellipse(x, y, Math.abs(11 - Math.abs(k) * 0.9) * (k ? 0.6 : 0.01) + 0.5, 14, 0, 0, TAU); ctx.stroke(); }
+  ctx.fillStyle = '#1e1a28'; ctx.fillRect(x - 5, y - 17, 10, 4); ctx.fillRect(x - 3, y + 13, 6, 3);
+  // mask
+  ctx.fillStyle = '#f4f1ea';
+  ctx.beginPath(); ctx.ellipse(x, y - 1, 6.5, 7.5, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = o.windup ? col : '#141118';
+  const px = o.look || 0;
+  ctx.beginPath(); ctx.ellipse(x - 2.6 + px, y - 2, 1.5, 2.5, -0.2, 0, TAU); ctx.ellipse(x + 2.6 + px, y - 2, 1.5, 2.5, 0.2, 0, TAU); ctx.fill();
+  ctx.restore();
+}
+
 // ---------------------------------------------------------------- ragdoll enemies
-const HUSK_LOOK = (eye) => ({ body: '#2d2935', shade: '#1e1b25', mat: 'cloth', eyes: eye, eyeStyle: 'none', head: 'mask', maskCol: '#ece6da', cape: null, blade: null, marks: [], rim: '#ffcf9e' });
-const BRUTE_LOOK = (eye) => ({ body: '#3a3440', shade: '#26222b', mat: 'metal', eyes: eye, eyeStyle: 'none', head: 'mask', maskCol: '#d8d0c2', maskHorns: true, cape: { col: '#4a3a3a', style: 'cape', len: 6 }, blade: null, marks: [], rim: '#ffcf9e' });
+export const HUSK_LOOK = (eye) => ({ body: '#1f1b26', shade: '#15121a', mat: 'cloth', eyes: eye, eyeStyle: 'none', head: 'mask', maskCol: '#ece6da', cape: null, blade: null, marks: [], rim: '#ffcf9e', cloak: '#3b3346', claws: '#e6dfd2', seams: false, arms: 0.9, legs: 0.85 });
+export const BRUTE_LOOK = (eye) => ({ body: '#3a3440', shade: '#26222b', mat: 'cloth', eyes: eye, eyeStyle: 'none', head: 'mask', maskCol: '#d8d0c2', maskHorns: true, cape: { col: '#4a3a3a', style: 'cape', len: 6 }, blade: null, marks: [], rim: '#ffcf9e', armor: '#5a5262', gaunt: true, bulk: 1.18, arms: 1.15, seams: false, cloak: '#3b3346' });
 
 export class Enemies {
   constructor(game) {

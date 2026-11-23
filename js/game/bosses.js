@@ -7,9 +7,10 @@ import { P } from '../physics/body.js';
 import { TILE, T, TILES, biomeOf } from '../world/tiles.js';
 import { Proj, hexRgb } from './enemies.js';
 import { drawGlow } from '../world/light.js';
-import { clamp, lerp, rand, sign, TAU, rgba, mix } from '../core/util.js';
+import { clamp, lerp, rand, sign, TAU, rgba, mix, shade } from '../core/util.js';
 import { RELICS, Save } from './progress.js';
 import { Platform } from '../platform.js';
+import { drawGateBanner } from '../art/props.js';
 
 const ORDINAL = ['First', 'Second', 'Third', 'Fourth', 'Fifth', 'Sixth', 'Seventh', 'Eighth', 'Ninth', 'Tenth'];
 const TYPES = {
@@ -115,6 +116,19 @@ export class Bosses {
   actorsList() { return this.active ? this.active.actors() : []; }
   lights(arr) { if (this.active && this.active.lights) this.active.lights(arr); }
   draw(ctx, a, layer) {
+    if (layer === 'back') {
+      // banners of the warden that holds the nearest gate
+      const g = this.game;
+      const gi = g.gateInfo(g.cam.x);
+      if (Math.abs(gi.gxw - g.cam.x) < 2200) {
+        const spec = TYPES[biomeOf(gi.guard).id];
+        const gy = g.world.surface(gi.gx) * TILE;
+        const down = this.defeated(gi.k);
+        ctx.save(); if (down) ctx.globalAlpha = 0.45;
+        for (const sd of [-1, 1]) drawGateBanner(ctx, gi.gxw + sd * (gi.half - 40), gy + 1, 1, down ? '#6a6470' : spec.col, g.time + sd);
+        ctx.restore();
+      }
+    }
     if (!this.arena || !this.active || this.active.over) return;
     if (layer === 'back' && this.active.drawBack) this.active.drawBack(ctx, a);
     if (layer !== 'front') return;
@@ -173,8 +187,9 @@ class Warden extends BossBase {
     this.maxHp = this.hp = Math.round(280 * (1 + tier * 0.65));
     const a = this.a = new Actor(g, {
       x, y: gy, team: 'enemy', scale: 2.25, heavy: 2.4, hp: this.hp, run: 150 + tier * 12, facing: -1, blade: true,
-      look: { body: spec.body, shade: spec.shade, mat: 'metal', eyes: spec.col, eyeStyle: 'slit', head: spec.head, hornCol: '#1a171d', accent: spec.col,
-        cape: { col: spec.cape, style: 'cape', len: 9 }, blade: { col: '#cfc7bb', glow: spec.col, len: 36 }, marks: [], rim: spec.col },
+      look: { body: spec.body, shade: spec.shade, mat: 'cloth', eyes: spec.col, eyeStyle: 'slit', head: spec.head, hornCol: '#1a171d', accent: spec.col, seams: false, mouth: false,
+        armor: shade(spec.body, 0.18), gaunt: true, bulk: 1.15, arms: 1.1,
+        cape: { col: spec.cape, style: 'cape', len: 9 }, blade: { col: '#cfc7bb', glow: spec.col, len: 40, w: 3.6 }, marks: [], rim: spec.col },
     });
     a.isBoss = true; a.noCrumple = true;
     a.mode = 'script'; a.scriptPose = { mode: 'cocoon', strength: 0.5 };
@@ -320,7 +335,8 @@ class Wraith extends BossBase {
     this.maxHp = this.hp = Math.round(240 * (1 + tier * 0.65));
     const a = this.a = new Actor(g, {
       x, y: gy - 60, team: 'enemy', scale: 1.9, heavy: 1.2, hp: this.hp, facing: -1, blade: false,
-      look: { body: spec.body, shade: spec.shade, mat: 'glow', eyes: spec.col, eyeStyle: 'visor', head: spec.head, accent: spec.col,
+      look: { body: spec.body, shade: spec.shade, mat: 'glow', eyes: spec.col, eyeStyle: 'visor', head: spec.head, accent: spec.col, seams: false, mouth: false,
+        robe: shade(spec.cape, -0.1), claws: spec.col, arms: 1.1,
         cape: { col: spec.cape, style: 'cape', len: 11 }, blade: null, marks: [], rim: spec.col },
     });
     a.isBoss = true; a.noCrumple = true;
@@ -440,7 +456,7 @@ class Wraith extends BossBase {
 }
 
 // ---------------------------------------------------------------- Golem: heart + torn-up blocks
-class Golem extends BossBase {
+export class Golem extends BossBase {
   constructor(g, mgr, spec, tier, x, gy) {
     super(g, mgr, spec, tier);
     this.maxHp = this.hp = Math.round(300 * (1 + tier * 0.65));
@@ -572,4 +588,4 @@ class Golem extends BossBase {
   }
   lights(arr) { arr.push({ x: this.c.x, y: this.c.y, c: hexRgb(this.spec.col), s: 0.9 }); }
 }
-export { TYPES };
+export { TYPES, Warden, Wraith };

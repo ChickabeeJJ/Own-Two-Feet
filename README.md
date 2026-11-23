@@ -6,16 +6,20 @@ Pure HTML5 and vanilla JavaScript (ES modules). No build step, no runtime depend
 
 To play locally, serve the folder (for example `python3 -m http.server`) and open `index.html`.
 
+## The story
+
+Before the world, there was a needle and a thread. The Seamstress stitched the land, and dolls to walk it. Then she vanished; her needles became the Wardens and shut every gate, and the dolls forgot how to stand. You are the last doll, born from the last falling thread of her light. Thread, her final living stitch, climbs out of your chest to guide you. Walk through every gate, take her light back from the Wardens, and finish the world yourself.
+
 ## The first minute (the hook)
 
-There is no menu. The first launch plays the birth:
+No loading screen, no menu. The game opens mid-fall:
 
-1. Black screen, two heartbeats.
-2. A seed of light falls and cracks open on the meadow. A limp body spills out.
-3. "Press any key to wake." Each press puts strength into the muscles: a twitch, a push onto one knee, then the body stands on its own two feet, physically.
-4. The title card fades in, the HUD slides up, and you are playing. A blade glows in the ground a few steps away, and a horned giant watches from the horizon where the first gate is.
+1. **Seconds 0–10: the fall.** You are already plummeting through a dusk sky, steering left and right to catch motes of light (each one is glimmer) while four lines of lore are told over the wind, clouds and speed lines.
+2. **The impact.** Slow motion, white-out, a shockwave across the meadow, and your body tumbles physically across the grass.
+3. **Getting up.** Thread climbs out of your chest: *"Up. You have to get up."* Two presses and the ragdoll pushes onto a knee, then stands. A Warden roars somewhere far away, a horned giant watches from the horizon, and the title card lands.
+4. **A clear chain of goals** (always shown top left with the keys to press, and Thread flies ahead to point the way): take the blade, defeat the Hollow that claws out of the ground, break 5 blocks, follow Thread to the fire, rest at the shrine, defeat the Hollow Warden, make a home, walk on.
 
-Every launch after that drops you straight back where you were.
+Returning players drop straight back where they were. Esc skips the opening.
 
 ## Controls
 
@@ -56,6 +60,17 @@ The character keeps the look of the Rag Toss and Rag Showdown mannequin (cream b
 - **Boss gates.** Every boundary between biomes is an arena held by a warden. Three archetypes with stronger variants: the Hollow Warden and the Pyre Knight (giant ragdolls: slam waves, wall-stunning charges, leaps), the Glass Widow and the Still Queen (flying ragdolls: volleys, dives, summons, rings, icefall), and the Unmade Heart (a core wrapped in torn-up blocks: throws, pound, spin). Tier scales health and adds patterns; a second phase starts at half health.
 - **Shrines** every ~85 tiles. Rest to heal, save and set your respawn. Each is kept by someone: a wanderer (trades blocks), a smith (hones your blade, forges hearths), a sage (more vessels, faster mending) or a tailor (cosmetics). Invite them to live at your hearth.
 - **Home.** Place a Hearth and that spot becomes home: your respawn point, and where the people you invite go to live.
+
+## Art pipeline and asset sheets
+
+All art is generated in code from one art bible (`js/art/paint.js`, header comment): painterly gradients and soft-shaded forms, key light from the upper left, rim light from behind, no outlines.
+
+- `js/art/doll.js`: characters. Tapered capsule anatomy shaded like cylinders, a torso hull, mitten hands and boots, stitched seams and mouth, the glowing thread in the chest, and accessories that give every role one readable silhouette (sash, cloak, robe, apron, pack, wide hat, staff, hammer, armour plates, bone masks, claws).
+- `js/art/tex.js`: seamless 128 px material textures per biome (soil with pebbles and roots, faceted cracked stone, deepstone, moss, sand, snow, ice, planks, brick, old stone, marble, nightglass, ember rock, bark, foliage), grass and snow lips.
+- `js/art/props.js`: shrine, campfire, blade in stone, hearth, lanterns, gate banners, the seed of light, isometric block icons, vessels, glimmer, relic medallions, effect frames.
+- `js/art/bg.js`: painted parallax flats with rim light and haze, cloud banks, and one sky set piece per biome (floating isles, glowing crystal spires, a stone sky, a smoking volcano, an aurora).
+
+The asset sheets in `art/sheets/` are rendered from that same code (so they always match the game): `characters.png`, `maps.png` (materials, trees and in-game captures of every biome) and `assets.png` (props, items, interface, effects). Rebuild them with `node tools/sheets.mjs`.
 
 ## Look and feel
 

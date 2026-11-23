@@ -1,17 +1,22 @@
 // Extra scenarios for tools/shot.mjs
 export default ({ page, sleep, key, shot, evalg }) => ({
   async birth() {
-    await sleep(1500); await shot('b0-dark');
-    await sleep(2200); await shot('b1-seed');
-    await sleep(1600); await shot('b2-landed');
-    await key('Space'); await sleep(700); await shot('b3-twitch');
-    await key('Space'); await sleep(900); await shot('b4-kneel');
-    await key('Space'); await sleep(1600); await shot('b5-stand');
-    await sleep(2400); await shot('b6-title');
-    await sleep(2200); await shot('b7-play');
-    await page.keyboard.down('KeyD'); await sleep(1500); await page.keyboard.up('KeyD'); await shot('b8-walk');
-    await key('KeyE'); await sleep(1200); await shot('b9-blade');
-    await page.keyboard.down('KeyD'); await sleep(4000); await page.keyboard.up('KeyD'); await shot('b10-far');
+    await sleep(400); await shot('b0-open');
+    await sleep(1800); await shot('b1-fall');
+    await page.keyboard.down('KeyD'); await sleep(1500); await page.keyboard.up('KeyD'); await shot('b2-steer');
+    await page.keyboard.down('KeyA'); await sleep(1500); await page.keyboard.up('KeyA'); await shot('b3-lore');
+    await sleep(3500); await shot('b4-near');
+    await page.waitForFunction(() => window.__game.story.stage >= 1, null, { timeout: 20000 });
+    await sleep(250); await shot('b5-impact');
+    await page.waitForFunction(() => window.__game.story.stage >= 2, null, { timeout: 20000 });
+    await sleep(500); await shot('b6-thread');
+    await key('Space'); await sleep(900); await shot('b7-kneel');
+    await key('Space'); await sleep(2600); await shot('b8-title');
+    await page.waitForFunction(() => window.__game.story.stage >= 5, null, { timeout: 20000 });
+    await sleep(600); await shot('b9-play');
+    await page.keyboard.down('KeyD'); await sleep(1600); await page.keyboard.up('KeyD'); await sleep(800); await shot('b10-blade');
+    await sleep(1500); await shot('b11-foe');
+    console.log('state', JSON.stringify(await evalg(() => { const g = window.__game; return { obj: g.save.obj, blade: g.save.hasBlade, glimmer: g.save.glimmer, enemies: g.enemies.list.length }; })));
   },
   async look() {
     // q: x,y (tiles), zoom — frame an arbitrary spot of the world
@@ -80,9 +85,9 @@ export default ({ page, sleep, key, shot, evalg }) => ({
   async prof() {
     await sleep(1200);
     await evalg((q) => { const g = window.__game; g.story.skipBirth(); if (q) { g.settings.quality = q; g.resize(); if (q === 'low') g.post.setEnabled(false); } }, process.env.Q || null);
-    await page.keyboard.down('KeyD');
-    await sleep(1000);
-    await evalg(() => { window.__prof = {}; });
+    if (!process.env.IDLE) await page.keyboard.down('KeyD');
+    await sleep(process.env.IDLE ? 2500 : 1000);
+    await evalg((nd) => { window.__prof = {}; window.__noDecor = !!nd; }, process.env.NODECOR || null);
     await sleep(3000);
     const r = await evalg(() => { const P = window.__prof, n = P.frames; const o = {}; for (const k in P) if (k !== 'frames') o[k] = +(P[k] / n).toFixed(2); o.frames = n; return o; });
     console.log('prof', JSON.stringify(r));

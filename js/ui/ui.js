@@ -84,6 +84,25 @@ export class UI {
     if (h.dataset.h !== html) { h.innerHTML = html; h.dataset.h = html; }
     h.classList.remove('hidden'); h.classList.add('show');
   }
+  lore(text) {
+    const l = $('#lore');
+    if (!text) { l.classList.remove('show'); return; }
+    l.classList.remove('show');
+    clearTimeout(this.loreT);
+    this.loreT = setTimeout(() => { l.textContent = text; void l.offsetWidth; l.classList.add('show'); }, l.textContent ? 650 : 0);
+  }
+  objective(text, hint, dist) {
+    const o = $('#objective');
+    const key = text + '|' + hint;
+    if (o.dataset.k !== key) {
+      o.dataset.k = key;
+      o.querySelector('.ob-text').textContent = text;
+      o.querySelector('.ob-hint').innerHTML = hint || '';
+      o.classList.remove('hidden', 'pulse'); void o.offsetWidth; o.classList.add('pulse');
+    }
+    const d = o.querySelector('.ob-dist');
+    if (d.textContent !== dist) d.textContent = dist;
+  }
   card(title, sub, cls = '', dur = 3.2) {
     const c = $('#card');
     c.className = cls;

@@ -6,6 +6,7 @@ import { P } from '../physics/body.js';
 import { TILE, T, TILES, biomeOf, biomeIndexAt, gateNear } from '../world/tiles.js';
 import { clamp, rand, hash2, mulberry, TAU, sign } from '../core/util.js';
 import { drawGlow } from '../world/light.js';
+import { drawShrine, drawCampfire } from '../art/props.js';
 import { upgradeCost, RELICS } from './progress.js';
 import { TYPES as BOSS_TYPES } from './bosses.js';
 
@@ -17,11 +18,11 @@ const NAMES = {
   tailor: ['Lisle', 'Bobbin', 'Seraphine', 'Pell', 'Velour'],
 };
 const TITLE = { wanderer: 'a wanderer', smith: 'a smith', sage: 'a sage', tailor: 'a tailor' };
-const LOOKS = {
-  wanderer: { body: '#d9b99a', shade: '#b0907a', mat: 'cloth', eyes: '#ffd9a0', eyeStyle: 'dots', head: 'hood', hoodCol: '#6b5446', cape: { col: '#8a5a3c', style: 'scarf', len: 8 }, marks: [], rim: '#ffe2bd' },
-  smith: { body: '#b98a5e', shade: '#8f6745', mat: 'metal', eyes: '#ffb36b', eyeStyle: 'slit', head: 'none', cape: { col: '#4a3a33', style: 'cape', len: 5 }, marks: [], rim: '#ffcf9e' },
-  sage: { body: '#ece7df', shade: '#c4bdb2', mat: 'porcelain', eyes: '#c4b5ff', eyeStyle: 'slit', head: 'halo', accent: '#f2c86a', cape: { col: '#e8e2d6', style: 'cape', len: 10 }, marks: [{ col: '#f2c86a' }], rim: '#ffffff' },
-  tailor: { body: '#e3b1aa', shade: '#bd8c86', mat: 'cloth', eyes: '#9ff3ff', eyeStyle: 'dots', head: 'tophat', accent: '#d9a441', cape: { col: '#5b3f8f', style: 'scarf', len: 9 }, marks: [], rim: '#ffe2bd' },
+export const LOOKS = {
+  wanderer: { body: '#d9b99a', shade: '#b0907a', mat: 'cloth', eyes: '#ffd9a0', eyeStyle: 'dots', head: 'widehat', hatCol: '#5a4636', accent: '#c8473d', pack: true, cape: { col: '#8a5a3c', style: 'scarf', len: 7 }, marks: [], rim: '#ffe2bd', bootCol: '#4a3a33' },
+  smith: { body: '#b98a5e', shade: '#8f6745', mat: 'cloth', eyes: '#ffb36b', eyeStyle: 'slit', head: 'none', cape: null, apron: '#3e2c22', hammer: true, gaunt: true, armor: null, bulk: 1.18, arms: 1.22, marks: [], rim: '#ffcf9e', bootCol: '#3a2c2a' },
+  sage: { body: '#ece7df', shade: '#c4bdb2', mat: 'porcelain', eyes: '#c4b5ff', eyeStyle: 'slit', head: 'halo', accent: '#f2c86a', cape: { col: '#d8d0c0', style: 'cape', len: 9 }, robe: '#e3dccd', staff: true, marks: [{ col: '#f2c86a' }], rim: '#ffffff' },
+  tailor: { body: '#e3b1aa', shade: '#bd8c86', mat: 'cloth', eyes: '#9ff3ff', eyeStyle: 'dots', head: 'tophat', accent: '#d9a441', cape: { col: '#5b3f8f', style: 'scarf', len: 9 }, tape: true, sash: '#5b3f8f', marks: [], rim: '#ffe2bd', bootCol: '#2b2530' },
 };
 const SHOP = [
   { tile: T.LANTERN, n: 2, cost: 18 }, { tile: T.PLANK, n: 10, cost: 12 }, { tile: T.GLASS, n: 6, cost: 14 },
@@ -220,9 +221,10 @@ export class Shrines {
     const r = Math.random();
     const L = {
       wanderer: first ? [
-        'Oh! A new one. Still wobbly in the knees, I see.',
-        'Everyone here was born the same way you were. Most of us just kept walking.',
-        `There is a gate ahead. ${guard.name} holds it. Bring a steady blade.`,
+        'Oh! Another one fell? And you\u2019re standing. Nobody stands anymore.',
+        'The Seamstress made us, then left. Her needles hold the gates now. We call them Wardens.',
+        'That glow in your chest... that\u2019s her thread. You could take her light back, gate by gate.',
+        `The first gate is east. ${guard.name} holds it. Rest here first.`,
       ] : [pickR(r, ['The road goes on forever, you know. That is the nice part.', 'Bring me nothing, buy something. That is how trade works.', `Mind ${guard.name}. It hits like a falling house.`])],
       smith: first ? [
         'Hmph. You swing that blade like it owes you money.',
@@ -247,25 +249,14 @@ export class Shrines {
     if (this.sv.home) arr.push({ x: this.sv.home.x, y: this.sv.home.y - 20, c: [1, 0.62, 0.32], s: 0.9 });
   }
   draw(ctx, a, layer) {
-    if (layer !== 'back' && layer !== 'front') return;
+    if (layer !== 'back') return;
     const g = this.game;
     for (const s of this.map.values()) {
-      if (layer === 'back') {
-        // campfire: crossed logs and a ring of stones
-        ctx.fillStyle = '#4a3a33';
-        ctx.save(); ctx.translate(s.x, s.y - 4);
-        ctx.rotate(0.35); ctx.beginPath(); ctx.roundRect(-16, -3, 32, 6, 3); ctx.fill(); ctx.rotate(-0.7); ctx.beginPath(); ctx.roundRect(-16, -3, 32, 6, 3); ctx.fill();
-        ctx.restore();
-        ctx.fillStyle = '#5a5258';
-        for (let i = -2; i <= 2; i++) { ctx.beginPath(); ctx.ellipse(s.x + i * 9, s.y - 2, 5, 3.5, 0, 0, TAU); ctx.fill(); }
-      } else {
-        ctx.save(); ctx.globalCompositeOperation = 'lighter';
-        const f = 0.85 + Math.sin(g.time * 11) * 0.1 + Math.sin(g.time * 27) * 0.05;
-        drawGlow(ctx, s.x, s.y - 14, 90 * f, [1, 0.6, 0.3], 0.55);
-        drawGlow(ctx, s.x, s.y - 10, 22 * f, [1, 0.9, 0.6], 0.9);
-        ctx.restore();
-      }
+      if (Math.abs(s.x - g.cam.x) > 1400) continue;
+      drawShrine(ctx, s.x - 78, s.y + 1, 0.95, g.time, true);
+      drawCampfire(ctx, s.x, s.y + 1, 0.95, g.time);
     }
+    if (this.sv.home && Math.abs(this.sv.home.x - g.cam.x) < 1400) drawCampfire(ctx, this.sv.home.x + 54, this.sv.home.y + 1, 0.7, g.time + 1);
   }
 }
 function pickR(r, arr) { return arr[(r * arr.length) | 0]; }
