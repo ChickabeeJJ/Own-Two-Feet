@@ -37,6 +37,7 @@ export function drawDoll(ctx, b, look, a, o = {}) {
   if (o.cape && look.cape) drawCape(ctx, o.cape, look, a, s, f);
   if (look.pack) drawPack(ctx, cx, cy, px, py, tx, ty, nx, ny, s, f, look);
   if (look.hammer) drawHammer(ctx, cx, cy, px, py, tx, ty, nx, ny, s);
+  if (look.gearPick) drawGearPick(ctx, cx, cy, px, py, tx, ty, nx, ny, s, look.gearPick);
   if (look.staff) drawStaff(ctx, X(P.HAND_B), Y(P.HAND_B), s, f, o);
 
   // ---------- far limbs
@@ -101,6 +102,7 @@ export function drawDoll(ctx, b, look, a, o = {}) {
     ctx.fillStyle = tint(look.beltCol || BELT); ctx.fillRect(qx - 1 * s, qy - 1 * s, 2 * s, 2 * s);
   }
   if (look.apron) drawApron(ctx, cx, cy, px, py, tx, ty, nx, ny, s, look.apron);
+  if (look.gearLamp) drawGearLamp(ctx, px, py, tx, ty, nx, ny, s, f, o);
   // the thread of light in the chest (story): a faint stitch
   if (look.thread) {
     const qx = lerp(bx, cx, 0.6) + nx * 2.4 * s, qy = lerp(by, cy, 0.6) + ny * 2.4 * s;
@@ -342,6 +344,23 @@ function drawPack(g, cx, cy, px, py, tx, ty, nx, ny, s, f, look) {
   capsule(g, -9 * s, -13 * s, 9 * s, -13 * s, 3.4 * s, 3.4 * s, '#c9b48a', { dark: 0.4, hi: 0.1 });
   g.fillStyle = '#4a4048'; g.beginPath(); g.arc(-6 * s * f, 8 * s, 3.5 * s, 0, TAU); g.fill();
   g.restore();
+}
+// worn gear: a pick slung across the back, a small lamp hanging at the hip
+function drawGearPick(g, cx, cy, px, py, tx, ty, nx, ny, s, kind) {
+  const mx = lerp(px, cx, 0.55) - nx * 7 * s, my = lerp(py, cy, 0.55) - ny * 7 * s;
+  g.save(); g.translate(mx, my); g.rotate(Math.atan2(ty, tx) + Math.PI / 2 + 0.7);
+  capsule(g, 0, 14 * s, 0, -14 * s, 1.4 * s, 1.4 * s, '#7a5a3e', { dark: 0.35 });
+  g.fillStyle = kind === 'g_pick_crystal' ? '#8ff7ff' : '#e2b85a';
+  g.beginPath(); g.moveTo(-10 * s, -12 * s); g.quadraticCurveTo(0, -20 * s, 10 * s, -12 * s); g.quadraticCurveTo(0, -16 * s, -10 * s, -12 * s); g.fill();
+  g.restore();
+}
+function drawGearLamp(g, px, py, tx, ty, nx, ny, s, f, o) {
+  const x = px + nx * 7 * s + tx * 2 * s, y = py + ny * 7 * s + 5 * s;
+  g.strokeStyle = '#4a4650'; g.lineWidth = 1 * s; g.beginPath(); g.moveTo(x, y - 4 * s); g.lineTo(x, y); g.stroke();
+  g.fillStyle = '#c9a45c'; g.beginPath(); g.roundRect(x - 3 * s, y, 6 * s, 1.6 * s, 0.6 * s); g.fill(); g.beginPath(); g.roundRect(x - 3 * s, y + 6.4 * s, 6 * s, 1.6 * s, 0.6 * s); g.fill();
+  g.save(); g.globalCompositeOperation = 'lighter'; softDisc(g, x, y + 4 * s, 9 * s, '#ffd28a', 0.45); g.restore();
+  g.fillStyle = 'rgba(255,233,192,.9)'; g.fillRect(x - 2.2 * s, y + 1.6 * s, 4.4 * s, 4.8 * s);
+  if (o.glows) o.glows.push([x, y + 4 * s, 16 * s, '#ffd28a', 0.4]);
 }
 function drawHammer(g, cx, cy, px, py, tx, ty, nx, ny, s) {
   const hx0 = cx - nx * 7 * s, hy0 = cy - ny * 7 * s;

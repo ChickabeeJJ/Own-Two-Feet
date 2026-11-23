@@ -41,7 +41,7 @@ const TUT = [
   { id: 'dash', title: 'Dash', keys: ['Shift'], touch: 'tap Dash', text: 'Dash. You can dash in the air too', done: s => s.dashed },
   { id: 'mine', title: 'Break blocks', keys: ['Hold Click'], touch: 'tap Build, then hold a block', text: 'Break three blocks of ground', done: s => s.sv.stats.blocks - s.tutB0 >= 3 },
   { id: 'place', title: 'Build', keys: ['Right-click'], touch: 'in build mode, tap empty space', text: 'Put a block back into the world', done: s => s.sv.stats.placed - s.tutP0 >= 1 },
-  { id: 'craft', title: 'Craft', keys: ['Q'], touch: 'open the menu, then Craft', text: 'Open your crafting book', done: s => !!s.tut.craftOpened },
+  { id: 'craft', title: 'Craft', keys: ['I', 'Q'], touch: 'tap Bag, then pick Planks', text: 'Open your satchel and turn timber into planks', done: s => !!s.tut.crafted },
 ];
 
 // the goal chain. each: id, text, hint(touch), target(game) -> {x,y} | null, done(game) -> bool
@@ -306,13 +306,14 @@ export class Story {
     const st = TUT[this.tutI];
     if (!st) { this.finishTutorial(); return; }
     if (st.id === 'strike' && !this.dummy) this.spawnDummy();
+    if (st.id === 'craft' && !this.timberGiven) { this.timberGiven = true; if ((this.sv.inv[T.LOG] || 0) < 1) { g.player.give(T.LOG, 2); ui && ui.pickup(T.LOG, 2); this.say('Here. Two lengths of timber. Make something.', 2.6, true); } }
     this.thread.target = st.id === 'blade' ? { x: BLADE_X * TILE + 16, y: this.bladeY - 40 } : st.id === 'strike' && this.dummy ? { x: this.dummyX, y: this.dummy.c.y - 60 } : null;
     if (ui && !g.cinematic) ui.tutorial(st, this.tutI, TUT.length, !!g.touch, this.tutDoneT > 0);
     if (this.tutDoneT > 0) { this.tutDoneT -= dt; if (this.tutDoneT <= 0) { this.tutI++; if (TUT[this.tutI] && TUT[this.tutI].id === 'mine') this.tutB0 = this.sv.stats.blocks; if (TUT[this.tutI] && TUT[this.tutI].id === 'place') this.tutP0 = this.sv.stats.placed; } return; }
     if (st.done(this)) {
       this.tutDoneT = 0.9;
       Audio.play('confirm');
-      const say = { move: 'Good. Feet first, always.', jump: 'Higher than the grass. A start.', blade: 'It fits your hand. Of course it does.', strike: 'Again, and harder when it counts.', dash: 'Fast. You can slip through attacks like that.', mine: 'Everything here can be taken apart...', place: '...and put back the way you like it.', craft: 'Planks, bricks, lanterns, a hearth. You will want a home.' }[st.id];
+      const say = { move: 'Good. Feet first, always.', jump: 'Higher than the grass. A start.', blade: 'It fits your hand. Of course it does.', strike: 'Again, and harder when it counts.', dash: 'Fast. You can slip through attacks like that.', mine: 'Everything here can be taken apart...', place: '...and put back the way you like it.', craft: 'Ladders, doors, a workbench... you will want a home.' }[st.id];
       if (say) this.say(say, 2.4, true);
     }
   }

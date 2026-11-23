@@ -131,7 +131,7 @@ export class Game {
     if (this.player) this.player.update(dt);
     for (const a of this.actors) a.update(dt);
     this.actors = this.actors.filter(a => !a.removed);
-    for (const p of this.projectiles) p.update(dt);
+    if (!(this.ui && this.ui.modal)) for (const p of this.projectiles) p.update(dt);
     this.projectiles = this.projectiles.filter(p => !p.dead);
     this.fx.update(dt);
     if (this.player) {
@@ -224,7 +224,8 @@ export class Game {
     this.dynLights.length = 0;
     if (this.player) {
       const pa = this.player.actor;
-      this.dynLights.push({ x: pa.c.x, y: pa.c.y - 50, c: [0.95, 0.9, 0.82], s: 0.78 });
+      const lamp = this.player.sv.equip && this.player.sv.equip.lamp;
+      this.dynLights.push({ x: pa.c.x, y: pa.c.y - 50, c: lamp ? [1.0, 0.88, 0.7] : [0.95, 0.9, 0.82], s: lamp ? 1.35 : 0.78 });
     }
     for (const s of this.systems) if (s.lights) s.lights(this.dynLights);
     for (const p of this.projectiles) if (p.light) this.dynLights.push(p.light);
@@ -258,8 +259,9 @@ export class Game {
     const P = this.post.P;
     const grade = k > 0 ? A.grade.map((x, i) => lerp(x, B.grade[i], k)) : A.grade;
     P.tint = grade.map(x => x * (1 - tierDark * 0.12));
-    P.desat = damp(P.desat, this.player && this.player.lowHp ? 0.35 : this.timeScale < 0.6 ? 0.25 : 0, 4, this.frameDt || 0.016);
-    P.vig = 0.4 + depth * 0.15 + tierDark * 0.1;
+    const bk = this.bagK || 0;   // the satchel's cinematic grade: muted, vignetted world around the doll
+    P.desat = damp(P.desat, this.player && this.player.lowHp ? 0.35 : bk > 0.05 ? 0.3 * bk : this.timeScale < 0.6 ? 0.25 : 0, 4, this.frameDt || 0.016);
+    P.vig = 0.4 + depth * 0.15 + tierDark * 0.1 + bk * 0.45;
     this.post.render(this.time);
     mark('post');
     if (PR) PR.frames = (PR.frames || 0) + 1;

@@ -64,9 +64,10 @@ export class Touch {
         this.tapped = true;
         if (navigator.vibrate) navigator.vibrate(8);
         if (a === 'tbuild') { this.toggleBuild(); return; }
+        if (a === 'tbag') { if (this.game.ui && this.game.ui.bag) this.game.ui.bag.open({ page: 'items' }); return; }
         Input.virt[a] = true; b.classList.add('down');
       });
-      const up = () => { if (a !== 'tbuild') { Input.virt[a] = false; b.classList.remove('down'); } };
+      const up = () => { if (a !== 'tbuild' && a !== 'tbag') { Input.virt[a] = false; b.classList.remove('down'); } };
       b.addEventListener('pointerup', up); b.addEventListener('pointercancel', up);
     };
     for (const b of document.querySelectorAll('#tbtns .tb')) press(b, b.dataset.a);
@@ -95,6 +96,12 @@ export class Touch {
   // called every frame by the UI: show the contextual action when something can be used
   frame() {
     const p = this.game.player;
+    // dialogs, the satchel and cutscenes own the whole screen: the stick and buttons step aside
+    const busy = !!(this.game.cinematic || (this.game.ui && this.game.ui.modal));
+    if (busy !== this.busy) {
+      this.busy = busy; document.body.classList.toggle('modal', busy);
+      if (busy) { Input.virt.axisX = 0; Input.virt.axisY = 0; Input.virt.up = Input.virt.down = false; for (const k of ['attack', 'jump', 'dash', 'heal', 'interact']) Input.virt[k] = false; this.sid = null; this.stick.classList.remove('live'); this.knob.style.transform = ''; }
+    }
     const it = p && p.interact && !this.game.cinematic && !(this.game.ui && this.game.ui.modal);
     if (it) {
       const verb = p.interact.verb || (p.interact.label.startsWith('Talk') ? 'Talk' : p.interact.label.startsWith('Rest') ? 'Rest' : p.interact.label.split(' ')[0]);

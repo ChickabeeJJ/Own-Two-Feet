@@ -229,8 +229,15 @@ export class Body {
       const ty0 = Math.floor((y[i] - R) / TILE), ty1 = Math.floor((y[i] + R) / TILE);
       for (let ty = ty0; ty <= ty1; ty++) for (let tx = tx0; tx <= tx1; tx++) {
         const t = world.get(tx, ty);
-        if (!TILES[t].solid) continue;
-        const bx0 = tx * TILE, by0 = ty * TILE, bx1 = bx0 + TILE, by1 = by0 + TILE;
+        const D = TILES[t];
+        if (!D.solid) {
+          // one-way tops (platforms, the top rung of a ladder) only catch a particle coming down onto them
+          if (this.oneWayOff || !(D.platform || (D.climb && !TILES[world.get(tx, ty - 1)].climb))) continue;
+          const top = ty * TILE;
+          if (py[i] + R <= top + 3 && y[i] + R > top && x[i] > tx * TILE - R * 0.5 && x[i] < tx * TILE + TILE + R * 0.5) { y[i] = top - R; this.contact[i] = 1; }
+          continue;
+        }
+        const bx0 = tx * TILE, by0 = ty * TILE + (D.half ? TILE / 2 : 0), bx1 = bx0 + TILE, by1 = ty * TILE + TILE;
         const qx = clamp(x[i], bx0, bx1), qy = clamp(y[i], by0, by1);
         let nx = x[i] - qx, ny = y[i] - qy;
         let d = Math.hypot(nx, ny);

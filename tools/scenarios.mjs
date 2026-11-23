@@ -61,7 +61,11 @@ export default ({ page, sleep, key, shot, evalg }) => ({
     await sleep(1200); await key('ShiftLeft', 80); await sleep(1300); await shot('t3-mine');
     await evalg(() => { window.__game.save.stats.blocks += 3; }); await sleep(1200);
     await evalg(() => { window.__game.save.stats.placed += 1; }); await sleep(1200);
-    await key('KeyQ'); await sleep(600); await key('Escape'); await sleep(1500); await shot('t4-done');
+    // the craft step: Thread hands over timber; open the satchel and make planks
+    await sleep(800); await key('KeyQ'); await sleep(700); await shot('t3-satchel');
+    await evalg(() => { const rows = [...document.querySelectorAll('#bag .rec')]; const r = rows.find(r => /Planks/.test(r.textContent)); r && r.click(); });
+    await sleep(200); await evalg(() => { const b = document.querySelector('#bag .craft'); b.dispatchEvent(new PointerEvent('pointerdown')); b.dispatchEvent(new PointerEvent('pointerup')); });
+    await sleep(1200); await key('Escape'); await sleep(1500); await shot('t4-done');
     const st = await evalg(() => { const g = window.__game; return { tutDone: g.save.tutDone, tutI: g.story.tutI, dummyHits: g.story.dummyHits, blade: g.save.hasBlade, obj: g.save.obj }; });
     console.log('tut', JSON.stringify(st));
   },
@@ -89,6 +93,55 @@ export default ({ page, sleep, key, shot, evalg }) => ({
     const need = ['init', 'loadingStart', 'loadingStop', 'gameplayStart', 'gameplayStop', 'ad:rewarded', 'ad:midgame'];
     const miss = need.filter(n => !after.calls.includes(n));
     if (miss.length || !pausedDuring || rose.dead || Math.abs(rose.dx) > 80 || after.dead || after.paused || !after.saves) throw new Error('sdk flow broken: ' + JSON.stringify({ miss, pausedDuring, rose, after }));
+  },
+  // satchel + crafting + new building parts
+  async bag() {
+    await page.waitForFunction(() => window.__game && window.__game.story);
+    await sleep(600);
+    await evalg(() => { const g = window.__game, p = g.player; g.story.skipBirth(); if (g.story.skipTutorial) g.story.skipTutorial(); g.enemies.calm = 999; g.save.hasBlade = true; p.actor.blade = true; g.story.firstFoeDown = true; g.save.tut.foe = 1; g.save.obj = 1;
+      for (const [t, n] of [[5, 6], [3, 30], [8, 10], [7, 8], [17, 12], [15, 4], [2, 10]]) p.give(t, n); p.hp = 3; });
+    await sleep(500);
+    await key('KeyI'); await sleep(900); await shot('bag-0-open');
+    const r0 = await evalg(() => ({ modal: window.__game.ui.modal, recipes: document.querySelectorAll('#bag .rec').length, items: document.querySelectorAll('#bag .bag-grid .bslot').length }));
+    // craft planks (first craftable at the top), hold for a few
+    await evalg(() => { const rows = [...document.querySelectorAll('#bag .rec')]; const i = rows.findIndex(r => /Planks/.test(r.textContent)); rows[i].click(); });
+    await sleep(200);
+    const btn = await page.$('#bag .craft');
+    const bb = await btn.boundingBox();
+    await page.mouse.move(bb.x + bb.width / 2, bb.y + bb.height / 2); await page.mouse.down(); await sleep(400); await shot('bag-1-crafting'); await sleep(1700); await page.mouse.up();
+    await sleep(900);
+    const planks = await evalg(() => window.__game.player.sv.inv[9] || 0);
+    // a workbench, by hand, then place it and craft at it
+    await evalg(() => { const rows = [...document.querySelectorAll('#bag .rec')]; rows.find(r => /Workbench/.test(r.textContent)).click(); });
+    await sleep(150); await evalg(() => document.querySelector('#bag .craft').dispatchEvent(new PointerEvent('pointerdown'))); await sleep(1200);
+    await key('KeyI'); await sleep(500);
+    const placed = await evalg(() => { const g = window.__game, p = g.player, W = g.world; const tx = Math.floor(p.x / 32) + 2, ty = Math.floor(p.y / 32) - 1;
+      const put = (x, y, t) => { if (W.get(x, y) === 0 && p.take(t, 1)) { W.set(x, y, t); return true; } return false; };
+      const ok = put(tx, ty, 32);
+      // ladder column and a platform for physics checks
+      p.give(25, 6); p.give(26, 4); p.give(28, 1); p.give(31, 1); p.give('i_draught', 2); p.give('g_lamp', 1);
+      return ok; });
+    await sleep(300);
+    await key('KeyQ'); await sleep(900); await shot('bag-2-bench');
+    const near = await evalg(() => [...document.querySelectorAll('#bag .bag-stations .st.on')].map(e => e.textContent));
+    // drink a draught from the satchel, wear the lamp
+    await evalg(() => { const b = window.__game.ui.bag; b.sel = 'i_draught'; b.renderDetail(); document.querySelector('#bag .dacts .btn').click(); });
+    await sleep(300);
+    await evalg(() => { const b = window.__game.ui.bag; b.sel = 'g_lamp'; b.renderDetail(); document.querySelector('#bag .dacts .btn').click(); });
+    await sleep(400); await shot('bag-3-gear');
+    const after = await evalg(() => { const p = window.__game.player; return { hp: p.hp, lamp: p.sv.equip.lamp, hot: p.sv.hotbar.length }; });
+    await key('Escape'); await sleep(600);
+    // ladder: build a column next to the player and climb it
+    const climb = await evalg(async () => { const g = window.__game, p = g.player, W = g.world, a = p.actor; const tx = Math.floor(p.x / 32) - 2, gy = Math.floor(p.y / 32);
+      for (let y = gy - 1; y >= gy - 5; y--) W.set(tx, y, 25);
+      W.set(tx - 1, gy - 6, 3); W.set(tx, gy - 6, 0);
+      p.respawnAt(tx * 32 + 16, gy * 32); await new Promise(r => setTimeout(r, 400)); const y0 = a.c.y;
+      window.__input.keys.add('KeyW'); await new Promise(r => setTimeout(r, 1600)); window.__input.keys.delete('KeyW');
+      await new Promise(r => setTimeout(r, 300));
+      return { rose: Math.round(y0 - a.c.y), climb: !!a.c.climb }; });
+    await shot('bag-4-ladder');
+    console.log('bag', JSON.stringify({ r0, planks, placed, near, after, climb }));
+    if (r0.modal !== 'bag' || planks < 8 || !placed || !near.includes('Workbench') || after.hp !== 4 || after.lamp !== 'g_lamp' || climb.rose < 100) throw new Error('bag flow broken');
   },
   async content() {
     await sleep(900);

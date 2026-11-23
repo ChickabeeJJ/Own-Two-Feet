@@ -6,6 +6,9 @@ import { TILE, T, TILES, biomeOf, gateNear } from '../world/tiles.js';
 import { Body, P } from '../physics/body.js';
 import { Animator } from '../physics/pose.js';
 import { Cape, drawBody } from '../physics/skin.js';
+import { Bag } from './bag.js';
+import { itemIconEl } from '../art/itemart.js';
+import { usable, itemName } from '../game/items.js';
 import { COSMETICS, SLOTS, SLOT_NAMES, RECIPES, cosmetic, lookFromSave, Save, genName } from '../game/progress.js';
 import { TYPES as BOSS_TYPES } from '../game/bosses.js';
 import { mulberry, hashStr, TAU, clamp, shade } from '../core/util.js';
@@ -145,11 +148,11 @@ export class UI {
     const last = box.lastChild;
     if (last && last.dataset.t == tile && Date.now() - last.dataset.ts < 1500) {
       last.dataset.n = +last.dataset.n + n; last.dataset.ts = Date.now();
-      last.querySelector('span').textContent = `+${last.dataset.n} ${TILES[tile].name}`;
+      last.querySelector('span').textContent = `+${last.dataset.n} ${itemName(tile)}`;
       return;
     }
-    const k = TILES[tile].k;
-    const d = el('div', 'pk', `<i style="background:${k && k[0] === '#' ? k : '#8a7f78'}"></i><span>+${n} ${esc(TILES[tile].name)}</span>`);
+    const d = el('div', 'pk', `<span>+${n} ${esc(itemName(tile))}</span>`);
+    d.prepend(itemIconEl(tile, 20));
     d.dataset.t = tile; d.dataset.n = n; d.dataset.ts = Date.now();
     box.appendChild(d);
     while (box.children.length > 4) box.firstChild.remove();
@@ -416,27 +419,12 @@ export class UI {
     drawBody(g, p.b, p.look, 1, { cape: p.cape, blade: this.sv.hasBlade, time: p.t, glows: [] });
   }
   tab_craft(body) {
-    const sv = this.sv, g = this.game;
-    if (g.story) g.story.tut.craftOpened = 1;
-    body.appendChild(el('div', 'h', 'Craft from what you carry'));
-    for (const r of RECIPES) {
-      const can = r.need.every(([t, n]) => (sv.inv[t] || 0) >= n);
-      const row = el('div', 'recipe');
-      const left = el('div', '', `<b>${esc(TILES[r.out].name)} x${r.n}</b><div class="need">${r.need.map(([t, n]) => `${n} ${esc(TILES[t].name)} (${sv.inv[t] || 0})`).join(' + ')}</div>`);
-      left.prepend(tileIcon(r.out, 22));
-      left.style.display = 'flex'; left.style.gap = '12px'; left.style.alignItems = 'center';
-      const btn = el('button', '', 'Craft'); btn.disabled = !can;
-      btn.onclick = () => {
-        for (const [t, n] of r.need) g.player.take(t, n);
-        g.player.give(r.out, r.n);
-        Audio.play('place', { pitch: 1.3 }); Audio.play('confirm');
-        g.story && (g.story.tut.crafted = 1);
-        this.renderMenu();
-      };
-      row.appendChild(left); row.appendChild(btn);
-      body.appendChild(row);
-    }
-    body.appendChild(el('div', 'note', 'Place a Hearth to make a home. People you meet can come to live there.'));
+    const g = this.game;
+    body.appendChild(el('div', 'h', 'Crafting lives in your satchel'));
+    body.appendChild(el('div', 'note', 'Open it with I or Tab (Q opens the crafting book), or the Bag button on touch. Simple things can be made anywhere; build a Workbench, Forge or Loom for the rest. A shrine fire works as a workbench.'));
+    const b = el('button', 'big-btn primary', '<b>Open the satchel</b><span>Inventory and crafting</span>');
+    b.onclick = () => { this.closeMenu(); setTimeout(() => this.bag.open({ page: 'craft' }), 50); };
+    body.appendChild(b);
   }
   tab_together(body) {
     const g = this.game, net = g.net;
@@ -546,14 +534,18 @@ export class UI {
   input(dt) {
     const g = this.game, p = g.player;
     if (!p) return;
+    if (!this.bag) this.bag = new Bag(this);
     if (this.modal === 'dialog') { this.updateDialog(dt); return; }
+    if (this.modal === 'bag') { this.bag.input(); return; }
+    if (!this.modal && Input.pressed('bag') && !g.cinematic) { Input.consume('bag'); this.bag.open({ page: 'items' }); return; }
     if (!this.modal && Input.pressed('menu') && !g.cinematic) { Input.consume('menu'); this.openMenu('journey'); }
     else if (this.modal === 'menu' && Input.pressed('menu')) { Input.consume('menu'); this.closeMenu(); }
-    if (!this.modal && Input.pressed('craft') && !g.cinematic) { Input.consume('craft'); this.openMenu('craft'); }
+    if (!this.modal && Input.pressed('craft') && !g.cinematic) { Input.consume('craft'); this.bag.open({ page: 'craft' }); }
     if (!this.modal && Input.pressed('emote') && !g.cinematic) { Input.consume('emote'); this.emote(); }
   }
   frame(dt) {
     const g = this.game, p = g.player;
+    if (this.bag) this.bag.frame(dt);
     if (this.preview) this.tickPreview(dt);
     if (!p) return;
     if (g.touch) g.touch.frame();
@@ -601,14 +593,15 @@ export class UI {
   }
   pausedTick(dt) { /* menus animate via CSS; dialog/preview run in frame() */ }
   renderHotbar() {
-    const sv = this.sv, box = $('#hotbar');
+    const sv = this.sv, box = $('#hotbar'), g = this.game;
     box.innerHTML = '';
     sv.hotbar.forEach((t, i) => {
       const s = el('div', 'slot' + (i === sv.sel ? ' sel' : ''));
-      s.appendChild(tileIcon(t));
+      s.appendChild(itemIconEl(t, 28));
       s.appendChild(el('span', 'k', i + 1));
       s.appendChild(el('span', 'n', sv.inv[t] || 0));
-      s.onclick = () => { sv.sel = i; Audio.play('blip'); };
+      // tapping the slot in hand again uses a consumable (throw a flare, drink a draught)
+      s.onclick = () => { if (sv.sel === i && usable(t) && g.player) g.player.useQueued = true; sv.sel = i; Audio.play('blip'); };
       box.appendChild(s);
     });
     this.hotbarDirty = false; this.lastSel = sv.sel;

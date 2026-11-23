@@ -7,6 +7,8 @@ export const T = {
   AIR: 0, GRASS: 1, DIRT: 2, STONE: 3, DEEP: 4, LOG: 5, LEAVES: 6, SAND: 7, CRYSTAL: 8,
   PLANK: 9, BRICK: 10, GLASS: 11, LANTERN: 12, ICE: 13, EMBER: 14, MOSS: 15, SNOW: 16,
   GOLD: 17, HEARTH: 18, RUIN: 19, GATE: 20, SHROOM: 21, CAP: 22, MARBLE: 23, OBSIDIAN: 24,
+  // crafted building parts and stations
+  LADDER: 25, PLATFORM: 26, TORCH: 27, DOOR: 28, DOOR_OPEN: 29, STEP: 30, STORE: 31, BENCH: 32, FORGE: 33, LOOM: 34,
 };
 
 // k: key colour role resolved per biome ('dirt','stone','deep','grass','leaf') or a fixed hex
@@ -38,6 +40,17 @@ TILES[T.SHROOM] = D({ name: 'Glowcap', k: '#9d8cff', solid: false, opaque: false
 TILES[T.CAP] = D({ name: 'Cap', k: '#7a6ad8', solid: false, opaque: false, hard: 0.2, light: [0.18, 0.14, 0.4] });
 TILES[T.MARBLE] = D({ name: 'Marble', k: '#e9e4dc', hard: 0.8, natural: false });
 TILES[T.OBSIDIAN] = D({ name: 'Nightglass', k: '#2a2440', hard: 1.2, natural: false });
+// climb: ladders; platform: solid only from above; half: the lower half is solid (a step)
+TILES[T.LADDER] = D({ name: 'Ladder', k: '#9b7653', solid: false, opaque: false, hard: 0.25, natural: false, climb: true });
+TILES[T.PLATFORM] = D({ name: 'Platform', k: '#9b7653', solid: false, opaque: false, hard: 0.25, natural: false, platform: true });
+TILES[T.TORCH] = D({ name: 'Torch', k: '#ffb066', solid: false, opaque: false, hard: 0.05, light: [1.0, 0.66, 0.36], natural: false });
+TILES[T.DOOR] = D({ name: 'Door', k: '#7a5a3e', opaque: false, hard: 0.4, natural: false, door: true, drop: T.DOOR });
+TILES[T.DOOR_OPEN] = D({ name: 'Door', k: '#7a5a3e', solid: false, opaque: false, hard: 0.4, natural: false, door: true, place: false, drop: T.DOOR });
+TILES[T.STEP] = D({ name: 'Step', k: '#9b7653', opaque: false, hard: 0.3, natural: false, half: true });
+TILES[T.STORE] = D({ name: 'Storage Chest', k: '#8a6440', solid: false, opaque: false, hard: 0.5, natural: false, station: 'store' });
+TILES[T.BENCH] = D({ name: 'Workbench', k: '#9b7653', solid: false, opaque: false, hard: 0.5, natural: false, station: 'bench' });
+TILES[T.FORGE] = D({ name: 'Forge', k: '#6e6670', solid: false, opaque: false, hard: 0.8, natural: false, station: 'forge', light: [1.0, 0.5, 0.22] });
+TILES[T.LOOM] = D({ name: 'Loom', k: '#b08a62', solid: false, opaque: false, hard: 0.5, natural: false, station: 'loom' });
 
 export const isSolid = t => TILES[t].solid;
 export const isOpaque = t => TILES[t].opaque;

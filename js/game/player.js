@@ -7,6 +7,7 @@ import { TILE, T, TILES } from '../world/tiles.js';
 import { lookFromSave, Save } from './progress.js';
 import { Cape } from '../physics/skin.js';
 import { clamp, lerp, segPointDist2, rgba, TAU, rand, sign } from '../core/util.js';
+import { norm, placeable, usable, onHotbar, ITEMS } from './items.js';
 
 const REACH = 6 * TILE;
 
@@ -106,7 +107,7 @@ export class Player {
     }
     a.update(dt);
     // surge: dashing through foes cuts them
-    if (this.sv.abil.surge && a.c.dashT > 0) {
+    if ((this.sv.abil.surge || (this.sv.equip && this.sv.equip.charm === 'g_charm_ember')) && a.c.dashT > 0) {
       for (const e of g.targets()) {
         if (e.surgeHit === g.tick || Math.abs(e.c.x - a.c.x) > 30 || Math.abs(e.cy - a.cy) > 50) continue;
         e.surgeHit = g.tick;
@@ -123,14 +124,16 @@ export class Player {
     Audio.play('blip', { pitch: 1 + i * 0.05 });
   }
   give(tile, n = 1) {
+    tile = norm(tile);
     const inv = this.sv.inv;
     inv[tile] = (inv[tile] || 0) + n;
-    if (!this.sv.hotbar.includes(tile) && TILES[tile].place) {
+    if (!this.sv.hotbar.includes(tile) && onHotbar(tile)) {
       if (this.sv.hotbar.length < 9) this.sv.hotbar.push(tile);
     }
     if (this.game.ui) this.game.ui.hotbarDirty = true;
   }
   take(tile, n = 1) {
+    tile = norm(tile);
     const inv = this.sv.inv;
     if ((inv[tile] || 0) < n) return false;
     inv[tile] -= n;
@@ -181,7 +184,7 @@ export class Player {
       target.blocked = blocked;
       target.canMine = t !== T.AIR && TILES[t].hard < 100 && !blocked;
       const sel = this.sv.hotbar[this.sv.sel];
-      const have = sel !== undefined && (this.sv.inv[sel] || 0) > 0;
+      const have = sel !== undefined && placeable(sel) && (this.sv.inv[sel] || 0) > 0;
       // placing onto a solid block puts the new block on the face nearest the pointer
       target.ptx = target.tx; target.pty = target.ty;
       if (t !== T.AIR && have && target.px !== undefined) {
@@ -193,14 +196,15 @@ export class Player {
       const pdist = Math.hypot(target.ptx * TILE + 16 - cx, target.pty * TILE + 16 - cy);
       const ok = have && pt === T.AIR && pdist <= REACH && this.placeOk(target.ptx, target.pty, sel);
       target.canPlace = ok && !(target.ptx === target.tx && target.pty === target.ty && blocked);
-      target.why = !have ? (this.sv.hotbar.length ? 'none left' : 'mine a block first') : pdist > REACH || target.far ? 'too far' : pt !== T.AIR ? '' : !ok ? (TILES[sel].solid && this.bodyIn(target.ptx, target.pty) ? 'someone is standing there' : 'needs a block beside it') : '';
+      target.why = !have ? (usable(sel) ? '' : this.sv.hotbar.length ? 'none left' : 'mine a block first') : pdist > REACH || target.far ? 'too far' : pt !== T.AIR ? '' : !ok ? (TILES[sel].solid && this.bodyIn(target.ptx, target.pty) ? 'someone is standing there' : 'needs a block beside it') : '';
     }
     this.cursor = target;
     // mine: hold left mouse (or Strike in build mode)
     const mineHeld = (this.mouseAim && Input.mouse.l && !this.buildMode && !this.foeNear) || ((this.buildMode || g.touchBuild) && (Input.down.attack || (g.touchBuild && g.touchBuild.mode === 'mine' && g.touchBuild.pid !== null)));
     if (target && target.canMine && mineHeld && this.sv.hasBlade !== false) {
       if (!this.mine || this.mine.tx !== target.tx || this.mine.ty !== target.ty) this.mine = { tx: target.tx, ty: target.ty, t: 0, tile: target.tile };
-      const hard = TILES[this.mine.tile].hard * (this.sv.hasBlade ? 1 : 2.2) / (1 + this.sv.lvl.blade * 0.25);
+      const pick = this.sv.equip && this.sv.equip.pick && ITEMS[this.sv.equip.pick] ? ITEMS[this.sv.equip.pick].mine : 1;
+      const hard = TILES[this.mine.tile].hard * (this.sv.hasBlade ? 1 : 2.2) / (1 + this.sv.lvl.blade * 0.25) / pick;
       this.mine.t += dt / Math.max(0.05, hard);
       a.face(sign(target.tx * TILE + 16 - a.c.x) || a.facing);
       if (!a.attack) { a.startAttack(Math.random() < 0.5 ? 'side' : 'side2', 0.26); Audio.play('swing', { vol: 0.35, pitch: 1.3 }); }
@@ -208,6 +212,15 @@ export class Player {
       if (this.mine.t >= 1) this.breakTile(target.tx, target.ty);
       this.consumeAttack = true;
     } else this.mine = null;
+    // a consumable in hand: right click (toward the pointer), R, or tapping its slot again on touch
+    const selId = this.sv.hotbar[this.sv.sel];
+    if (usable(selId) && ((this.mouseAim && Input.mouse.rp && !this.buildMode) || Input.pressed('use') || this.useQueued)) {
+      this.useQueued = false;
+      const aim = this.mouseAim ? { x: wp.x, y: wp.y } : { x: a.c.x + a.facing * 220, y: a.c.y - 120 };
+      this.useItem(selId, aim);
+      return;
+    }
+    this.useQueued = false;
     // place: right mouse (hold and drag to lay a line), E in build mode, or a touch drag in build mode
     const tb = g.touchBuild;
     const placeHeld = (this.mouseAim && Input.mouse.r && !this.buildMode) || (tb && tb.mode === 'place' && tb.pid !== null);
@@ -223,6 +236,37 @@ export class Player {
     }
     if (!placeHeld) this.lastPlaced = null;
   }
+  useItem(id, aim) {
+    const g = this.game, a = this.actor;
+    if (id === 'i_draught') {
+      if (this.hp >= this.sv.maxHp) { g.ui && g.ui.toast('You are already whole'); return; }
+      if (!this.take(id, 1)) return;
+      this.hp = Math.min(this.sv.maxHp, this.hp + 1);
+      g.fx.burst(a.c.x, a.c.y - 50, { n: 16, speed: 120, col: '#ffd9e4', col1: '#ff8fb1', add: true, life: 0.7, size: 3, kind: 'mote' });
+      Audio.play('heal'); a.doEmote && a.doEmote('cheer', 0.6);
+      return;
+    }
+    if (id === 'i_flare' || id === 'i_charge') {
+      if (!g.throwables || !this.take(id, 1)) return;
+      const ox = a.c.x + a.facing * 10, oy = a.c.y - 60;
+      const dx = aim.x - ox, dy = aim.y - oy;
+      const d = Math.max(60, Math.min(420, Math.hypot(dx, dy)));
+      const ang = Math.atan2(dy, dx) - 0.25 * Math.sign(dx || a.facing);
+      const sp = 380 + d * 0.9;
+      a.face(sign(dx) || a.facing);
+      a.startAttack('side2', 0.25);
+      g.throwables.throw(id === 'i_flare' ? 'flare' : 'charge', ox, oy, Math.cos(ang) * sp, Math.sin(ang) * sp);
+      Audio.play('swing', { pitch: 0.8 });
+    }
+  }
+  toggleDoor(tx, ty) {
+    const g = this.game, W = g.world;
+    let y0 = ty; while (TILES[W.get(tx, y0 - 1)].door) y0--;
+    const open = W.get(tx, y0) === T.DOOR;
+    if (!open) for (let y = y0; TILES[W.get(tx, y)].door; y++) if (this.bodyIn(tx, y)) { g.ui && g.ui.toast('Someone is in the doorway'); return; }
+    for (let y = y0; TILES[W.get(tx, y)].door; y++) { const nt = open ? T.DOOR_OPEN : T.DOOR; W.set(tx, y, nt); if (g.net) g.net.sendEdit(tx, y, nt, 0); }
+    Audio.play('place', { pitch: open ? 0.7 : 0.6 });
+  }
   bodyIn(tx, ty) {
     const x0 = tx * TILE, y0 = ty * TILE;
     const hit = (c) => c.x + c.w / 2 > x0 && c.x - c.w / 2 < x0 + TILE && c.y > y0 && c.y - c.h < y0 + TILE;
@@ -233,6 +277,7 @@ export class Player {
   placeOk(tx, ty, tile) {
     const g = this.game, W = g.world;
     if (!TILES[tile].place) return false;
+    if (tile === T.DOOR && (W.get(tx, ty - 1) !== T.AIR || this.bodyIn(tx, ty - 1) || !TILES[W.get(tx, ty + 1)].solid)) return false;
     // needs something to attach to
     const near = W.get(tx + 1, ty) || W.get(tx - 1, ty) || W.get(tx, ty + 1) || W.get(tx, ty - 1) || W.wall(tx, ty);
     if (!near) return false;
@@ -250,6 +295,10 @@ export class Player {
     W.set(tx, ty, T.AIR);
     if (g.net) g.net.sendEdit(tx, ty, T.AIR, 0);
     this.mine = null;
+    // a door is two blocks: the other half comes away too (one door back)
+    if (TILES[t].door) for (const dy of [-1, 1]) if (TILES[W.get(tx, ty + dy)].door) { W.set(tx, ty + dy, T.AIR); if (g.net) g.net.sendEdit(tx, ty + dy, T.AIR, 0); }
+    // a storage chest spills what it held into your satchel
+    if (t === T.STORE) { const k = tx + ',' + ty, st = this.sv.stores[k]; if (st) { for (const id in st) this.give(id, st[id]); delete this.sv.stores[k]; } }
     const drop = TILES[t].drop === -1 ? null : TILES[t].drop ?? t;
     if (drop !== null && TILES[drop]) {
       this.give(drop, 1);
@@ -282,6 +331,7 @@ export class Player {
     if (!this.take(tile, 1)) return;
     g.world.set(tx, ty, tile, layer);
     if (g.net) g.net.sendEdit(tx, ty, tile, layer);
+    if (tile === T.DOOR && !layer) { g.world.set(tx, ty - 1, T.DOOR); if (g.net) g.net.sendEdit(tx, ty - 1, T.DOOR, 0); }
     Audio.play('place', { pitch: rand(0.9, 1.1) });
     g.fx.dust(tx * TILE + 16, ty * TILE + 30, 3, '#e0d8c8', -Math.PI / 2, 40);
     this.sv.stats.placed++;
@@ -366,7 +416,7 @@ export class Player {
     // recoil and pogo
     if (kind === 'down') { a.c.vy = -680; a.bounced = true; a.c.jumps = 0; a.c.airDash = 1; }
     else if (kind !== 'surge') a.c.vx -= a.facing * (armored ? 260 : 140);
-    this.sv.breath = Math.min(100, (this.sv.breath || 0) + (armored ? 6 : 11));
+    this.sv.breath = Math.min(100, (this.sv.breath || 0) + (armored ? 6 : 11) * (this.sv.equip && this.sv.equip.charm === 'g_charm_thread' ? 2 : 1));
   }
   plunge() {
     const a = this.actor;
@@ -417,7 +467,7 @@ export class Player {
   // ------------------------------------------------------------ damage / death
   takeHit(n, fromX, fromY, o = {}) {
     const g = this.game, a = this.actor;
-    if (this.dead || a.inv > 0 || g.cinematic) return false;
+    if (this.dead || a.inv > 0 || g.cinematic || (g.ui && g.ui.modal)) return false;
     this.hp -= n;
     a.inv = 1.0; a.flash = 1;
     const dir = sign(a.c.x - fromX) || -a.facing;
@@ -452,8 +502,18 @@ export class Player {
 
   // ------------------------------------------------------------ draw
   draw(ctx, al) {
-    const a = this.actor;
-    a.draw(ctx, al, { alpha: a.inv > 0 && !this.dead && (this.game.tick >> 3) % 2 ? 0.55 : 1 });
+    const a = this.actor, g = this.game;
+    a.draw(ctx, al, { alpha: a.inv > 0 && !this.dead && (g.tick >> 3) % 2 && !(g.ui && g.ui.modal) ? 0.55 : 1 });
+    // the open satchel on the doll's lap
+    const k = g.bagK || 0;
+    if (k > 0.05) {
+      const b = a.body, x = b.ipx(6, al) * 0.5 + b.ipx(8, al) * 0.5, y = b.ipy(6, al) * 0.5 + b.ipy(8, al) * 0.5 + 4;
+      ctx.save(); ctx.globalAlpha = Math.min(1, k * 1.5);
+      ctx.fillStyle = '#6e523b'; ctx.beginPath(); ctx.roundRect(x - 11, y - 6, 22, 14, [3, 3, 6, 6]); ctx.fill();
+      ctx.fillStyle = '#8a6a4c'; ctx.beginPath(); ctx.moveTo(x - 11, y - 6); ctx.quadraticCurveTo(x, y - 13 - k * 3, x + 11, y - 6); ctx.fill();
+      ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = rgba('#ffd9a0', 0.25 * k); ctx.beginPath(); ctx.ellipse(x, y - 7, 9, 3, 0, 0, TAU); ctx.fill();
+      ctx.restore();
+    }
   }
   // build cursor: a ghost of the chosen block where it will go, cracks on a block being mined, a soft red
   // frame (and a reason on click) when an action isn't possible, and the reach ring while building

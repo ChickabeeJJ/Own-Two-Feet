@@ -108,6 +108,7 @@ export function newSave(seed) {
     edits: {}, stats: { kills: 0, blocks: 0, placed: 0, deaths: 0, far: 0, time: 0 },
     settings: null, tut: {},
     lights: 0, rescued: {}, chests: {}, stitches: {}, nests: {}, lore: [], requests: [], bossSeen: {}, coopRelics: 0,
+    equip: {}, stores: {}, crafted: 0,
   };
 }
 export function lookFromSave(sv) {
@@ -123,6 +124,7 @@ export function lookFromSave(sv) {
     marks: (sv.marks || []).map(c => ({ col: c })), rim: '#ffe2bd', accent: '#f2c86a', trailCol: eyes[0] === '#ffffff' ? '#9ff3ff' : eyes[0],
     thread: true, threadCol: eyes[0] === '#ffffff' ? '#e8f4ff' : eyes[0], bootCol: mat === 'shadow' ? '#1a171f' : '#6b4a32',
     coat: mat === 'shadow' ? '#2b2633' : mat === 'metal' ? '#d8c9a8' : '#ece6dc', hoodCol: '#5f7a4a',
+    gearLamp: !!(sv.equip && sv.equip.lamp), gearPick: (sv.equip && sv.equip.pick) || null,
   };
 }
 

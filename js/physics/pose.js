@@ -194,6 +194,18 @@ export class Animator {
       armF = [lerp(0.1, 0.4, k1) * (1 - k2) + HALF_PI * k2, lerp(0.2, -0.4, k1) * (1 - k2) + (HALF_PI - 0.2) * k2];
       armB = [lerp(0.5, 0.9, k1) * (1 - k2) + (HALF_PI + 0.1) * k2, lerp(0.6, 0.2, k1) * (1 - k2) + (HALF_PI - 0.1) * k2];
       rate = 12;
+    } else if (mode === 'climb') {
+      // hand over hand, foot over foot: one limb pair reaches while the other pulls, driven by distance climbed
+      rootY = null;
+      const ph = (st.climbD || 0) / (34 * s);
+      const u = (Math.sin(ph * Math.PI) + 1) / 2, v = 1 - u;
+      torso = -HALF_PI + 0.1;
+      armF = [lerp(-1.25, -2.0, u), lerp(-1.65, -2.45, u)];
+      armB = [lerp(-1.25, -2.0, v), lerp(-1.65, -2.45, v)];
+      fF = [rootX + 9 * s * f, st.py + lerp(31, 19, u) * s, -0.2];
+      fB = [rootX + 7 * s * f, st.py + lerp(31, 19, v) * s, -0.2];
+      spine = [0.06, 0.04];
+      rate = 22;
     } else if (mode === 'sit') {
       rootY = st.gy - 9 * s;
       torso = -HALF_PI - 0.12 + Math.sin(this.time * 1.7) * 0.02;

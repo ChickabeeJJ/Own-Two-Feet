@@ -211,6 +211,8 @@ export class Enemies {
   update(dt) {
     const g = this.game, P0 = g.player;
     if (!P0 || g.cinematic) return;
+    // nothing moves against you while you talk, read or rummage in your satchel
+    if (g.ui && g.ui.modal && !(g.net && g.net.remotes && g.net.remotes.size)) return;
     if (g.net && g.net.isGuest) return;
     this.calm -= dt;
     for (const e of this.list) {

@@ -209,8 +209,8 @@ export class Shrines {
     const k = Math.round((shrine.sx - 20) / 85);
     const pick = (arr) => arr[((k % arr.length) + arr.length) % arr.length];
     const req = { sx: shrine.sx, kind, name, claimed: false };
-    if (kind === 'wanderer') Object.assign(req, pick([{ type: 'bring', tile: T.DIRT, n: 15 }, { type: 'bring', tile: T.LOG, n: 6 }, { type: 'bring', tile: T.STONE, n: 12 }]));
-    else if (kind === 'smith') Object.assign(req, pick([{ type: 'bring', tile: T.GOLD, n: 2 }, { type: 'bring', tile: T.STONE, n: 20 }, { type: 'bring', tile: T.CRYSTAL, n: 3 }]));
+    if (kind === 'wanderer') Object.assign(req, pick([{ type: 'bring', tile: T.DIRT, n: 15 }, { type: 'bring', tile: T.TORCH, n: 4 }, { type: 'bring', tile: T.LOG, n: 6 }, { type: 'bring', tile: T.LADDER, n: 6 }, { type: 'bring', tile: T.STONE, n: 12 }]));
+    else if (kind === 'smith') Object.assign(req, pick([{ type: 'bring', tile: T.GOLD, n: 2 }, { type: 'bring', tile: T.PLANK, n: 12 }, { type: 'bring', tile: T.STONE, n: 20 }, { type: 'bring', tile: T.BRICK, n: 8 }, { type: 'bring', tile: T.CRYSTAL, n: 3 }]));
     else if (kind === 'sage') Object.assign(req, pick([{ type: 'wake', n: 1 }, { type: 'stitch', n: 1 }]));
     else Object.assign(req, pick([{ type: 'chest', n: 1 }, { type: 'kill', n: 5 }]));
     req.base = this.counter(req.type);

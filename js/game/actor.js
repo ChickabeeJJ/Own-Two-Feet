@@ -63,8 +63,32 @@ export class Actor {
     const W = this.world;
     const tx0 = Math.floor(x0 / TILE), tx1 = Math.floor((x1 - 0.001) / TILE);
     const ty0 = Math.floor(y0 / TILE), ty1 = Math.floor((y1 - 0.001) / TILE);
-    for (let ty = ty0; ty <= ty1; ty++) for (let tx = tx0; tx <= tx1; tx++) if (TILES[W.get(tx, ty)].solid) return { tx, ty };
+    for (let ty = ty0; ty <= ty1; ty++) for (let tx = tx0; tx <= tx1; tx++) {
+      const d = TILES[W.get(tx, ty)];
+      if (!d.solid) continue;
+      if (d.half) { if (y1 > ty * TILE + TILE / 2 + 0.001) return { tx, ty, top: ty * TILE + TILE / 2 }; continue; }
+      return { tx, ty, top: ty * TILE };
+    }
     return null;
+  }
+  // a one-way surface whose top lies between two feet heights (platforms, and the top rung of a ladder)
+  oneWayTop(x0, x1, yOld, yNew) {
+    if (this.dropT > 0 || this.c.climb) return null;
+    const W = this.world;
+    const ty0 = Math.floor((yOld - 0.5) / TILE) + 1, ty1 = Math.floor(yNew / TILE);
+    for (let ty = ty0; ty <= ty1; ty++) {
+      const top = ty * TILE;
+      if (yOld > top + 0.5 || yNew < top) continue;
+      for (let tx = Math.floor(x0 / TILE); tx <= Math.floor((x1 - 0.001) / TILE); tx++) {
+        const d = TILES[W.get(tx, ty)];
+        if (d.platform || (d.climb && !TILES[W.get(tx, ty - 1)].climb)) return top;
+      }
+    }
+    return null;
+  }
+  onLadder() {
+    const c = this.c, W = this.world, tx = Math.floor(c.x / TILE);
+    return TILES[W.get(tx, Math.floor((c.y - 1) / TILE))].climb || TILES[W.get(tx, Math.floor((c.y - c.h * 0.5) / TILE))].climb;
   }
   boxFree(x, y) { const c = this.c; return !this.overlaps(x - c.w / 2, y - c.h, x + c.w / 2, y); }
   moveX(dx) {
@@ -77,9 +101,13 @@ export class Actor {
       if (this.boxFree(nx, c.y)) { c.x = nx; continue; }
       // step up one tile when walking on the ground
       if (c.ground || c.coyote > 0.05) {
-        for (const up of [TILE * 0.5, TILE + 1]) {
-          const ty = Math.ceil((c.y - up) / TILE) * TILE;
-          if (c.y - ty <= TILE + 1 && this.boxFree(nx, ty) && this.boxFree(c.x, ty)) { c.y = ty; c.x = nx; this.stepped = true; break; }
+        for (const up of [TILE * 0.5 + 0.5, TILE + 1]) {
+          const ty = c.y - up;
+          if (this.boxFree(nx, ty) && this.boxFree(c.x, ty)) {
+            // settle onto the surface just climbed
+            let y = ty; for (let k = 0; k < 8 && this.boxFree(nx, y + 4); k++) y += 4;
+            c.y = y; c.x = nx; this.stepped = true; break;
+          }
         }
         if (c.x === nx) continue;
       }
@@ -98,9 +126,10 @@ export class Actor {
     const sdy = dy / steps;
     for (let i = 0; i < steps; i++) {
       const ny = c.y + sdy;
+      if (sdy > 0) { const top = this.oneWayTop(c.x - c.w / 2, c.x + c.w / 2, c.y, ny); if (top !== null) { c.y = top; return 1; } }
       if (this.boxFree(c.x, ny)) { c.y = ny; continue; }
       const hit = this.overlaps(c.x - c.w / 2, ny - c.h, c.x + c.w / 2, ny);
-      if (sdy > 0) { c.y = hit ? hit.ty * TILE : c.y; return 1; }
+      if (sdy > 0) { c.y = hit ? hit.top : c.y; return 1; }
       c.y = hit ? (hit.ty + 1) * TILE + c.h + 0.01 : c.y; return -1;
     }
     return 0;
@@ -143,6 +172,7 @@ export class Actor {
     b.strength = this.strength;
     b.rootK = this.mode === 'limp' || this.mode === 'dead' ? 0 : 1;
     b.balanceK = 1;
+    b.oneWayOff = this.dropT > 0 || !!this.c.climb;
     b.step(dt, this.world);
     if (this.mode === 'limp' && b.lastHitSpeed > 900 && this.onSplat) this.onSplat(b.lastHitSpeed);
     // cape
@@ -177,7 +207,28 @@ export class Actor {
       this.inv = Math.max(this.inv, 0.12);
       if (this.onDash) this.onDash();
     }
-    if (c.dashT > 0) {
+    // ladders: up or down grabs the rungs; jump lets go. Platforms: hold down to drop through
+    this.dropT = Math.max(0, (this.dropT || 0) - dt);
+    const lad = this.onLadder();
+    const below = TILES[this.world.get(Math.floor(c.x / TILE), Math.floor((c.y + 4) / TILE))];
+    if (!lad && !(I.down && below.climb)) c.climb = false;
+    else if ((I.up && lad) || (I.down && (lad && !c.ground || below.climb))) c.climb = true;
+    if (I.down && c.ground && !c.climb && (below.platform)) { this.downT = (this.downT || 0) + dt; if (this.downT > 0.15) { this.dropT = 0.25; c.ground = false; this.downT = 0; } }
+    else this.downT = 0;
+    if (c.climb && c.dashT <= 0) {
+      if (I.jump && !I.up) { c.climb = false; c.vy = -PHYS.jumpV * 0.75; this.jumped('jump'); }
+      else {
+        c.vy = (I.up ? -1 : I.down ? 1 : 0) * 175;
+        c.vx = I.mx * 110;
+        // reaching the top rung: step off onto it
+        const fty = Math.floor((c.y - 1) / TILE), ftx = Math.floor(c.x / TILE), W = this.world;
+        if (I.up && TILES[W.get(ftx, fty)].climb && !TILES[W.get(ftx, fty - 1)].climb && c.y - fty * TILE < 14 && this.boxFree(c.x, fty * TILE)) {
+          c.y = fty * TILE; c.vy = 0; c.climb = false; c.ground = true; this.dropT = 0;
+        }
+        if (I.mx && !this.attack) this.face(sign(I.mx));
+        this.climbD = (this.climbD || 0) + Math.abs(c.vy) * dt;
+      }
+    } else if (c.dashT > 0) {
       c.dashT -= dt;
       c.vx = this.facing * PHYS.dashV; c.vy = 0;
       if (c.dashT <= 0) c.vx = this.facing * this.run * 0.9;
@@ -215,15 +266,16 @@ export class Actor {
     } else if (hitY === -1) { c.vy = Math.max(0, c.vy); c.ground = false; }
     else {
       // still grounded? probe just below
-      c.ground = !!this.overlaps(c.x - c.w / 2, c.y, c.x + c.w / 2, c.y + 2) && c.vy >= 0;
+      c.ground = (!!this.overlaps(c.x - c.w / 2, c.y, c.x + c.w / 2, c.y + 2) || this.oneWayTop(c.x - c.w / 2, c.x + c.w / 2, c.y - 0.5, c.y + 2) !== null) && c.vy >= 0 && !c.climb;
       if (c.ground && !wasGround) this.landed(c.lastVy);
     }
     if (!c.ground && wasGround) c.fallStart = c.y;
+    if (c.climb) { c.fallStart = c.y; if (c.ground && I.down) c.ground = false; }
     // drive the animator
-    const mode = c.dashT > 0 ? 'dash' : c.ground ? (this.emote && !I.mx && !this.attack ? 'emote' : 'ground') : c.wallSlide ? 'wall' : 'air';
+    const mode = c.climb && !c.ground ? 'climb' : this.sitting && c.ground ? 'sit' : c.dashT > 0 ? 'dash' : c.ground ? (this.emote && !I.mx && !this.attack ? 'emote' : 'ground') : c.wallSlide ? 'wall' : 'air';
     this.anim.update(dt, {
       mode, x: c.x, gy: c.y, py: c.y - this.pelvisH, vx: c.vx, vy: c.vy, runMax: this.run, attack: this.attack, blade: !!this.blade,
-      look: this.look_at, crouch, emote: this.emote, windup: this.telegraph || 0, accel: clamp((I.mx * this.facing), -1, 1) * (c.ground ? 1 : 0),
+      look: this.look_at, crouch, emote: this.emote, windup: this.telegraph || 0, accel: clamp((I.mx * this.facing), -1, 1) * (c.ground ? 1 : 0), climbD: this.climbD || 0,
     }, this.world);
   }
   updatePuppet(dt) {

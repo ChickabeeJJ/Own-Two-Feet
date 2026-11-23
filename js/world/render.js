@@ -7,6 +7,7 @@ import { drawLantern, drawHearth } from '../art/props.js';
 import { capsule } from '../art/paint.js';
 import { makeLayers, drawClouds, drawSkyFeature } from '../art/bg.js';
 import { texPattern, drawSprite, IMG } from '../art/images.js';
+import { drawPart } from '../art/itemart.js';
 
 const TREE_SPRITE = { round: 'meadow', crystal: 'glass', shroom: 'hollow', dead: 'ember', pine: 'frost' };
 // x of the trunk's centre as a fraction of the sprite width (read once from the bottom rows of the image)
@@ -191,6 +192,7 @@ export class WorldRenderer {
   drawTile(g, tx, ty, t, x, y) {
     const W = this.world, p = paletteAt(tx);
     const d = TILES[t];
+    if (t >= T.LADDER) { drawPart(g, t, x, y, (dx, dy) => W.get(tx + dx, ty + dy)); return; }
     const base = tileColor(t, p);
     const h = hash2(tx, ty, 1);
     const sol = (a, b) => { const q = W.get(a, b); return TILES[q].solid && TILES[q].opaque; };

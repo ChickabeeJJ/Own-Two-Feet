@@ -295,7 +295,11 @@ export class World {
     const tx = Math.floor(x / TILE);
     let ty = Math.floor(y / TILE);
     const end = Math.floor((y + maxDist) / TILE);
-    for (; ty <= end; ty++) if (this.solid(tx, ty)) return ty * TILE;
+    for (; ty <= end; ty++) {
+      const d = TILES[this.get(tx, ty)];
+      if (d.solid) return ty * TILE + (d.half ? TILE / 2 : 0);
+      if ((d.platform || (d.climb && !TILES[this.get(tx, ty - 1)].climb)) && ty * TILE >= y) return ty * TILE;
+    }
     return null;
   }
 

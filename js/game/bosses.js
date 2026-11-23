@@ -41,6 +41,7 @@ export class Bosses {
   update(dt) {
     const g = this.game, p = g.player;
     if (!p) return;
+    if (this.active && g.ui && g.ui.modal && !(g.net && g.net.remotes && g.net.remotes.size)) return;
     this.cool -= dt;
     if (!this.active) {
       if (p.dead || g.cinematic || this.cool > 0) return;
