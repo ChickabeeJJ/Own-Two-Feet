@@ -133,6 +133,13 @@ export function drawDoll(ctx, b, look, a, o = {}) {
 
   // ---------- blade, then the near arm
   if (o.blade && look.blade) drawBlade(ctx, b, look, a, o);
+  if (look.shield) {
+    // an elite's round shield on the off hand
+    const sx = X(P.HAND_B) + f * 4 * s, sy = Y(P.HAND_B) - 6 * s;
+    ballShade(ctx, sx, sy, 10 * s, '#4a3a34', { dark: 0.4 });
+    ctx.strokeStyle = '#8a6a4c'; ctx.lineWidth = 1.6 * s; ctx.beginPath(); ctx.arc(sx, sy, 8.5 * s, 0, TAU); ctx.stroke();
+    ballShade(ctx, sx, sy, 2.6 * s, '#c9a45c', { dark: 0.4 });
+  }
   const sleeve = look.cloakLong ? tint(look.cloakLong) : look.armor ? tint(look.armor) : coat;
   capsule(ctx, cx, cy, X(P.ELB_F), Y(P.ELB_F), 3.5 * ar, 2.9 * ar, sleeve, M);
   capsule(ctx, X(P.ELB_F), Y(P.ELB_F), X(P.HAND_F), Y(P.HAND_F), 2.9 * ar, 2.5 * ar, sleeve, M);

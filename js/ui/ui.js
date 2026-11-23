@@ -7,6 +7,7 @@ import { Body, P } from '../physics/body.js';
 import { Animator } from '../physics/pose.js';
 import { Cape, drawBody } from '../physics/skin.js';
 import { Bag } from './bag.js';
+import { QUESTS } from '../game/quests.js';
 import { itemIconEl } from '../art/itemart.js';
 import { usable, itemName } from '../game/items.js';
 import { COSMETICS, SLOTS, SLOT_NAMES, RECIPES, cosmetic, lookFromSave, Save, genName } from '../game/progress.js';
@@ -271,7 +272,7 @@ export class UI {
     return g.actors.some(a => a.npcKind === 'tailor' && Math.abs(a.c.x - g.player.x) < 260);
   }
   renderMenu() {
-    const tabs = [['journey', 'Journey'], ['journal', 'Journal'], ['look', 'Look'], ['craft', 'Craft'], ['together', 'Together'], ['settings', 'Settings'], ['controls', 'Controls']];
+    const tabs = [['journey', 'Journey'], ['quests', 'Quests'], ['journal', 'Journal'], ['look', 'Look'], ['craft', 'Craft'], ['together', 'Together'], ['settings', 'Settings'], ['controls', 'Controls']];
     const th = $('#menu .tabs'); th.innerHTML = '';
     for (const [id, name] of tabs) {
       const b = el('button', 'tab' + (id === this.menuTab ? ' on' : ''), name);
@@ -311,6 +312,50 @@ export class UI {
     body.appendChild(row);
   }
   displayName() { return Platform.username || this.sv.name; }
+  // the quest log: tracked quest, active chains with their steps, the day's commissions, finished quests
+  tab_quests(body) {
+    const g = this.game, Q = g.quests, sv = this.sv;
+    if (!Q) return;
+    const row = el('div', 'row'), c1 = el('div', 'col'), c2 = el('div', 'col');
+    c1.appendChild(el('div', 'h', 'Quests'));
+    const ids = Object.keys(sv.quests || {});
+    const active = ids.filter(id => !sv.quests[id].done), done = ids.filter(id => sv.quests[id].done);
+    if (!active.length) c1.appendChild(el('div', 'note', 'Keepers at the shrines have work. Ask them when you meet them.'));
+    for (const id of active) {
+      const D = QUESTS[id], st = sv.quests[id];
+      const card = el('div', 'qcard' + (sv.qtrack === id ? ' tracked' : ''));
+      card.appendChild(el('div', 'qh', `<b>${esc(D.name)}</b><span>${esc(D.giver === 'Thread' ? 'from Thread' : 'from a ' + D.giver)}</span>`));
+      D.steps.forEach((s, i) => {
+        const p = i === st.step ? Q.progress(s, st.base) : 0;
+        const prog = i === st.step && s.t !== 'talk' ? ` <em>${s.t === 'deliver' ? Math.min(sv.inv[s.id] || 0, s.n) : p}/${s.n}</em>` : '';
+        card.appendChild(el('div', 'qstep' + (i < st.step ? ' ok' : i === st.step ? ' now' : ''), `<i></i>${esc(s.text)}${prog}`));
+      });
+      const tb = el('button', 'mini-btn', sv.qtrack === id ? 'Tracking' : 'Track');
+      tb.onclick = () => { sv.qtrack = id; this.renderMenu(); };
+      card.appendChild(tb);
+      c1.appendChild(card);
+    }
+    if (done.length) c1.appendChild(el('div', 'note', 'Finished: ' + done.map(id => esc(QUESTS[id].name)).join(', ')));
+    c2.appendChild(el('div', 'h', "Today's commissions"));
+    const d = sv.daily;
+    if (d) {
+      const card = el('div', 'qcard' + (sv.qtrack === 'daily' ? ' tracked' : ''));
+      for (const c of d.list) {
+        const p = Q.progress(c, c.base);
+        card.appendChild(el('div', 'qstep' + (c.done ? ' ok' : ' now'), `<i></i>${esc(c.text)}${c.done || c.t === 'deliver' ? '' : ` <em>${p}/${c.n}</em>`}`));
+      }
+      card.appendChild(el('div', 'note', d.claimed ? 'Claimed. New commissions tomorrow.' : d.list.every(c => c.done) ? 'All done: claim your reward from any keeper.' : 'Finish all three, then see any keeper for a reward.'));
+      const tb = el('button', 'mini-btn', sv.qtrack === 'daily' ? 'Tracking' : 'Track');
+      tb.onclick = () => { sv.qtrack = 'daily'; this.renderMenu(); };
+      if (!d.claimed) card.appendChild(tb);
+      c2.appendChild(card);
+    }
+    const nav = el('label', 'toggle', `<input type="checkbox" ${Q.navOn ? 'checked' : ''}> Show the way to the tracked quest`);
+    nav.querySelector('input').onchange = (e) => { Q.navOn = e.target.checked; g.settings.questNav = Q.navOn; g.saveSettings && g.saveSettings(); };
+    c2.appendChild(nav);
+    row.appendChild(c1); row.appendChild(c2);
+    body.appendChild(row);
+  }
   tab_journal(body) {
     const sv = this.sv, g = this.game;
     const row = el('div', 'row');
@@ -566,6 +611,14 @@ export class UI {
   frame(dt) {
     const g = this.game, p = g.player;
     if (this.bag) this.bag.frame(dt);
+    if (g.quests && (this.qT = (this.qT || 0) - dt) <= 0) {
+      this.qT = 0.4;
+      const q = g.quests.trackedText(), box = $('#objective .ob-quest');
+      if (box) {
+        box.classList.toggle('hidden', !q || !!(g.story && g.story.tutStep && g.story.tutStep()));
+        if (q) { box.querySelector('.q-name').textContent = q.name; box.querySelector('.q-text').textContent = q.text; box.querySelector('.q-hint').textContent = q.hint; }
+      }
+    }
     if (this.preview) this.tickPreview(dt);
     if (!p) return;
     if (g.touch) g.touch.frame();

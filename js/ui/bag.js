@@ -325,6 +325,7 @@ export class Bag {
     setTimeout(() => {
       p.give(r.out, r.n);
       this.sv.crafted = (this.sv.crafted || 0) + r.n;
+      if (g.quests) g.quests.onCraft(r.out, r.n);
       if (g.story && g.story.tut) g.story.tut.crafted = 1;
       Audio.play('confirm'); Audio.play('place', { pitch: 1.3 });
       g.fx.burst(p.actor.c.x + p.actor.facing * 12, p.actor.c.y - 34, { n: 14, speed: 140, col: '#ffffff', col1: '#ffd9a0', add: true, life: 0.6, size: 2.4, kind: 'mote' });

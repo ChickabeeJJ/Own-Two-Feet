@@ -361,3 +361,22 @@ body.carding #tut { opacity: 0; transition: opacity .3s; }
 .terms h3 { font-family: 'Cormorant Garamond', serif; font-weight: 500; font-size: 22px; color: var(--text); margin: 18px 0 6px; }
 .terms b { color: var(--text); }
 .terms p { margin: 0 0 10px; }
+
+/* tracked quest under the objective */
+.ob-quest { margin-top: 8px; padding-left: 22px; display: flex; flex-direction: column; gap: 2px; }
+.ob-quest .q-name { font: 700 10px Manrope; letter-spacing: .16em; text-transform: uppercase; color: var(--warm); }
+.ob-quest .q-text { font: 500 13px Manrope; color: var(--text); text-shadow: 0 1px 3px rgba(0,0,0,.6); }
+.ob-quest .q-hint { font: 500 11px Manrope; color: var(--dim); }
+.ob-quest.hidden { display: none; }
+/* quest log */
+.qcard { background: rgba(255,255,255,.04); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; margin-bottom: 10px; }
+.qcard.tracked { border-color: rgba(255,217,160,.5); box-shadow: 0 0 0 3px rgba(255,217,160,.08); }
+.qh { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+.qh b { font-family: 'Cormorant Garamond', serif; font-weight: 500; font-size: 19px; }
+.qh span { font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--dim); }
+.qstep { display: flex; align-items: center; gap: 8px; font-size: 13px; color: rgba(243,236,224,.4); padding: 3px 0; }
+.qstep i { width: 10px; height: 10px; border-radius: 3px; border: 1.5px solid currentColor; flex: none; }
+.qstep.now { color: var(--text); }
+.qstep.ok { color: rgba(184,240,200,.75); text-decoration: line-through; }
+.qstep.ok i { background: currentColor; }
+.qstep em { font-style: normal; color: var(--warm); margin-left: 4px; }

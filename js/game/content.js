@@ -54,13 +54,14 @@ export class Content {
   }
   // deterministic sites in [a, b] tiles
   sites(kind, a, b) {
-    const spec = { doll: [36, 21, 1], chest: [52, 31, 2], stitch: [47, 17, 3], nest: [110, 75, 4] }[kind];
+    const spec = { doll: [36, 21, 1], chest: [52, 31, 2], stitch: [47, 17, 3], nest: [110, 75, 4], brazier: [131, 64, 5], plates: [167, 95, 6], race: [149, 40, 7], camp: [157, 112, 8] }[kind];
     const [step, off, salt] = spec;
     const out = [];
     for (let k = Math.floor((a - off) / step) - 1; k <= Math.ceil((b - off) / step) + 1; k++) {
       const x = k * step + off + Math.floor(hash2(k, salt, this.game.world.seed) * 16);
       if (x < a || x > b || !this.ok(x)) continue;
-      if (kind === 'nest' && Math.abs(x) < 130) continue;   // the first stretch is for learning
+      if ((kind === 'nest' || kind === 'camp') && Math.abs(x) < 130) continue;   // the first stretch is for learning
+      if (kind !== 'doll' && kind !== 'chest' && kind !== 'stitch' && kind !== 'nest' && Math.abs(x) < 45) continue;
       out.push(x);
     }
     return out;

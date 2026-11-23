@@ -354,6 +354,7 @@ export class Player {
     if (g.net) g.net.sendEdit(tx, ty, tile, layer);
     if (tile === T.DOOR && !layer) { g.world.set(tx, ty - 1, T.DOOR); if (g.net) g.net.sendEdit(tx, ty - 1, T.DOOR, 0); }
     Audio.play('place', { pitch: rand(0.9, 1.1) });
+    if (g.quests) g.quests.onPlace(tile);
     g.fx.dust(tx * TILE + 16, ty * TILE + 30, 3, '#e0d8c8', -Math.PI / 2, 40);
     this.sv.stats.placed++;
     if (g.onTilePlaced) g.onTilePlaced(tx, ty, tile);

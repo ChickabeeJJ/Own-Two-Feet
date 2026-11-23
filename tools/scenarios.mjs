@@ -286,6 +286,44 @@ export default ({ page, sleep, key, shot, evalg }) => ({
       }
     }
   },
+  async quests() {
+    await page.waitForFunction(() => window.__game && window.__game.story);
+    await sleep(600);
+    const r = await evalg(async () => {
+      const g = window.__game, p = g.player, sv = g.save, Q = g.quests, S = g.sites; const wait = ms => new Promise(r => setTimeout(r, ms));
+      g.story.skipBirth(); g.story.skipTutorial && g.story.skipTutorial(); g.enemies.calm = 999; g.story.firstFoeDown = true; sv.tut.foe = 1;
+      sv.respawn = { x: p.x, y: p.y }; await wait(400);
+      const out = { benchStarted: !!sv.quests.q_bench, tracked: sv.qtrack };
+      Q.onCraft(9, 4); await wait(100); out.step1 = sv.quests.q_bench.step;
+      Q.onCraft(32, 1); await wait(150); Q.onPlace(32); await wait(150); Q.onCraft(25, 3); await wait(150); Q.onCraft('w_spear', 1); await wait(300);
+      out.benchDone = sv.quests.q_bench.done;
+      // a keeper chain through dialogue
+      const opts = Q.dialogOpts('smith', 'Smith'); out.smithOffer = opts.map(o => o.label);
+      opts[0].act(); out.smithStarted = !!sv.quests.q_smith;
+      out.daily = sv.daily && sv.daily.list.map(d => d.text);
+      out.trackedText = Q.trackedText();
+      // sites: find and solve a brazier puzzle
+      const bx = g.content.sites('brazier', 20, 600)[0]; out.brazierAt = bx;
+      p.respawnAt(bx * 32 + 16, g.world.surface(bx) * 32); await wait(900);
+      const site = S.list.get('brazier' + bx);
+      for (const b of site.items) S.light(site, b);
+      await wait(200); out.brazierSolved = site.solved; S.openChest(site); out.chestOpened = site.chest.open;
+      // a camp: spawn, clear, chest
+      const cx = g.content.sites('camp', 130, 900)[0]; out.campAt = cx;
+      g.enemies.calm = 0;
+      p.respawnAt(cx * 32 + 16 - 400, g.world.surface(cx - 12) * 32); await wait(1200);
+      const camp = S.list.get('camp' + cx); out.campSpawned = camp && camp.spawned; out.elite = camp && camp.elite && camp.elite.eliteName;
+      if (camp) for (const u of camp.units) g.enemies.kill(u, { x: u.cx, y: u.cy, dx: 1, dy: -0.5 });
+      await wait(300); out.campCleared = camp && camp.solved;
+      out.counters = sv.counters;
+      return out;
+    });
+    console.log('quests', JSON.stringify(r));
+    await page.keyboard.press('Escape'); await sleep(300);
+    await evalg(() => window.__game.ui.openMenu('quests')); await sleep(600); await shot('quests-log');
+    await evalg(() => window.__game.ui.closeMenu()); await sleep(300); await shot('quests-hud');
+    if (!r.benchStarted || !r.benchDone || !r.smithStarted || !r.brazierSolved || !r.chestOpened || !r.campCleared) throw new Error('quests broken');
+  },
   async doll() {
     await page.waitForFunction(() => window.__game && window.__game.story);
     await sleep(600);

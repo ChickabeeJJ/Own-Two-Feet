@@ -199,6 +199,7 @@ export class Shrines {
       else if (this.requestDone(rq)) opts.unshift({ label: 'It is done', act: () => this.claim(rq, name) });
       else opts.unshift({ label: `About that favour: ${this.requestText(rq)}`, act: () => { g.ui.toast(this.requestText(rq) + ' · ' + this.requestProgress(rq)); } });
     }
+    if (g.quests) opts.unshift(...g.quests.dialogOpts(kind, name));
     opts.push({ label: 'Farewell', act: () => {} });
     Audio.play('talk');
     ui.dialog(name, lines, opts);
