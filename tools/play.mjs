@@ -183,6 +183,8 @@ while ((Date.now() - t0) / 1000 < SECS) {
   const foe = st.foes.filter(f => f.kind !== 'dummy').sort((a, b) => Math.abs(a.x - st.x) - Math.abs(b.x - st.x))[0];
   if (foe && Math.abs(foe.x - st.x) < 260 && Math.abs(foe.y - st.y) < 200) {
     // fight: close in, face, strike; dash away when hurt
+    // a foe up on a ledge: jump at the wall and mantle up to it, like a person would
+    if (foe.y < st.y - 70) { const k = foe.x >= st.x ? 'KeyD' : 'KeyA'; await hold(k, true); await tap('Space', 300); await sleep(500); await releaseAll(); continue; }
     const there = await walkTo(st, foe.x - 34 * Math.sign(foe.x - st.x || 1), 16);
     if (there) { await releaseAll(); if ((foe.x > st.x) !== (st.facing > 0)) await tap(foe.x > st.x ? 'KeyD' : 'KeyA', 40); await tap('KeyJ'); await sleep(180); }
     if (st.hp <= 1 && Math.random() < 0.2) await tap('KeyH', 900);
