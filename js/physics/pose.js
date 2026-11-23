@@ -1,7 +1,7 @@
 // Procedural animation: turns controller state into muscle targets for the ragdoll.
 // Gait is distance-driven (feet don't skate), feet are placed with two-bone IK onto the real terrain,
 // and every target is smoothed so transitions blend instead of popping.
-import { P, NJ, SH_OFF } from './body.js';
+import { P, NJ, SH_OFF, JOINTS } from './body.js';
 import { wrapAng, clamp, lerp, angLerp, smooth, TAU } from '../core/util.js';
 
 const HALF_PI = Math.PI / 2;
@@ -383,7 +383,12 @@ export class Animator {
     tg[0] = spine[0]; tg[1] = spine[1];
     tg[2] = clamp(wrapAng(head - torso), -0.7, 0.7) * 0.6;
     const arm = (ua, fa, ks, ke) => {
-      tg[ks] = wrapAng(ua - down + SH_OFF);
+      // the shoulder can't turn all the way round: of the two ways to reach an angle, keep the one on the
+      // same side as now (no flip through the dead zone behind the head), then hold it inside the joint's range
+      let r = wrapAng(ua - down + SH_OFF);
+      const cur = this.cur[ks];
+      if (Math.abs(r - TAU - cur) < Math.abs(r - cur)) r -= TAU; else if (Math.abs(r + TAU - cur) < Math.abs(r - cur)) r += TAU;
+      tg[ks] = clamp(r, JOINTS[ks][4], JOINTS[ks][5]);
       tg[ke] = clamp(wrapAng(fa - ua), -2.55, 0.02);
     };
     if (armF) arm(armF[0], armF[1], 3, 4);
@@ -411,7 +416,11 @@ export class Animator {
 
     // smooth targets
     const k = 1 - Math.exp(-rate * dt);
-    for (let j = 0; j < NJ; j++) this.cur[j] = angLerp(this.cur[j], tg[j], j === 3 || j === 4 ? Math.max(k, st.attack && st.attack.t < 1 ? 0.7 : k) : k);
+    for (let j = 0; j < NJ; j++) {
+      const kj = j === 3 || j === 4 ? Math.max(k, st.attack && st.attack.t < 1 ? 0.7 : k) : k;
+      // shoulders blend straight (their range has a gap, so the short way round can cross it)
+      this.cur[j] = j === 3 || j === 5 ? lerp(this.cur[j], tg[j], kj) : angLerp(this.cur[j], tg[j], kj);
+    }
     b.target.set(this.cur);
     // root + balance
     const ky = 1 - Math.exp(-30 * dt);

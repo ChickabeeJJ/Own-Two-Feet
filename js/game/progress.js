@@ -93,6 +93,9 @@ export function upgradeCost(kind, lvl) {
 // ---------------- names / sigils ----------------
 const N1 = ['Wren', 'Ivo', 'Mara', 'Sable', 'Tamsin', 'Oro', 'Lio', 'Pell', 'Rue', 'Juno', 'Ash', 'Kestrel', 'Nim', 'Odette', 'Pim', 'Sorrel', 'Tove', 'Vey', 'Wynn', 'Ilse'];
 const N2 = ['of the Pale', 'Twice-Born', 'the Unfinished', 'of Small Steps', 'the Stitched', 'of Loose Thread', 'the Wakeful', 'Who Stood', 'of the Seam', 'the Kindled'];
+// the name shown for the player: a CrazyGames username with this doll's title, or one shared default
+export function titleOf(seed) { const r = mulberry(seed); r(); return N2[(r() * N2.length) | 0]; }
+export function playerName(sv, username) { return username ? `${username}, ${titleOf(sv.seed)}` : 'Wren, the Unfinished'; }
 export function genName(seed) { const r = mulberry(seed); return N1[(r() * N1.length) | 0] + ' ' + N2[(r() * N2.length) | 0]; }
 
 export function newSave(seed) {

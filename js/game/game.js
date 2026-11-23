@@ -112,13 +112,13 @@ export class Game {
     if (this.settings.qualityLocked || this.paused || !this.player) return;
     this.aqT = (this.aqT || 0) + dt;
     this.aqAvg = this.aqAvg === undefined ? dt : this.aqAvg * 0.97 + dt * 0.03;
-    if (this.aqT < 5) return;
-    if (this.aqAvg > 0.027) {
+    if (this.aqT < 10) return;
+    // only for sustained, clearly slow frames (under ~28 fps for 10 s), and never below medium by itself
+    if (this.aqAvg > 0.036) {
       const q = this.settings.quality;
-      const next = q === 'high' ? 'medium' : q === 'medium' ? 'low' : null;
+      const next = q === 'high' ? 'medium' : null;
       if (!next) { this.settings.qualityLocked = true; return; }
       this.settings.quality = next;
-      if (next === 'low' && this.post.setEnabled) { this.post.setEnabled(false); this.settings.post = false; }
       this.resize();
       this.aqT = 0; this.aqAvg = undefined;
     }

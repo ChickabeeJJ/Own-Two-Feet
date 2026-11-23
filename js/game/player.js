@@ -411,6 +411,12 @@ export class Player {
     a.startAttack(step.k, dur);
     a.attack.step = step; a.attack.W = W;
     a.attackCD = dur * 0.82;
+    // follow-through: a grounded swing carries the body a short step forward, a little further toward a foe in reach
+    if (!air && !W.ranged && !kind) {
+      let near = false;
+      for (const e of this.game.targets()) { const dx = (e.cx ?? e.c.x) - a.c.x; if (e.mode !== 'dead' && Math.sign(dx) === a.facing && Math.abs(dx) < 120 && Math.abs((e.cy ?? e.c.y) - a.c.y) < 90) { near = true; break; } }
+      a.c.vx += a.facing * (W === WEAPONS.w_hammer ? 130 : 200) * (near ? 1.5 : 1);
+    }
     this.comboT = 0;
     this.slashPts = [];
     Audio.play('swing', { pitch: rand(0.9, 1.15) * (W === WEAPONS.w_hammer ? 0.6 : W === WEAPONS.w_daggers ? 1.4 : 1) });
@@ -680,7 +686,7 @@ export class Player {
     const g = this.game, it = this.interact;
     if (!it || !g.touch || this.dead || g.cinematic || (g.ui && g.ui.modal)) return;
     const verb = (it.verb || it.label.split(' ')[0]).toUpperCase();
-    const x = it.x, y = it.y - 46 + Math.sin(g.time * 3) * 2;
+    const x = it.x, y = (it.top !== undefined ? it.top : it.y - 46) + Math.sin(g.time * 3) * 2;
     ctx.save();
     ctx.font = '800 10px Manrope, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     const w = ctx.measureText(verb).width + 18;

@@ -51,7 +51,7 @@ export class Net {
     return `${this.mode === 'public' ? 'Open world' : this.isHost ? 'Your world is open' : 'Visiting a friend'} · ${this.peers} soul${this.peers > 1 ? 's' : ''} here`;
   }
   roster() { return [...this.remotes.values()].map(r => ({ name: r.name, host: r.host })); }
-  myName() { return Platform.username || this.game.save.name.split(' ')[0]; }
+  myName() { return Platform.username || 'Wren'; }
   myLook() { const sv = this.game.save; return { look: sv.look, marks: sv.marks, hasBlade: sv.hasBlade }; }
 
   // ------------------------------------------------------------ boot: invites + instant multiplayer

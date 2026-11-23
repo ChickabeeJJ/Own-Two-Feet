@@ -25,11 +25,17 @@ import { drawSprite } from '../art/images.js';
 
 const BLADE_X = 12;
 const FALL_H = 5600;
+const PROLOGUE = [
+  'Before the world had edges, there was a needle, and a thread.',
+  'A Seamstress stitched the land awake, and dolls to walk it. Then she was gone.',
+  'Her needles became five Wardens. They shut every gate and kept her light.',
+];
+const WARDENS = [['The Hollow Warden', '#ffb36b', 'horns'], ['The Glass Widow', '#8ff7ff', 'halo'], ['The Unmade Heart', '#c4b5ff', 'flower'], ['The Pyre Knight', '#ff7a3a', 'crown'], ['The Still Queen', '#dff6ff', 'spires']];
 const LORE = [
-  'Before the world, there was a needle, and a thread.',
-  'The Seamstress stitched the land, and dolls to walk it.',
-  'Then she vanished. Her needles became Wardens, and shut every gate.',
   'One thread of her light was still falling.',
+  'It found a doll who had never stood.',
+  'Catch what light you can. You will need all of it.',
+  'Brace.',
 ];
 
 // tutorial: one verb at a time, each confirmed before the next
@@ -105,6 +111,39 @@ export class Story {
     for (let i = 0; i < 26; i++) this.streaks.push({ x: Math.random(), y: Math.random(), l: rand(0.05, 0.16), a: rand(0.04, 0.12) });
     this.gotMotes = 0;
     this.groundY = gy;
+    // the prologue plays first: the seed of light falling, then the wardens; the doll is inside the seed
+    this.stage = -1; this.pt = 0; this.hidden = true; this.shot = 0;
+    a.scriptPose.vy = 150;
+    g.cam.zoomT = g.cam.zoom = 1.35;
+  }
+  // ---------------- prologue (non-interactive, any key fast-forwards to the fall)
+  updatePrologue(dt) {
+    const g = this.game, a = g.player.actor, ui = this.ui, sp = a.scriptPose;
+    const t = this.pt += dt;
+    if (!this.pBeat) { this.pBeat = 1; ui.lore(PROLOGUE[0]); }
+    for (const bt of [0.25, 1.05, 1.85]) if (t >= bt && (this.beats || 0) < [0.25, 1.05, 1.85].indexOf(bt) + 1) { this.beats = (this.beats || 0) + 1; Audio.play('beat'); }
+    if (t > 2.9 && this.shot === 0) { this.shot = 1; ui.fade(0, 1.4); ui.lore(PROLOGUE[1]); g.cam.zoomT = 1.0; }
+    if (t > 6.2 && this.shot === 1) { this.shot = 2; ui.lore(PROLOGUE[2]); Audio.play('roar', { vol: 0.25, pitch: 0.5 }); }
+    if (t > 9.6 && this.shot === 2) this.endPrologue();
+    // the seed drifts down; the camera rides above it
+    sp.vy = 150 + t * 18;
+    g.cam.override.x = a.c.x; g.cam.override.y = a.c.y + 40;
+    const speed = 0.35;
+    for (const p of this.puffs) { p.y -= dt * speed * 1.3 * p.z; if (p.y < -0.4) Object.assign(p, this.newPuff(false)); }
+    if (t > 1.2 && (Input.any || Input.mouse.lp || (g.touch && g.touch.tapped))) { if (g.touch) g.touch.tapped = false; this.endPrologue(); }
+  }
+  endPrologue() {
+    const g = this.game, a = g.player.actor, ui = this.ui;
+    if (this.stage !== -1) return;
+    this.stage = 0; this.t = 0; this.hidden = false; this.shot = 3;
+    ui.fade(0, 0.4); ui.lore(null);
+    a.scriptPose.vy = 240;
+    g.cam.zoomT = 1.15;
+    // the seed bursts and the doll tumbles out of it
+    g.flash([1, 0.95, 0.85], 0.6); g.shake(0.3);
+    g.fx.ring(a.c.x, a.c.y - 40, 8, 160, 0.6, '#ffe3a0', 6);
+    g.fx.burst(a.c.x, a.c.y - 40, { n: 40, speed: 420, col: '#ffffff', col1: '#ffd9a0', add: true, life: 0.8, size: 2.8 });
+    Audio.play('crack'); Audio.play('chime', { vol: 0.6 });
   }
   newPuff(anywhere) { return { x: Math.random(), y: anywhere ? Math.random() * 1.4 : 1.2 + Math.random() * 0.3, r: rand(0.12, 0.32), a: rand(0.12, 0.28), z: rand(0.8, 1.6) }; }
   updateFall(dt) {
@@ -247,7 +286,7 @@ export class Story {
     setTimeout(() => this.ui.fade(0, 1.4), 30);
     this.ui.hud(true);
     const B = g.biomeAt(g.player.x);
-    this.card(B.name, `welcome back, ${this.sv.name.split(' ')[0]}`, 'small', 2.8);
+    this.card(B.name, `welcome back, ${(this.game.ui && this.game.ui.displayName().split(',')[0]) || 'Wren'}`, 'small', 2.8);
     this.lastBiome = biomeIndexAt(Math.floor(g.player.x / TILE));
     setTimeoutGame(g, 1.5, () => this.say(['You came back.', 'The thread still glows.', 'Let’s keep walking.'][Math.floor(Math.random() * 3)], 2.6));
     Platform.gameplayStart();
@@ -259,6 +298,7 @@ export class Story {
     if (!p) return;
     if (this.thread.visible) this.thread.update(dt);
     if (this.crater) this.crater.t += dt;
+    if (this.stage === -1) { if (Input.pressed('menu')) { Input.consume('menu'); this.skipBirth(); return; } this.updatePrologue(dt); return; }
     if (this.stage === 0) { if (Input.pressed('menu')) { Input.consume('menu'); this.skipBirth(); return; } this.updateFall(dt); return; }
     if (this.stage === 1) { this.updateImpact(dt); return; }
     if (this.stage === 2 || this.stage === 3) { this.updateWake(dt); return; }
@@ -442,6 +482,40 @@ export class Story {
   // ------------------------------------------------------------ draw
   draw(ctx, a, layer) {
     const g = this.game;
+    if (this.stage === -1 && g.player) {
+      const p = g.player.actor;
+      if (layer === 'front') drawSeedOfLight(ctx, p.c.x, p.c.y - 40, g.time, this.pt);
+      if (layer === 'screen') this.drawPrologue(ctx, g.W, g.H, g.pxRatio, this.pt);
+      return;
+    }
+    // tutorial guidance in the world: the training doll glows while you're meant to hit it, and a small
+    // bobbing arrow by your doll points to where the step happens (the blade, the doll, the way to walk)
+    const tut = this.tutStep && this.tutStep();
+    if (layer === 'back' && tut === 'strike' && this.dummy && !this.dummy.removed) {
+      const d = this.dummy, k = 0.6 + Math.sin(g.time * 4) * 0.25;
+      ctx.save(); ctx.globalCompositeOperation = 'lighter';
+      drawGlow(ctx, d.c.x, d.c.y - 40, 70, [1, 0.85, 0.55], 0.35 * k);
+      ctx.strokeStyle = rgba('#ffd9a0', 0.55 * k); ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.ellipse(d.c.x, d.c.y - 2, 30 + k * 6, 7 + k * 1.5, 0, 0, TAU); ctx.stroke();
+      ctx.restore();
+    }
+    if (layer === 'front' && tut && !g.cinematic && !(g.ui && g.ui.modal) && g.player) {
+      const p = g.player.actor;
+      let tx = null;
+      if (tut === 'move') tx = BLADE_X * TILE + 16;
+      else if (tut === 'blade') tx = BLADE_X * TILE + 16;
+      else if (tut === 'strike' && this.dummy) tx = this.dummy.c.x;
+      if (tx !== null && Math.abs(tx - p.c.x) > 40) {
+        const dir = Math.sign(tx - p.c.x), bob = Math.sin(g.time * 5) * 4;
+        const x = p.c.x + dir * (34 + bob), y = p.c.y - 60;
+        ctx.save(); ctx.fillStyle = rgba('#ffd9a0', 0.9);
+        for (let i = 0; i < 2; i++) { const ox = x + dir * i * 9; ctx.globalAlpha = 0.5 + i * 0.4; ctx.beginPath(); ctx.moveTo(ox + dir * 6, y); ctx.lineTo(ox - dir * 3, y - 7); ctx.lineTo(ox - dir * 3, y + 7); ctx.closePath(); ctx.fill(); }
+        ctx.restore();
+      } else if (tut === 'jump') {
+        const y = p.c.y - 104 + Math.sin(g.time * 5) * 4;
+        ctx.save(); ctx.fillStyle = rgba('#ffd9a0', 0.9); ctx.beginPath(); ctx.moveTo(p.c.x, y - 7); ctx.lineTo(p.c.x + 7, y + 3); ctx.lineTo(p.c.x - 7, y + 3); ctx.closePath(); ctx.fill(); ctx.restore();
+      }
+    }
     if (layer === 'back') {
       if (this.bladeY !== null && this.stage >= 5) { if (!this.sv.hasBlade && !drawSprite(ctx, 'props/bladestone', BLADE_X * TILE + 16, this.bladeY + 6, 150, { grade: g.biomeAt(BLADE_X * TILE) })) drawBladeStone(ctx, BLADE_X * TILE + 16, this.bladeY + 2, 1, g.time, true); }
       if (this.crater) {
@@ -484,6 +558,32 @@ export class Story {
       }
       ctx.globalCompositeOperation = 'source-over';
       for (const p of this.puffs) softDisc(ctx, p.x * W, p.y * H, p.r * W * 0.6 * p.z, '#f4ece4', p.a);
+      ctx.restore();
+    }
+  }
+  drawPrologue(ctx, W, H, px, t) {
+    // shot 1: black. shot 3: the five wardens on the horizon
+    if (t < 3.4) { ctx.fillStyle = `rgba(4,3,8,${clamp(1 - (t - 2.9) / 0.5, 0, 1)})`; ctx.fillRect(0, 0, W, H); }
+    const k = clamp((t - 6.0) / 0.5, 0, 1) * clamp((9.6 - t) / 0.45, 0, 1);
+    if (k > 0) {
+      ctx.save(); ctx.globalAlpha = k;
+      const sky = ctx.createLinearGradient(0, 0, 0, H);
+      sky.addColorStop(0, '#07060d'); sky.addColorStop(0.62, '#1a1626'); sky.addColorStop(0.66, '#2a2236'); sky.addColorStop(1, '#09080d');
+      ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
+      const hy = H * 0.68, push = 1 + (t - 6) * 0.012;
+      ctx.translate(W / 2, hy); ctx.scale(push, push); ctx.translate(-W / 2, -hy);
+      ctx.fillStyle = '#060509'; ctx.fillRect(0, hy, W, H - hy);
+      WARDENS.forEach(([name, col, kind], i) => {
+        const a = clamp((t - 6.25 - i * 0.42) / 0.5, 0, 1);
+        if (a <= 0) return;
+        const x = W * (0.14 + i * 0.18), h = H * (0.3 + (i % 2) * 0.05);
+        drawWardenSil(ctx, x, hy, h, col, kind, a, t);
+        ctx.globalAlpha = k * a * 0.85;
+        ctx.fillStyle = col; ctx.textAlign = 'center';
+        ctx.font = `600 ${Math.round(11 * px)}px Manrope, sans-serif`;
+        ctx.fillText(name.toUpperCase(), x, hy + 26 * px);
+        ctx.globalAlpha = k;
+      });
       ctx.restore();
     }
   }
@@ -589,3 +689,37 @@ const BIOME_LINES = {
   frost: 'So quiet. Even the wind forgot how to move.',
 };
 export { BLADE_X, COSMETICS, drawSeed, sign };
+
+// the seed of light: a hot star with a long tail, flickering rays
+function drawSeedOfLight(g, x, y, time, t) {
+  g.save(); g.globalCompositeOperation = 'lighter';
+  const pulse = 1 + Math.sin(time * 9) * 0.08;
+  const tail = g.createLinearGradient(x, y - 260, x, y);
+  tail.addColorStop(0, 'rgba(255,217,160,0)'); tail.addColorStop(1, 'rgba(255,233,200,0.5)');
+  g.fillStyle = tail; g.beginPath(); g.moveTo(x - 10, y - 260); g.lineTo(x + 10, y - 260); g.lineTo(x + 4, y); g.lineTo(x - 4, y); g.fill();
+  drawGlow(g, x, y, 160 * pulse, [1, 0.85, 0.6], 0.6);
+  drawGlow(g, x, y, 50 * pulse, [1, 1, 1], 0.9);
+  g.strokeStyle = 'rgba(255,241,216,0.55)'; g.lineWidth = 1.5; g.lineCap = 'round';
+  for (let i = 0; i < 8; i++) { const a = i / 8 * TAU + time * 0.5, r = 34 + (i % 3) * 18; g.beginPath(); g.moveTo(x + Math.cos(a) * 16, y + Math.sin(a) * 16); g.lineTo(x + Math.cos(a) * r, y + Math.sin(a) * r); g.stroke(); }
+  g.restore();
+}
+// a warden on the horizon: a tall cloaked shape with a rim of its colour and its crown or mark
+function drawWardenSil(g, x, base, h, col, kind, a, t) {
+  g.save(); g.globalAlpha *= a;
+  const w = h * 0.34, top = base - h, hr = h * 0.07;
+  const body = () => { g.beginPath(); g.moveTo(x - w, base); g.quadraticCurveTo(x - w * 0.55, top + h * 0.45, x - hr * 0.9, top + hr * 2.1); g.lineTo(x + hr * 0.9, top + hr * 2.1); g.quadraticCurveTo(x + w * 0.55, top + h * 0.45, x + w, base); g.closePath(); };
+  // rim light
+  g.save(); g.shadowColor = col; g.shadowBlur = 18; g.fillStyle = '#0b0a10'; body(); g.fill(); g.restore();
+  g.fillStyle = '#0b0a10'; body(); g.fill();
+  g.beginPath(); g.arc(x, top + hr, hr, 0, TAU); g.fill();
+  g.strokeStyle = col; g.lineWidth = 2; g.globalAlpha *= 0.8;
+  if (kind === 'horns') { for (const s of [-1, 1]) { g.beginPath(); g.moveTo(x + s * hr * 0.6, top + hr * 0.4); g.quadraticCurveTo(x + s * hr * 2.2, top - hr * 0.6, x + s * hr * 1.6, top - hr * 2.2); g.stroke(); } }
+  if (kind === 'halo') { g.beginPath(); g.ellipse(x, top - hr * 0.6, hr * 1.4, hr * 0.45, 0, 0, TAU); g.stroke(); }
+  if (kind === 'crown') { g.beginPath(); g.moveTo(x - hr, top); g.lineTo(x - hr * 0.6, top - hr * 1.2); g.lineTo(x, top - hr * 0.3); g.lineTo(x + hr * 0.6, top - hr * 1.2); g.lineTo(x + hr, top); g.stroke(); }
+  if (kind === 'spires') { for (const s of [-1, 0, 1]) { g.beginPath(); g.moveTo(x + s * hr * 0.7, top); g.lineTo(x + s * hr * 0.9, top - hr * (s ? 1.4 : 2.2)); g.stroke(); } }
+  if (kind === 'flower') { for (let i = 0; i < 7; i++) { const an = i / 7 * TAU + t * 0.3; g.beginPath(); g.ellipse(x + Math.cos(an) * hr * 1.6, top + hr + Math.sin(an) * hr * 1.6, hr * 0.6, hr * 0.3, an, 0, TAU); g.stroke(); } }
+  // a cold glow where a heart would be
+  g.globalAlpha = a * 0.6; g.globalCompositeOperation = 'lighter';
+  drawGlow(g, x, top + h * 0.38, h * 0.12, [1, 1, 1].map((v, i) => parseInt(col.slice(1 + i * 2, 3 + i * 2), 16) / 255), 0.5 + Math.sin(t * 3) * 0.15);
+  g.restore();
+}

@@ -170,6 +170,62 @@ function drawSpecial(g, id, cx, cy, s) {
       g.fillStyle = rgba('#ffffff', 0.3); g.beginPath(); g.moveTo(-20, -14); g.quadraticCurveTo(0, -27, 16, -16); g.quadraticCurveTo(0, -22, -20, -14); g.fill();
       break;
     }
+    case 'w_blade': {
+      g.rotate(-0.78);
+      const bl = g.createLinearGradient(-5, 0, 5, 0); bl.addColorStop(0, '#f4f1ea'); bl.addColorStop(1, '#a9a4b0');
+      g.fillStyle = bl; g.beginPath(); g.moveTo(-4.5, 8); g.lineTo(-4.5, -24); g.lineTo(0, -32); g.lineTo(4.5, -24); g.lineTo(4.5, 8); g.closePath(); g.fill();
+      g.fillStyle = rgba('#ffffff', 0.5); g.fillRect(-1, -26, 2, 32);
+      g.fillStyle = BRASS; g.beginPath(); g.roundRect(-12, 8, 24, 5, 2); g.fill();
+      capsule(g, 0, 14, 0, 26, 3, 3, '#5a3a2a', { dark: 0.3 });
+      ballShade(g, 0, 29, 4, BRASS, { dark: 0.3 });
+      break;
+    }
+    case 'w_spear': {
+      g.rotate(-0.78);
+      capsule(g, 0, 32, 0, -14, 2.6, 2.6, WOOD, { dark: 0.35 });
+      g.fillStyle = '#e8e4dc'; g.beginPath(); g.moveTo(0, -34); g.lineTo(6, -18); g.lineTo(0, -12); g.lineTo(-6, -18); g.closePath(); g.fill();
+      g.fillStyle = rgba('#ffffff', 0.45); g.beginPath(); g.moveTo(0, -32); g.lineTo(2.5, -18); g.lineTo(0, -14); g.closePath(); g.fill();
+      g.fillStyle = '#c0453a'; g.fillRect(-3.5, -12, 7, 4);
+      break;
+    }
+    case 'w_hammer': {
+      g.rotate(-0.6);
+      capsule(g, 0, 32, 0, -8, 3, 3, WOOD, { dark: 0.35 });
+      const hd = g.createLinearGradient(0, -26, 0, -6); hd.addColorStop(0, '#9a96a0'); hd.addColorStop(1, '#4e4a56');
+      g.fillStyle = hd; g.beginPath(); g.roundRect(-18, -26, 36, 18, 4); g.fill();
+      g.fillStyle = rgba('#ffffff', 0.25); g.fillRect(-16, -24, 32, 4);
+      g.fillStyle = BRASS; g.fillRect(-4, -26, 8, 18);
+      break;
+    }
+    case 'w_daggers': {
+      for (const sd of [-1, 1]) {
+        g.save(); g.rotate(sd * 0.55); g.translate(sd * 4, 4);
+        g.fillStyle = '#e8e4dc'; g.beginPath(); g.moveTo(-3.5, 0); g.lineTo(0, -26); g.lineTo(3.5, 0); g.closePath(); g.fill();
+        g.fillStyle = BRASS; g.fillRect(-8, 0, 16, 3.5);
+        capsule(g, 0, 5, 0, 15, 2.5, 2.5, '#5a3a2a', { dark: 0.3 });
+        g.restore();
+      }
+      break;
+    }
+    case 'w_sling': {
+      g.strokeStyle = '#a98a62'; g.lineWidth = 2.5; g.lineCap = 'round';
+      g.beginPath(); g.moveTo(-20, -24); g.quadraticCurveTo(-14, 4, 0, 12); g.quadraticCurveTo(14, 4, 20, -24); g.stroke();
+      g.fillStyle = '#7a5a3e'; g.beginPath(); g.ellipse(0, 12, 10, 6, 0, 0, TAU); g.fill();
+      ballShade(g, 0, 8, 7, '#9a96a0', { dark: 0.35 });
+      for (const xx of [-20, 20]) ballShade(g, xx, -25, 3.5, '#d8c7a8', { dark: 0.3 });
+      break;
+    }
+    case 'i_infuse_ember': case 'i_infuse_frost': {
+      const c = id === 'i_infuse_ember' ? '#ff9b4a' : '#9fdcff', c2 = id === 'i_infuse_ember' ? '#b0401e' : '#3a78b0';
+      g.fillStyle = '#e8eef5'; g.beginPath(); g.roundRect(-4, -28, 8, 12, 2); g.fill();
+      g.fillStyle = '#a98a62'; g.beginPath(); g.roundRect(-5, -31, 10, 5, 2); g.fill();
+      g.save(); g.globalCompositeOperation = 'lighter'; softDisc(g, 0, 4, 24, c, 0.4); g.restore();
+      g.fillStyle = rgba('#d8e6ee', 0.5); g.beginPath(); g.moveTo(-5, -17); g.lineTo(-16, 18); g.quadraticCurveTo(0, 26, 16, 18); g.lineTo(5, -17); g.closePath(); g.fill();
+      const lq = g.createLinearGradient(0, -4, 0, 22); lq.addColorStop(0, c); lq.addColorStop(1, c2);
+      g.fillStyle = lq; g.beginPath(); g.moveTo(-10, 0); g.lineTo(-15, 17); g.quadraticCurveTo(0, 24, 15, 17); g.lineTo(10, 0); g.closePath(); g.fill();
+      g.fillStyle = rgba('#ffffff', 0.4); g.beginPath(); g.ellipse(-6, 6, 2.5, 6, 0.3, 0, TAU); g.fill();
+      break;
+    }
     case 'g_charm_thread': case 'g_charm_ember': {
       const c = id === 'g_charm_thread' ? '#9ff3ff' : '#ff9b4a';
       g.strokeStyle = '#d8c7a8'; g.lineWidth = 2; g.beginPath(); g.moveTo(-14, -26); g.quadraticCurveTo(0, -10, 14, -26); g.stroke();

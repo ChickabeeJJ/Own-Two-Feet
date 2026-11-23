@@ -324,6 +324,25 @@ export default ({ page, sleep, key, shot, evalg }) => ({
     await evalg(() => window.__game.ui.closeMenu()); await sleep(300); await shot('quests-hud');
     if (!r.benchStarted || !r.benchDone || !r.smithStarted || !r.brazierSolved || !r.chestOpened || !r.campCleared) throw new Error('quests broken');
   },
+  async uitour() {
+    await sleep(900);
+    await evalg(() => { window.__game.story.skipBirth(); window.__game.enemies.calm = 999; });
+    await sleep(1400); await shot('ui-0-tut');
+    await evalg(() => { const g = window.__game; g.save.tutDone = 1; g.save.hasBlade = true; g.player.actor.blade = true; g.player.give(5, 6); g.player.give(12, 12); g.player.give(3, 20); g.player.give(17, 4); g.save.glimmer = 40; });
+    for (const t of ['journey', 'look', 'quests', 'settings']) { await evalg((t) => window.__game.ui.openMenu(t), t); await sleep(900); await shot('ui-m-' + t); }
+    await evalg(() => window.__game.ui.closeMenu()); await sleep(400);
+    await evalg(() => window.__game.ui.bag.open({ page: 'items' })); await sleep(900); await shot('ui-bag-items');
+    await evalg(() => { const g = window.__game, b = g.ui.bag; g.player.give('w_spear', 1); b.sel = 'w_spear'; b.render(); }); await sleep(700); await shot('ui-bag-craft');
+    await evalg(() => { const b = window.__game.ui.bag, rows = [...document.querySelectorAll('#bag .rec')]; const i = rows.findIndex(r => /Planks/.test(r.textContent)); b.rsel = Math.max(0, i); b.renderRecipes(); const c = document.querySelector('#bag .craft'); c.dispatchEvent(new PointerEvent('pointerdown')); c.dispatchEvent(new PointerEvent('pointerup')); });
+    await sleep(640); await shot('ui-bag-made');
+  },
+  async opening() {
+    await sleep(700); await shot('op-1-black');
+    await sleep(3200); await shot('op-2-seed');
+    await sleep(3200); await shot('op-3-wardens');
+    await sleep(2400); await shot('op-4-burst');
+    await sleep(1500); await shot('op-5-fall');
+  },
   async doll() {
     await page.waitForFunction(() => window.__game && window.__game.story);
     await sleep(600);

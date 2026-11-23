@@ -10,6 +10,7 @@ import { Bag } from './bag.js';
 import { QUESTS } from '../game/quests.js';
 import { itemIconEl } from '../art/itemart.js';
 import { usable, itemName } from '../game/items.js';
+import { playerName } from '../game/progress.js';
 import { COSMETICS, SLOTS, SLOT_NAMES, RECIPES, cosmetic, lookFromSave, Save, genName } from '../game/progress.js';
 import { TYPES as BOSS_TYPES } from '../game/bosses.js';
 import { mulberry, hashStr, TAU, clamp, shade } from '../core/util.js';
@@ -99,17 +100,27 @@ export class UI {
     clearTimeout(this.loreT);
     this.loreT = setTimeout(() => { l.textContent = text; void l.offsetWidth; l.classList.add('show'); }, l.textContent ? 650 : 0);
   }
+  // a compact banner: a progress ring, the verb, one line of how; on touch the button to press pulses
   tutorial(st, i, n, touch, done) {
     const el = $('#tut');
+    document.querySelectorAll('#touch .hint').forEach(b => b.classList.remove('hint'));
+    document.body.classList.toggle('tutoring', !!st);
     if (!st) { el.classList.add('hidden'); return; }
     $('#objective').classList.add('hidden');
+    const BTN = { jump: 'jump', strike: 'attack', dash: 'dash', mine: 'tbuild', place: 'tbuild', craft: 'tbag' };
+    if (touch && !done && BTN[st.id]) { const b = document.querySelector(`#tbtns .tb[data-a="${BTN[st.id]}"]`); if (b) b.classList.add('hint'); }
+    document.body.classList.toggle('hint-stick', touch && !done && st.id === 'move');
     const key = st.id + (touch ? 't' : 'k') + (done ? 'd' : '');
     if (el.dataset.k === key) return;
     el.dataset.k = key;
     el.classList.remove('hidden');
     const keys = touch ? `<span class="tt-touch">${esc(st.touch)}</span>` : st.keys.map(k => `<kbd>${esc(k)}</kbd>`).join('<span class="tt-or">or</span>');
-    el.innerHTML = `<div class="tt-step">Tutorial ${i + 1} / ${n}</div><div class="tt-title">${esc(st.title)}</div><div class="tt-keys">${keys}</div><div class="tt-text">${esc(st.text)}</div><div class="tt-dots">${Array.from({ length: n }, (_, k) => `<i class="${k < i || (k === i && done) ? 'on' : k === i ? 'cur' : ''}"></i>`).join('')}</div><button class="tt-skip">Skip tutorial</button>`;
+    const frac = (i + (done ? 1 : 0)) / n, C = 2 * Math.PI * 15;
+    el.innerHTML = `<div class="tt-ring"><svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="15" class="bg"/><circle cx="18" cy="18" r="15" class="fg" style="stroke-dasharray:${C};stroke-dashoffset:${C * (1 - frac)}"/></svg><span>${i + 1}/${n}</span></div>`
+      + `<div class="tt-main"><div class="tt-title">${done ? '<i class="tt-check"></i>' : ''}${esc(st.title)}</div><div class="tt-text">${esc(st.text)}</div></div>`
+      + `<div class="tt-keys">${keys}</div><button class="tt-skip" title="Skip tutorial">Skip</button>`;
     el.classList.toggle('done', done);
+    el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop');
     el.querySelector('.tt-skip').onclick = () => { this.game.story.skipTutorial(); Audio.play('blip'); };
   }
   objective(text, hint, dist) {
@@ -252,6 +263,7 @@ export class UI {
     if (this.dlg) this.closeDialog();
     this.tailorMode = tab === 'look' && this.game.player && this.nearTailor();
     this.modal = 'menu';
+    document.body.classList.add('menu-open', 'modal');
     if (tab) this.menuTab = tab;
     $('#menu').classList.remove('hidden');
     const mp = this.game.net && this.game.net.active;
@@ -261,6 +273,7 @@ export class UI {
   }
   closeMenu() {
     this.modal = null;
+    document.body.classList.remove('menu-open', 'modal');
     $('#menu').classList.add('hidden');
     this.game.paused = false;
     if (this.game.story && this.game.story.stage >= 5) Platform.gameplayStart();
@@ -273,14 +286,30 @@ export class UI {
   }
   renderMenu() {
     const tabs = [['journey', 'Journey'], ['quests', 'Quests'], ['journal', 'Journal'], ['look', 'Look'], ['craft', 'Craft'], ['together', 'Together'], ['settings', 'Settings'], ['controls', 'Controls']];
-    const th = $('#menu .tabs'); th.innerHTML = '';
-    for (const [id, name] of tabs) {
-      const b = el('button', 'tab' + (id === this.menuTab ? ' on' : ''), name);
-      b.addEventListener('click', () => { this.menuTab = id; Audio.play('blip'); this.renderMenu(); });
-      th.appendChild(b);
+    const th = $('#menu .tabs');
+    // tabs are built once; the underline slides between them
+    if (!th.querySelector('.tab')) {
+      for (const [id, name] of tabs) {
+        const b = el('button', 'tab', name); b.dataset.id = id;
+        b.addEventListener('click', () => { if (this.menuTab === id) return; this.menuTab = id; Audio.play('blip'); this.renderMenu(); });
+        th.appendChild(b);
+      }
+      th.appendChild(el('div', 'tab-line'));
+      const back = el('button', 'menu-back', '<svg viewBox="0 0 24 24" width="16" height="16"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Back</span>');
+      back.onclick = () => { Audio.play('blip', { pitch: 0.8 }); this.closeMenu(); };
+      $('#menu .menu-head').appendChild(back);
     }
-    const body = $('#menu .menu-body'); body.innerHTML = '';
+    let on = null;
+    for (const b of th.querySelectorAll('.tab')) { const is = b.dataset.id === this.menuTab; b.classList.toggle('on', is); if (is) on = b; }
+    const line = th.querySelector('.tab-line');
+    if (on && line) requestAnimationFrame(() => { line.style.width = on.offsetWidth + 'px'; line.style.transform = `translateX(${on.offsetLeft}px)`; line.style.top = (on.offsetTop + on.offsetHeight - 2) + 'px'; });
+    const body = $('#menu .menu-body');
+    body.classList.remove('enter'); void body.offsetWidth;
+    body.innerHTML = '';
     this['tab_' + this.menuTab](body);
+    // content slides in, its parts one after another
+    body.classList.add('enter');
+    [...body.querySelectorAll('.big-btn, .stat, .qcard, .recipe, .item, .row > .col > *')].slice(0, 30).forEach((e, i) => e.style.setProperty('--i', i));
   }
   tab_journey(body) {
     const sv = this.sv, g = this.game;
@@ -311,7 +340,7 @@ export class UI {
     row.appendChild(c2);
     body.appendChild(row);
   }
-  displayName() { return Platform.username || this.sv.name; }
+  displayName() { return playerName(this.sv, Platform.username); }
   // the quest log: tracked quest, active chains with their steps, the day's commissions, finished quests
   tab_quests(body) {
     const g = this.game, Q = g.quests, sv = this.sv;
@@ -396,14 +425,15 @@ export class UI {
     pv.appendChild(el('div', 'note', 'Your sigil changes with every choice. No one else carries this one.'));
     const rn = el('button', 'mini-btn', 'New name');
     rn.onclick = () => { sv.name = genName((Math.random() * 1e9) | 0); this.renderMenu(); };
-    if (!Platform.username) pv.appendChild(rn);
+    void rn;
     wrap.appendChild(pv);
     const right = el('div', 'col');
     const slots = el('div', 'slots');
     this.lookSlot = this.lookSlot || 'color';
     for (const s of SLOTS) {
-      const b = el('button', 'tab' + (s === this.lookSlot ? ' on' : ''), SLOT_NAMES[s]);
-      b.onclick = () => { this.lookSlot = s; this.renderMenu(); };
+      const all = COSMETICS.filter(c => c.slot === s), own = all.filter(c => sv.unlocked.includes(c.id)).length;
+      const b = el('button', 'chip' + (s === this.lookSlot ? ' on' : ''), `${SLOT_NAMES[s]}<small>${own}/${all.length}</small>`);
+      b.onclick = () => { this.lookSlot = s; Audio.play('blip', { pitch: 1.2 }); this.renderMenu(); };
       slots.appendChild(b);
     }
     right.appendChild(slots);
@@ -420,7 +450,7 @@ export class UI {
       else if (c.slot === 'blade') sw = c.v.glow;
       else if (c.slot === 'mat') sw = { cloth: '#d9d2c4', porcelain: 'linear-gradient(135deg,#fff,#cfc8bd)', metal: 'linear-gradient(135deg,#e9c48a,#7a5a33)', glow: 'radial-gradient(#9ff3ff,#1c3a40)', shadow: '#1d1a24' }[c.v];
       else sw = 'rgba(255,255,255,.12)';
-      it.innerHTML = `<div class="sw" style="background:${sw}"></div>${esc(c.name)}${owned ? '' : `<span class="how">${esc(c.how)}</span>`}${!owned && c.cost ? `<span class="cost">${c.cost} glimmer</span>` : ''}`;
+      it.innerHTML = `<div class="sw" style="background:${sw}">${owned ? '' : '<i class="lock"></i>'}</div><b>${esc(c.name)}</b>${owned ? (on ? '<span class="how">Wearing</span>' : '') : `<span class="how">${esc(c.how)}</span>`}${!owned && c.cost ? `<span class="cost">${c.cost}</span>` : ''}`;
       it.onclick = () => {
         if (!owned) {
           if (c.cost && this.tailorMode) {
@@ -454,17 +484,29 @@ export class UI {
     p.t += dt;
     const steps = Math.min(8, Math.ceil(dt / (1 / 120)));
     for (let i = 0; i < steps; i++) {
-      p.an.update(1 / 120, { mode: 'ground', x: 230, gy: 512, py: 400, vx: 0, vy: 0, runMax: 300, look: { x: 240 + Math.sin(p.t * 0.7) * 300, y: 200 } }, null);
+      // the preview turns now and then and waves or bows, like it knows it's being looked at
+      const cyc = p.t % 9;
+      const f = cyc > 4.5 ? -1 : 1;
+      if (f !== p.b.facing) p.b.flip();
+      const emote = cyc > 2.2 && cyc < 3.6 ? 'wave' : cyc > 6.6 && cyc < 7.8 ? 'bow' : null;
+      p.an.update(1 / 120, { mode: emote ? 'emote' : 'ground', emote, x: 230, gy: 512, py: 400, vx: 0, vy: 0, runMax: 300, look: { x: 240 + f * 200, y: 230 } }, null);
       p.b.step(1 / 120, null);
-      p.b.y[P.FOOT_F] = Math.min(p.b.y[P.FOOT_F], 512 - 12); p.b.y[P.FOOT_B] = Math.min(p.b.y[P.FOOT_B], 512 - 12);
       if (p.cape) p.cape.step(1 / 120, (p.b.x[P.NECK] + p.b.x[P.CHEST]) / 2 - 7, (p.b.y[P.NECK] + p.b.y[P.CHEST]) / 2, Math.sin(p.t * 1.3) * 25 - 10, 1);
     }
     const g = p.cv.getContext('2d');
     g.setTransform(1, 0, 0, 1, 0, 0);
     g.clearRect(0, 0, 480, 560);
-    const grd = g.createRadialGradient(230, 510, 10, 230, 510, 180);
-    grd.addColorStop(0, 'rgba(0,0,0,.35)'); grd.addColorStop(1, 'rgba(0,0,0,0)');
-    g.fillStyle = grd; g.beginPath(); g.ellipse(230, 514, 150, 26, 0, 0, TAU); g.fill();
+    // a soft spotlight and a stone pedestal
+    const sp = g.createRadialGradient(230, 240, 20, 230, 300, 300);
+    sp.addColorStop(0, 'rgba(255,233,200,.18)'); sp.addColorStop(1, 'rgba(255,233,200,0)');
+    g.fillStyle = sp; g.fillRect(0, 0, 480, 560);
+    const ped = g.createLinearGradient(0, 512, 0, 560);
+    ped.addColorStop(0, '#4a4550'); ped.addColorStop(1, '#2a2630');
+    g.fillStyle = ped; g.beginPath(); g.ellipse(230, 528, 150, 30, 0, 0, TAU); g.fill();
+    g.fillStyle = 'rgba(255,240,220,.12)'; g.beginPath(); g.ellipse(230, 516, 140, 22, 0, 0, TAU); g.fill();
+    const grd = g.createRadialGradient(230, 512, 10, 230, 512, 140);
+    grd.addColorStop(0, 'rgba(0,0,0,.4)'); grd.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = grd; g.beginPath(); g.ellipse(230, 514, 120, 18, 0, 0, TAU); g.fill();
     drawBody(g, p.b, p.look, 1, { cape: p.cape, blade: this.sv.hasBlade, time: p.t, glows: [] });
   }
   tab_craft(body) {
@@ -611,6 +653,10 @@ export class UI {
   frame(dt) {
     const g = this.game, p = g.player;
     if (this.bag) this.bag.frame(dt);
+    // the boss bar only shows while a fight is actually on and you're in its arena
+    { const B = g.bosses && g.bosses.active, A = g.bosses && g.bosses.arena;
+      const on = B && !B.over && A && p && p.x > A.x0 - 200 && p.x < A.x1 + 200;
+      if (!on) { const bb = $('#bossbar'); if (bb && !bb.classList.contains('hidden')) bb.classList.add('hidden'); } }
     if (g.quests && (this.qT = (this.qT || 0) - dt) <= 0) {
       this.qT = 0.4;
       const q = g.quests.trackedText(), box = $('#objective .ob-quest');

@@ -32,6 +32,8 @@ async function boot() {
   // settings
   const st = Object.assign(game.settings, { shake: 1, flashes: true, post: true, quality: 'high', touchOn: false, muted: false }, sv.settings || {});
   sv.settings = st;
+  // quality defaults to high with post-processing on (older saves may have been stepped down automatically)
+  if (!st.qualityV2) { st.qualityV2 = 1; st.quality = 'high'; st.post = true; st.qualityLocked = false; }
   if (st.vol_master !== undefined) Audio.vol.master = st.vol_master;
   if (st.vol_music !== undefined) Audio.vol.music = st.vol_music;
   if (st.vol_sfx !== undefined) Audio.vol.sfx = st.vol_sfx;

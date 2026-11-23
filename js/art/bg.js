@@ -155,22 +155,48 @@ function features(g, B, layer, pts, col, seed) {
 }
 
 // ---------------------------------------------------------------- clouds
+// painted cumulus: each cloud is a dome of soft puffs (shadowed underside, body, sunlit crown), drawn on
+// its own sheet so its base can be flattened and faded, then laid onto the strip with a few thin streaks
+function puff(g, x, y, r, col, a) {
+  const gr = g.createRadialGradient(x, y, r * 0.1, x, y, r);
+  gr.addColorStop(0, rgba(col, a)); gr.addColorStop(0.55, rgba(col, a * 0.75)); gr.addColorStop(1, rgba(col, 0));
+  g.fillStyle = gr; g.beginPath(); g.arc(x, y, r, 0, TAU); g.fill();
+}
 function makeClouds(B) {
   const cv = canvas(LW, 360);
   const g = cv.getContext('2d');
   const R = rng(B.id.length * 31 + 7);
-  const lit = mix(B.sky[2], '#ffffff', 0.35), dark = mix(B.sky[1], B.fog, 0.4);
-  for (let c = 0; c < 9; c++) {
-    const cx = R() * LW, cy = 80 + R() * 200, w = 120 + R() * 220;
-    const draw = (ox) => {
-      for (let i = 0; i < 9; i++) {
-        const px = cx + ox + (R() - 0.5) * w, py = cy + (R() - 0.5) * 26 - Math.cos((px - cx - ox) / w * Math.PI) * 18, r = 24 + R() * 40;
-        const gr = g.createLinearGradient(0, py - r * 0.7, 0, py + r * 0.7);
-        gr.addColorStop(0, rgba(lit, 0.3)); gr.addColorStop(0.55, rgba(mix(lit, dark, 0.5), 0.22)); gr.addColorStop(1, rgba(dark, 0.0));
-        g.fillStyle = gr; g.beginPath(); g.ellipse(px, py, r * 1.9, r * 0.62, 0, 0, TAU); g.fill();
-      }
-    };
-    draw(0); if (cx > LW - 300) draw(-LW); if (cx < 300) draw(LW);
+  const lit = mix(B.sky[2], '#ffffff', 0.5), body = mix(mix(B.sky[2], B.sky[1], 0.45), '#ffffff', 0.18), dark = mix(B.sky[1], B.fog, 0.35);
+  // thin high streaks first
+  for (let i = 0; i < 4; i++) {
+    const y = 40 + R() * 120, x = R() * LW, w = 300 + R() * 500;
+    g.save(); g.translate(x, y); g.scale(1, 0.08);
+    puff(g, 0, 0, w * 0.5, lit, 0.16); g.restore();
+  }
+  for (let c = 0; c < 8; c++) {
+    const w = 170 + R() * 230, h = 60 + R() * 50;
+    const sheet = canvas(Math.ceil(w + 160), Math.ceil(h + 140));
+    const q = sheet.getContext('2d');
+    const cx = sheet.width / 2, base = sheet.height - 40;
+    const pts = [];
+    const n = Math.round(w / 16);
+    for (let i = 0; i < n; i++) {
+      const u = R() * 2 - 1, dome = 1 - u * u;
+      pts.push([cx + u * w * 0.5, base - dome * h * 0.75 - R() * 10, 16 + dome * 34 + R() * 12]);
+    }
+    pts.sort((p1, p2) => p2[1] - p1[1]);
+    for (const [x, y, r] of pts) puff(q, x, y + r * 0.35, r * 1.05, dark, 0.32);
+    for (const [x, y, r] of pts) puff(q, x, y, r, body, 0.34);
+    for (const [x, y, r] of pts) if (y < base - h * 0.3) puff(q, x - r * 0.15, y - r * 0.3, r * 0.65, lit, 0.3);
+    // flat, softly fading base
+    q.globalCompositeOperation = 'destination-out';
+    const fade = q.createLinearGradient(0, base - 18, 0, base + 30);
+    fade.addColorStop(0, 'rgba(0,0,0,0)'); fade.addColorStop(1, 'rgba(0,0,0,1)');
+    q.fillStyle = fade; q.fillRect(0, base - 18, sheet.width, 80);
+    const x = R() * LW - sheet.width / 2, y = 30 + R() * 190 - sheet.height / 2;
+    g.drawImage(sheet, x, y);
+    if (x + sheet.width > LW) g.drawImage(sheet, x - LW, y);
+    if (x < 0) g.drawImage(sheet, x + LW, y);
   }
   return cv;
 }
@@ -182,7 +208,7 @@ export function drawClouds(ctx, L, W, H, camX, camY, zoom, time, alpha, band = 0
   let ox = -(((camX * f + time * (band ? 9 : 4)) * zoom) % w);
   if (ox > 0) ox -= w;
   const y = H * (band ? 0.22 : 0.06) - camY * f * zoom * 0.4;
-  ctx.globalAlpha = alpha * (band ? 0.35 : 0.75);
+  ctx.globalAlpha = alpha * (band ? 0.45 : 0.9);
   for (let x = ox; x < W; x += w) ctx.drawImage(cv, x, y, w + 1, h);
   ctx.globalAlpha = 1;
 }

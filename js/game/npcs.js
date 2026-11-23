@@ -146,7 +146,7 @@ export class Shrines {
     const g = this.game, out = [];
     for (const s of this.map.values()) {
       out.push({ x: s.x, y: s.y - 30, r: 70, label: 'Rest', verb: 'Rest', pri: this.sv.met && this.sv.met[s.sx] && !(this.sv.respawn && Math.abs(this.sv.respawn.x - s.x) < 96) ? 45 : 0, act: () => this.rest(s) });
-      if (s.npc && !s.npc.removed && s.npc.mode !== 'dead') out.push({ x: s.npc.c.x, y: s.npc.c.y - 30, r: 80, label: 'Talk to ' + s.name, act: () => this.talk(s.kind, s.name, s) });
+      if (s.npc && !s.npc.removed && s.npc.mode !== 'dead') out.push({ x: s.npc.c.x, y: s.npc.c.y - 30, top: s.npc.c.y - s.npc.c.h - 26, r: 80, label: 'Talk to ' + s.name, act: () => this.talk(s.kind, s.name, s) });
     }
     if (this.home) {
       for (const a of this.home.npcs) out.push({ x: a.c.x, y: a.c.y - 30, r: 80, label: 'Talk to ' + a.npcName, act: () => this.talk(a.npcKind, a.npcName, null) });
