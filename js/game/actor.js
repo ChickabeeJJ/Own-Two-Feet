@@ -25,7 +25,8 @@ export class Actor {
     this.facing = o.facing || 1;
     this.body = new Body({ scale: s, x: o.x, y: o.y - 41 * s, facing: this.facing, heavy: o.heavy || 1 });
     this.anim = new Animator(this.body);
-    this.cape = this.look && this.look.cape ? new Cape(this.look.cape.style === 'scarf' ? 7 : 7, (this.look.cape.len || 7) * s) : null;
+    this.cape = this.look && this.look.cape ? new Cape(7, (this.look.cape.len || 7) * s) : null;
+    if (this.cape) this.cape.flare = this.look.cape.flare || (this.look.cape.wide > 10 ? 900 : 640);
     this.mode = o.mode || 'ctrl';     // ctrl | limp | getup | dead | script
     this.scriptPose = null;           // for 'script': {mode:'sit'|'cocoon'|'emote', ...}
     this.intent = { mx: 0, jump: false, jumpHeld: false, dash: false, attack: false, down: false, up: false };

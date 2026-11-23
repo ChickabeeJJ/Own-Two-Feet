@@ -10,12 +10,16 @@ import { COSMETICS, SLOTS, SLOT_NAMES, RECIPES, cosmetic, lookFromSave, Save, ge
 import { TYPES as BOSS_TYPES } from '../game/bosses.js';
 import { mulberry, hashStr, TAU, clamp, shade } from '../core/util.js';
 import { Platform } from '../platform.js';
+import { iconURL, TILE_ICON, IMG } from '../art/images.js';
+import { gateReq, LORE } from '../game/content.js';
 
 const $ = s => document.querySelector(s);
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html !== undefined) e.innerHTML = html; return e; };
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 export function tileIcon(t, size = 26) {
+  const url = iconURL(t);
+  if (url && IMG['icons/b_' + TILE_ICON[t]]) { const im = new Image(); im.src = url; im.className = 'ticon'; im.style.width = im.style.height = size + 'px'; return im; }
   const c = document.createElement('canvas');
   const d = Math.min(2, devicePixelRatio || 1);
   c.width = c.height = size * d;
@@ -90,6 +94,19 @@ export class UI {
     l.classList.remove('show');
     clearTimeout(this.loreT);
     this.loreT = setTimeout(() => { l.textContent = text; void l.offsetWidth; l.classList.add('show'); }, l.textContent ? 650 : 0);
+  }
+  tutorial(st, i, n, touch, done) {
+    const el = $('#tut');
+    if (!st) { el.classList.add('hidden'); return; }
+    $('#objective').classList.add('hidden');
+    const key = st.id + (touch ? 't' : 'k') + (done ? 'd' : '');
+    if (el.dataset.k === key) return;
+    el.dataset.k = key;
+    el.classList.remove('hidden');
+    const keys = touch ? `<span class="tt-touch">${esc(st.touch)}</span>` : st.keys.map(k => `<kbd>${esc(k)}</kbd>`).join('<span class="tt-or">or</span>');
+    el.innerHTML = `<div class="tt-step">Tutorial ${i + 1} / ${n}</div><div class="tt-title">${done ? '\u2713 ' : ''}${esc(st.title)}</div><div class="tt-keys">${keys}</div><div class="tt-text">${esc(st.text)}</div><div class="tt-dots">${Array.from({ length: n }, (_, k) => `<i class="${k < i || (k === i && done) ? 'on' : k === i ? 'cur' : ''}"></i>`).join('')}</div><button class="tt-skip">Skip tutorial</button>`;
+    el.classList.toggle('done', done);
+    el.querySelector('.tt-skip').onclick = () => { this.game.story.skipTutorial(); Audio.play('blip'); };
   }
   objective(text, hint, dist) {
     const o = $('#objective');
@@ -244,7 +261,7 @@ export class UI {
     return g.actors.some(a => a.npcKind === 'tailor' && Math.abs(a.c.x - g.player.x) < 260);
   }
   renderMenu() {
-    const tabs = [['journey', 'Journey'], ['look', 'Look'], ['craft', 'Craft'], ['together', 'Together'], ['settings', 'Settings'], ['controls', 'Controls']];
+    const tabs = [['journey', 'Journey'], ['journal', 'Journal'], ['look', 'Look'], ['craft', 'Craft'], ['together', 'Together'], ['settings', 'Settings'], ['controls', 'Controls']];
     const th = $('#menu .tabs'); th.innerHTML = '';
     for (const [id, name] of tabs) {
       const b = el('button', 'tab' + (id === this.menuTab ? ' on' : ''), name);
@@ -278,6 +295,32 @@ export class UI {
     body.appendChild(row);
   }
   displayName() { return Platform.username || this.sv.name; }
+  tab_journal(body) {
+    const sv = this.sv, g = this.game;
+    const row = el('div', 'row');
+    const c1 = el('div', 'col');
+    const gi = gateNear(Math.floor(g.player.x / TILE));
+    const need = gateReq(gi.tier);
+    c1.appendChild(el('div', 'h', 'Threads of light'));
+    c1.appendChild(el('div', 'stat', `<span>Carried</span><b>${sv.lights || 0}</b>`));
+    c1.appendChild(el('div', 'stat', `<span>Needed for the nearest gate</span><b>${need}</b>`));
+    c1.appendChild(el('div', 'stat', `<span>Dolls woken</span><b>${Object.keys(sv.rescued || {}).length}</b>`));
+    c1.appendChild(el('div', 'stat', `<span>Lost stitches found</span><b>${Object.keys(sv.stitches || {}).length}</b>`));
+    c1.appendChild(el('div', 'stat', `<span>Nests broken</span><b>${Object.keys(sv.nests || {}).length}</b>`));
+    c1.appendChild(el('div', 'stat', `<span>Chests opened</span><b>${Object.keys(sv.chests || {}).length}</b>`));
+    c1.appendChild(el('div', 'h', 'Favours'));
+    const open = (sv.requests || []).filter(r => !r.claimed);
+    if (!open.length) c1.appendChild(el('div', 'note', 'Keepers at the shrines have work for you. Ask them.'));
+    for (const r of open) c1.appendChild(el('div', 'stat', `<span>${esc(r.name)}: ${esc(g.shrines.requestText(r))}</span><b>${g.shrines.requestProgress(r)}</b>`));
+    row.appendChild(c1);
+    const c2 = el('div', 'col');
+    c2.appendChild(el('div', 'h', 'What the stitches remember'));
+    const lore = sv.lore || [];
+    if (!lore.length) c2.appendChild(el('div', 'note', 'Lost stitches glow in high places and deep caves. Each holds a memory of her.'));
+    lore.forEach((i, k) => c2.appendChild(el('div', 'note', `<b style="color:var(--warm)">${k + 1}.</b> ${esc(LORE[i])}`)));
+    row.appendChild(c2);
+    body.appendChild(row);
+  }
   tab_look(body) {
     const sv = this.sv;
     const wrap = el('div', 'editor');
@@ -342,6 +385,7 @@ export class UI {
     const b = new Body({ scale: 3.5, x: 230, y: 330, facing: 1 });
     const an = new Animator(b);
     const cape = look.cape ? new Cape(7, look.cape.len * 3.5) : null;
+    if (cape) cape.flare = 640;
     this.preview = { cv, b, an, cape, look, t: 0 };
   }
   tickPreview(dt) {
@@ -364,6 +408,7 @@ export class UI {
   }
   tab_craft(body) {
     const sv = this.sv, g = this.game;
+    if (g.story) g.story.tut.craftOpened = 1;
     body.appendChild(el('div', 'h', 'Craft from what you carry'));
     for (const r of RECIPES) {
       const can = r.need.every(([t, n]) => (sv.inv[t] || 0) >= n);
@@ -502,6 +547,7 @@ export class UI {
     const g = this.game, p = g.player;
     if (this.preview) this.tickPreview(dt);
     if (!p) return;
+    if (g.touch) g.touch.frame();
     const sv = this.sv;
     // vessels
     if (p.hp !== this.lastHp || sv.maxHp !== this.lastMax) {

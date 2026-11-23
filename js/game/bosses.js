@@ -11,13 +11,15 @@ import { clamp, lerp, rand, sign, TAU, rgba, mix, shade } from '../core/util.js'
 import { RELICS, Save } from './progress.js';
 import { Platform } from '../platform.js';
 import { drawGateBanner } from '../art/props.js';
+import { drawSprite, img } from '../art/images.js';
+import { gateReq } from './content.js';
 
 const ORDINAL = ['First', 'Second', 'Third', 'Fourth', 'Fifth', 'Sixth', 'Seventh', 'Eighth', 'Ninth', 'Tenth'];
 const TYPES = {
-  meadow: { arch: 'warden', name: 'The Hollow Warden', col: '#ffb36b', body: '#2b2731', shade: '#1b1820', head: 'horns', cape: '#5a2f2b' },
-  ember: { arch: 'warden', name: 'The Pyre Knight', col: '#ff7a3a', body: '#3a2420', shade: '#24140f', head: 'crown', cape: '#a8341f' },
-  glass: { arch: 'wraith', name: 'The Glass Widow', col: '#8ff7ff', body: '#203a40', shade: '#132529', head: 'halo', cape: '#2b6f70' },
-  frost: { arch: 'wraith', name: 'The Still Queen', col: '#dff6ff', body: '#5b6c86', shade: '#3c4960', head: 'crown', cape: '#c9e2f5' },
+  meadow: { arch: 'warden', name: 'The Hollow Warden', col: '#ffb36b', body: '#2b2731', head2: '#2b2731', shade: '#1b1820', head: 'horns', cape: '#4a4650' },
+  ember: { arch: 'warden', name: 'The Pyre Knight', col: '#ff7a3a', body: '#2e1c1a', head2: '#6a2222', shade: '#24140f', head: 'crown', cape: '#a8341f' },
+  glass: { arch: 'wraith', name: 'The Glass Widow', col: '#8ff7ff', body: '#1f4f52', head2: '#2f7f80', shade: '#132529', head: 'halo', cape: '#2b8a86' },
+  frost: { arch: 'wraith', name: 'The Still Queen', col: '#dff6ff', body: '#9fb2c8', head2: '#e6edf5', shade: '#3c4960', head: 'crown', cape: '#e4ecf5' },
   hollow: { arch: 'golem', name: 'The Unmade Heart', col: '#c4b5ff', body: '#3b3458', shade: '#28223f' },
 };
 
@@ -43,8 +45,20 @@ export class Bosses {
     if (!this.active) {
       if (p.dead || g.cinematic || this.cool > 0) return;
       const gi = g.gateInfo(p.x);
-      if (this.defeated(gi.k) || (g.net && g.net.isGuest)) return;
-      if (Math.abs(p.x - gi.gxw) < gi.half - 5 * TILE) this.begin(gi);
+      if (this.defeated(gi.k) || (g.net && g.net.isGuest)) { this.sealSide = 0; return; }
+      const need = gateReq(gi.tier), have = g.save.lights || 0;
+      const dx = p.x - gi.gxw;
+      if (have < need && !(g.net && g.net.visiting)) {
+        // sealed: the threads hold the gate shut until you carry enough light
+        if (!this.sealSide || Math.abs(dx) > gi.half + 6 * TILE) this.sealSide = sign(dx) || -1;
+        const edge = gi.gxw + this.sealSide * (gi.half + 1.5 * TILE);
+        const a = p.actor.c;
+        if ((a.x - edge) * this.sealSide < 0) { a.x = edge; a.vx = 0; if (!this.sealWarn || g.time - this.sealWarn > 5) { this.sealWarn = g.time; g.story && g.story.say(`Sealed. It needs ${need} threads of light. We have ${have}.`, 3.2, true); g.ui && g.ui.toast(`Gate sealed · ${have}/${need} Threads of Light`); Audio.play('shard', { pitch: 0.5 }); } }
+        this.sealed = { x: edge, gy: g.world.surface(gi.gx) * TILE, k: gi.k };
+        return;
+      }
+      this.sealed = null; this.sealSide = 0;
+      if (Math.abs(dx) < gi.half - 5 * TILE) this.begin(gi);
       return;
     }
     const B = this.active;
@@ -70,7 +84,9 @@ export class Bosses {
     const B = this.active = new ctor(g, this, spec, tier, bx, gy);
     B.title = `${ORDINAL[Math.min(gi.tier, 9)]} Gate` + (tier >= 5 ? ` · Tier ${Math.floor(tier / 5) + 1}` : '');
     if (g.enemies) for (const e of g.enemies.list) e.removed = true;
-    g.story.bossIntro(B);
+    const seen = g.save.bossSeen['g' + gi.k];
+    g.save.bossSeen['g' + gi.k] = 1;
+    if (seen) g.story.bossQuick(B); else g.story.bossIntro(B);
     if (g.net) g.net.announce(B.name, B.title, 'boss', 2.8, { lb: false, snd: 'roar', shake: 0.6 });
     Audio.setScene(guard.id, true);
   }
@@ -125,9 +141,20 @@ export class Bosses {
         const gy = g.world.surface(gi.gx) * TILE;
         const down = this.defeated(gi.k);
         ctx.save(); if (down) ctx.globalAlpha = 0.45;
-        for (const sd of [-1, 1]) drawGateBanner(ctx, gi.gxw + sd * (gi.half - 40), gy + 1, 1, down ? '#6a6470' : spec.col, g.time + sd);
+        for (const sd of [-1, 1]) if (!drawSprite(ctx, 'props/banner', gi.gxw + sd * (gi.half - 40), gy + 4, 170)) drawGateBanner(ctx, gi.gxw + sd * (gi.half - 40), gy + 1, 1, down ? '#6a6470' : spec.col, g.time + sd);
         ctx.restore();
       }
+    }
+    if (layer === 'front' && this.sealed && !this.active) {
+      const g = this.game, S = this.sealed;
+      ctx.save(); ctx.globalCompositeOperation = 'lighter';
+      for (let i = 0; i < 9; i++) {
+        const xx = S.x + Math.sin(g.time * 1.5 + i) * 6;
+        ctx.strokeStyle = rgba('#9ff3ff', 0.25 + 0.15 * Math.sin(g.time * 3 + i)); ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.moveTo(xx - 10 + i * 2.5, S.gy); ctx.bezierCurveTo(xx + 14, S.gy - 120, xx - 14, S.gy - 220, xx - 6 + i * 1.5, S.gy - 320); ctx.stroke();
+      }
+      drawGlow(ctx, S.x, S.gy - 140, 120, [0.6, 0.95, 1], 0.25);
+      ctx.restore();
     }
     if (!this.arena || !this.active || this.active.over) return;
     if (layer === 'back' && this.active.drawBack) this.active.drawBack(ctx, a);
@@ -152,6 +179,15 @@ export function setTimeoutGame(g, t, fn) {
   g.onTickHooks.push(hook);
 }
 
+function drawPetal(ctx, x, y, ang, hot, t, spec) {
+  ctx.save(); ctx.translate(x, y); ctx.rotate(ang + Math.PI / 2);
+  const gr = ctx.createLinearGradient(0, -30, 0, 26);
+  gr.addColorStop(0, hot ? '#e6dcff' : '#b8a2f0'); gr.addColorStop(0.5, '#8a6ad8'); gr.addColorStop(1, '#4a3480');
+  ctx.fillStyle = gr;
+  ctx.beginPath(); ctx.moveTo(0, 22); ctx.bezierCurveTo(-22, 6, -18, -26, 0, -32); ctx.bezierCurveTo(18, -26, 22, 6, 0, 22); ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.25)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(0, 18); ctx.quadraticCurveTo(-3, -6, 0, -28); ctx.stroke();
+  ctx.restore();
+}
 // ---------------------------------------------------------------- base
 class BossBase {
   constructor(g, mgr, spec, tier) {
@@ -187,9 +223,9 @@ class Warden extends BossBase {
     this.maxHp = this.hp = Math.round(280 * (1 + tier * 0.65));
     const a = this.a = new Actor(g, {
       x, y: gy, team: 'enemy', scale: 2.25, heavy: 2.4, hp: this.hp, run: 150 + tier * 12, facing: -1, blade: true,
-      look: { body: spec.body, shade: spec.shade, mat: 'cloth', eyes: spec.col, eyeStyle: 'slit', head: spec.head, hornCol: '#1a171d', accent: spec.col, seams: false, mouth: false,
-        armor: shade(spec.body, 0.18), gaunt: true, bulk: 1.15, arms: 1.1,
-        cape: { col: spec.cape, style: 'cape', len: 9 }, blade: { col: '#cfc7bb', glow: spec.col, len: 40, w: 3.6 }, marks: [], rim: spec.col },
+      look: { body: spec.head2 || spec.body, limb: spec.body, coat: spec.body, mat: 'cloth', eyes: spec.col, eyeStyle: 'slit', head: spec.head, hornCol: '#2a2430', accent: '#d9a441', belt: false,
+        cloakLong: spec.cape, cloakToGround: true, trim: '#c9a45c', gaunt: true, gloves: spec.body, bulk: 1.05,
+        cape: { col: shade(spec.cape, -0.15), style: 'cape', len: 12, wide: 13, trim: '#c9a45c' }, blade: { col: '#dcd6cc', glow: spec.col, len: 42, w: 3.8 }, marks: [], rim: spec.col },
     });
     a.isBoss = true; a.noCrumple = true;
     a.mode = 'script'; a.scriptPose = { mode: 'cocoon', strength: 0.5 };
@@ -335,9 +371,9 @@ class Wraith extends BossBase {
     this.maxHp = this.hp = Math.round(240 * (1 + tier * 0.65));
     const a = this.a = new Actor(g, {
       x, y: gy - 60, team: 'enemy', scale: 1.9, heavy: 1.2, hp: this.hp, facing: -1, blade: false,
-      look: { body: spec.body, shade: spec.shade, mat: 'glow', eyes: spec.col, eyeStyle: 'visor', head: spec.head, accent: spec.col, seams: false, mouth: false,
-        robe: shade(spec.cape, -0.1), claws: spec.col, arms: 1.1,
-        cape: { col: spec.cape, style: 'cape', len: 11 }, blade: null, marks: [], rim: spec.col },
+      look: { body: spec.head2 || spec.body, limb: spec.body, coat: spec.cape, mat: 'glow', eyes: spec.col, eyeStyle: 'dots', head: spec.head, accent: spec.name.includes('Still') ? '#e8eef5' : '#bff6ff', belt: false,
+        robe: spec.cape, trim: shade(spec.cape, 0.35), claws: spec.col, arms: 1.05,
+        cape: { col: shade(spec.cape, -0.1), style: 'cape', len: 13, wide: 14 }, blade: null, marks: [], rim: spec.col },
     });
     a.isBoss = true; a.noCrumple = true;
     a.mode = 'script'; a.scriptPose = { mode: 'cocoon', strength: 0.5 };
@@ -469,8 +505,8 @@ export class Golem extends BossBase {
     this.core.body = null;
     g.actors.push(this.core);
     this.parts = [];
-    for (let i = 0; i < 12; i++) this.parts.push({ a: i / 12 * TAU, r: 70, x: x, y: gy, state: 'orbit', t: 0, tile: [T.RUIN, T.STONE, T.DEEP][i % 3] });
-    this.orbitR = 64; this.spin = 1; this.y0 = gy;
+    for (let i = 0; i < 10; i++) this.parts.push({ a: i / 10 * TAU, r: 70, x: x, y: gy, state: 'orbit', t: 0, tile: [T.RUIN, T.STONE, T.DEEP][i % 3] });
+    this.orbitR = 62; this.spin = 1; this.y0 = gy;
     this.c = this.core.c;
   }
   actors() { return [this.core]; }
@@ -495,7 +531,7 @@ export class Golem extends BossBase {
     for (const q of this.parts) {
       if (q.state === 'orbit') {
         q.a += dt * this.spin * (this.phase === 2 ? 1.6 : 1);
-        const tx = c.x + Math.cos(q.a) * this.orbitR, ty = c.y + Math.sin(q.a) * this.orbitR * 0.8;
+        const tx = c.x + Math.cos(q.a) * this.orbitR, ty = c.y + Math.sin(q.a) * this.orbitR;
         q.x = lerp(q.x, tx, 1 - Math.exp(-10 * dt)); q.y = lerp(q.y, ty, 1 - Math.exp(-10 * dt));
         if (this.orbitR > 100) this.mgr.hitAll(o => Math.hypot(o.c.x - q.x, o.cy - q.y) < 30, 1, q.x, q.y);
       } else if (q.state === 'gone') { q.t -= dt; if (q.t <= 0) { q.state = 'orbit'; q.x = c.x; q.y = c.y; } }
@@ -510,7 +546,7 @@ export class Golem extends BossBase {
         c.vx += ((tx - c.x) * 1.5 - c.vx) * Math.min(1, dt * 2);
         c.x += c.vx * dt;
         c.y = lerp(c.y, this.y0 - 230 + Math.sin(g.time * 1.3) * 20, 1 - Math.exp(-3 * dt));
-        this.orbitR = lerp(this.orbitR, 64, 1 - Math.exp(-3 * dt));
+        this.orbitR = lerp(this.orbitR, 62, 1 - Math.exp(-3 * dt));
         if (this.t <= 0) this.choose();
         break;
       }
@@ -559,30 +595,26 @@ export class Golem extends BossBase {
   drawFront(ctx) {
     const g = this.game, c = this.c;
     ctx.save();
+    // petals: each is a throwable piece of the heart
     for (const q of this.parts) {
       if (q.state === 'gone') continue;
-      ctx.save(); ctx.translate(q.x, q.y); ctx.rotate(q.a * 0.5);
-      const col = TILES[q.tile].k[0] === '#' ? TILES[q.tile].k : '#5a5470';
-      ctx.fillStyle = this.state === 'throwW' ? mix(col, '#ffffff', 0.25 + 0.25 * Math.sin(g.time * 40)) : mix(col, this.spec.body, 0.35);
-      ctx.beginPath(); ctx.roundRect(-15, -15, 30, 30, 7); ctx.fill();
-      ctx.fillStyle = rgba('#ffffff', 0.14); ctx.fillRect(-12, -13, 24, 4);
-      ctx.restore();
+      const ang = Math.atan2(q.y - c.y, q.x - c.x);
+      drawPetal(ctx, q.x, q.y, ang, this.state === 'throwW' ? 1 : 0, g.time, this.spec);
     }
     if (this.core.mode !== 'dead') {
-      // the heart: a pale mask over a pulsing core
       const pulse = 1 + Math.sin(g.time * 4) * 0.05;
       ctx.globalCompositeOperation = 'lighter';
-      drawGlow(ctx, c.x, c.y, 110 * pulse, hexRgb(this.spec.col), 0.6);
+      drawGlow(ctx, c.x, c.y, 120 * pulse, hexRgb(this.spec.col), 0.55);
       ctx.globalCompositeOperation = 'source-over';
-      ctx.fillStyle = this.core.flash > 0 ? '#ffffff' : this.spec.body;
-      ctx.beginPath(); ctx.arc(c.x, c.y, 34 * pulse, 0, TAU); ctx.fill();
-      ctx.fillStyle = '#ece6da';
-      ctx.beginPath(); ctx.ellipse(c.x, c.y - 4, 24, 28, 0, 0, TAU); ctx.fill();
-      ctx.fillStyle = this.state === 'stunned' ? '#ffffff' : '#141118';
-      const px = clamp((g.player.x - c.x) * 0.02, -4, 4);
-      ctx.beginPath(); ctx.ellipse(c.x - 8 + px, c.y - 6, 4, 7, 0, 0, TAU); ctx.ellipse(c.x + 8 + px, c.y - 6, 4, 7, 0, 0, TAU); ctx.fill();
-      ctx.strokeStyle = rgba(this.spec.col, 0.8); ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.moveTo(c.x - 4, c.y + 6); ctx.lineTo(c.x + 2, c.y + 14); ctx.lineTo(c.x - 1, c.y + 22); ctx.stroke();
+      // the skull at the heart of the flower
+      const gr = ctx.createRadialGradient(c.x - 8, c.y - 10, 2, c.x, c.y, 30);
+      gr.addColorStop(0, this.core.flash > 0 ? '#ffffff' : '#fbf8f2'); gr.addColorStop(0.7, '#e6ded2'); gr.addColorStop(1, '#b9ad9e');
+      ctx.fillStyle = '#2a2240'; ctx.beginPath(); ctx.arc(c.x, c.y, 34 * pulse, 0, TAU); ctx.fill();
+      ctx.fillStyle = gr; ctx.beginPath(); ctx.ellipse(c.x, c.y - 2, 25, 27, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = this.state === 'stunned' ? this.spec.col : '#141118';
+      const px = clamp((g.player.x - c.x) * 0.02, -3, 3);
+      ctx.beginPath(); ctx.ellipse(c.x - 8 + px, c.y - 3, 5, 8, 0, 0, TAU); ctx.ellipse(c.x + 8 + px, c.y - 3, 5, 8, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#5a4e60'; ctx.beginPath(); ctx.moveTo(c.x - 2.5, c.y + 9); ctx.lineTo(c.x + 2.5, c.y + 9); ctx.lineTo(c.x, c.y + 13); ctx.fill();
     }
     ctx.restore();
   }

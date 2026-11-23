@@ -34,6 +34,7 @@
   <div id="bossbar" class="hidden"><div class="bname"></div><div class="btrack"><div class="bfill"></div><div class="bghost"></div></div></div>
   <div id="hint" class="hidden"></div>
   <div id="lore"></div>
+  <div id="tut" class="hidden"></div>
   <div id="card" class="hidden"><div class="line l1"></div><div class="title"></div><div class="sub"></div><div class="line l2"></div></div>
   <div id="dialog" class="hidden"><div class="who"></div><div class="text"></div><div class="opts"></div></div>
   <div id="fade"></div>
@@ -45,15 +46,16 @@
   </div>
   <div id="press" class="hidden"></div>
   <div id="touch" class="hidden">
+    <div id="tzone"></div>
     <div id="stick"><div id="knob"></div></div>
     <div id="tbtns">
-      <button data-a="attack" class="tb big">&#9876;</button>
-      <button data-a="jump" class="tb big">&#8593;</button>
-      <button data-a="dash" class="tb">&#187;</button>
-      <button data-a="interact" class="tb">E</button>
-      <button data-a="heal" class="tb">&#10084;</button>
-      <button data-a="tbuild" class="tb">&#9638;</button>
+      <button data-a="attack" class="tb tb-xl"><svg viewBox="0 0 24 24"><path d="M14.5 3.5 20.5 3.5 20.5 9.5 10 20 8 18 4.5 21.5 2.5 19.5 6 16 4 14z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M12.5 7.5l4 4" stroke="currentColor" stroke-width="1.8"/></svg><span>Strike</span></button>
+      <button data-a="jump" class="tb tb-l"><svg viewBox="0 0 24 24"><path d="M12 4l7 7M12 4l-7 7M12 4v15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg><span>Jump</span></button>
+      <button data-a="dash" class="tb tb-m"><svg viewBox="0 0 24 24"><path d="M5 6l6 6-6 6M12 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Dash</span></button>
+      <button data-a="heal" class="tb tb-s"><svg viewBox="0 0 24 24"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z" fill="none" stroke="currentColor" stroke-width="1.9"/></svg><span>Mend</span></button>
+      <button data-a="tbuild" class="tb tb-s"><svg viewBox="0 0 24 24"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z M12 12l8-4.5 M12 12v9 M12 12L4 7.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg><span>Build</span></button>
     </div>
+    <button id="tact" class="hidden" data-a="interact"><span>Talk</span></button>
   </div>
 </div>
 <script type="module" src="js/main.js"></script>

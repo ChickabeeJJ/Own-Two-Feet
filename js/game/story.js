@@ -19,6 +19,9 @@ import { Platform } from '../platform.js';
 import { Thread } from './thread.js';
 import { drawBladeStone, drawSeed } from '../art/props.js';
 import { softDisc } from '../art/paint.js';
+import { gateReq } from './content.js';
+import { Actor } from './actor.js';
+import { drawSprite } from '../art/images.js';
 
 const BLADE_X = 12;
 const FALL_H = 5600;
@@ -29,16 +32,28 @@ const LORE = [
   'One thread of her light was still falling.',
 ];
 
-// the goal chain. each: id, text, hint(touch), target(game) -> {x,y} | null, done(game) -> bool, enter(story)
+// tutorial: one verb at a time, each confirmed before the next
+const TUT = [
+  { id: 'move', title: 'Walk', keys: ['A', 'D'], touch: 'drag on the left side of the screen', text: 'Walk toward the light', done: s => Math.abs(s.game.player.x - s.tutX0) > 4 * TILE },
+  { id: 'jump', title: 'Jump', keys: ['Space'], touch: 'tap the ↑ button', text: 'Jump. Tap twice for a higher hop later', done: s => s.jumped },
+  { id: 'blade', title: 'Take the blade', keys: [], touch: 'walk into it', text: 'Walk into the blade in the stone', done: s => s.sv.hasBlade },
+  { id: 'strike', title: 'Strike', keys: ['J', 'Click'], touch: 'tap the ⚔ button', text: 'Hit the training doll three times', done: s => s.dummyHits >= 3 },
+  { id: 'dash', title: 'Dash', keys: ['Shift'], touch: 'tap the » button', text: 'Dash. You can dash in the air too', done: s => s.dashed },
+  { id: 'mine', title: 'Break blocks', keys: ['Hold Click'], touch: 'tap ▦, then hold a block', text: 'Break three blocks of ground', done: s => s.sv.stats.blocks - s.tutB0 >= 3 },
+  { id: 'place', title: 'Build', keys: ['Right-click'], touch: 'in build mode, tap empty space', text: 'Put a block back into the world', done: s => s.sv.stats.placed - s.tutP0 >= 1 },
+  { id: 'craft', title: 'Craft', keys: ['Q'], touch: 'menu ☰, then Craft', text: 'Open your crafting book', done: s => !!s.tut.craftOpened },
+];
+
+// the goal chain. each: id, text, hint(touch), target(game) -> {x,y} | null, done(game) -> bool
+const nextGate = (s) => { const p = s.game.player.x / TILE; let gi = gateNear(Math.floor(p)); for (let i = 0; i < 4 && s.game.bosses.defeated(gi.k); i++) gi = gateNear(gi.gx + 440 * (gi.gx >= 0 ? 1 : -1)); return gi; };
 const GOALS = [
-  { id: 'blade', text: 'Take the blade', hint: k => k ? 'walk to it' : '<kbd>A</kbd><kbd>D</kbd> walk · <kbd>Space</kbd> jump', target: s => ({ x: BLADE_X * TILE + 16, y: s.bladeY - 30 }), done: s => s.sv.hasBlade },
   { id: 'hollow', text: 'Defeat the Hollow', hint: k => k ? 'tap &#9876; to strike' : '<kbd>J</kbd> or <kbd>Click</kbd> strike', target: s => s.firstFoe && !s.firstFoe.removed ? { x: s.firstFoe.c.x, y: s.firstFoe.c.y - 50 } : null, done: s => s.firstFoeDown },
-  { id: 'dig', text: 'Break 5 blocks', hint: k => k ? 'tap &#9638; then hold a block' : 'hold <kbd>Click</kbd> on the ground', target: () => null, done: s => s.sv.stats.blocks - (s.sv.digBase || 0) >= 5 },
   { id: 'shrine', text: 'Follow Thread to the fire', hint: () => 'someone keeps a shrine ahead', target: s => ({ x: 105 * TILE + 16, y: s.game.world.surface(105) * TILE - 40 }), done: s => Object.keys(s.sv.met).length > 0 },
-  { id: 'rest', text: 'Rest at the shrine', hint: k => k ? 'tap E by the fire' : '<kbd>E</kbd> by the fire', target: s => ({ x: 105 * TILE + 16, y: s.game.world.surface(105) * TILE - 40 }), done: s => !!s.sv.respawn },
-  { id: 'warden', text: 'Defeat the Hollow Warden', hint: () => 'the first gate · dash with <kbd>Shift</kbd>', target: s => ({ x: 170 * TILE, y: s.game.world.surface(170) * TILE - 60 }), done: s => Object.keys(s.sv.bosses).length > 0 },
+  { id: 'rest', text: 'Rest at the shrine', hint: k => k ? 'tap the action button by the fire' : '<kbd>E</kbd> by the fire', target: s => ({ x: 105 * TILE + 16, y: s.game.world.surface(105) * TILE - 40 }), done: s => !!s.sv.respawn },
+  { id: 'lights', text: s => `Gather Threads of Light ${Math.min(s.sv.lights || 0, gateReq(nextGate(s).tier))}/${gateReq(nextGate(s).tier)}`, hint: () => 'wake lost dolls · find stitches · break nests · help keepers', target: s => s.game.content && s.game.content.nearestActivity(s.game.player.x), done: s => (s.sv.lights || 0) >= gateReq(nextGate(s).tier) },
+  { id: 'warden', text: 'The gate is open: face its Warden', hint: () => 'watch the wind-up, then dash through', target: s => { const g = nextGate(s); return { x: g.gx * TILE, y: s.game.world.surface(g.gx) * TILE - 60 }; }, done: s => Object.keys(s.sv.bosses).length > 0 },
   { id: 'home', text: 'Make a home: place a Hearth', hint: k => k ? 'craft it in the menu' : '<kbd>Q</kbd> craft · <kbd>Right-click</kbd> place', target: () => null, done: s => !!s.sv.home },
-  { id: 'onward', text: 'Walk on. Every gate holds more of her light', hint: () => 'the world has no edge', target: s => { const g = gateNear(Math.floor(s.game.player.x / TILE) + 200); return { x: g.gx * TILE, y: s.game.world.surface(g.gx) * TILE - 60 }; }, done: () => false },
+  { id: 'onward', text: s => `Carry more light to the next gate ${Math.min(s.sv.lights || 0, gateReq(nextGate(s).tier))}/${gateReq(nextGate(s).tier)}`, hint: () => 'every gate holds more of her light', target: s => (s.sv.lights || 0) >= gateReq(nextGate(s).tier) ? { x: nextGate(s).gx * TILE, y: s.game.world.surface(nextGate(s).gx) * TILE - 60 } : s.game.content && s.game.content.nearestActivity(s.game.player.x), done: () => false },
 ];
 
 export class Story {
@@ -56,6 +71,7 @@ export class Story {
     this.thread = new Thread(game);
     game.thread = this.thread;
     this.firstFoe = null; this.firstFoeDown = !!this.sv.tut.foe;
+    this.tutI = 0; this.dummy = null; this.dummyHits = 0; this.jumped = false; this.dashed = false;
   }
   get sv() { return this.game.save; }
   get ui() { return this.game.ui; }
@@ -199,7 +215,7 @@ export class Story {
         // far away, a warden hears it
         setTimeoutGame(g, 1.4, () => { Audio.play('roar', { vol: 0.55, pitch: 0.65 }); g.shake(0.35); this.roared = g.time; });
         setTimeoutGame(g, 1.8, () => { this.card('Own Two Feet', 'the last doll walks', '', 4.4); Audio.play('chime'); g.cam.override = null; g.cam.zoomT = 0.85; });
-        setTimeoutGame(g, 4.6, () => { ui.letterbox(false); ui.hud(true); g.cinematic = false; g.cam.zoomT = 1; this.say('She left a blade for you. Over there.', 3.2); });
+        setTimeoutGame(g, 4.6, () => { ui.letterbox(false); ui.hud(true); g.cinematic = false; g.cam.zoomT = 1; this.say('Let me show you how to walk this world.', 3.2); });
         setTimeoutGame(g, 5.4, () => { this.stage = 5; this.sv.born = true; this.sv.obj = 0; g.saveNow(); Platform.gameplayStart(); });
       }
     }
@@ -221,7 +237,8 @@ export class Story {
   quickStart() {
     const g = this.game;
     this.stage = 5; this.hidden = false;
-    if (this.sv.obj === undefined) this.sv.obj = this.sv.hasBlade ? 2 : 0;
+    if (this.sv.tutDone === undefined && this.sv.hasBlade) this.sv.tutDone = 1;
+    if (this.sv.obj === undefined || this.sv.obj > 6) this.sv.obj = 0;
     this.thread.visible = true;
     this.ui.fade(1, 0);
     setTimeout(() => this.ui.fade(0, 1.4), 30);
@@ -243,7 +260,8 @@ export class Story {
     if (this.stage === 1) { this.updateImpact(dt); return; }
     if (this.stage === 2 || this.stage === 3) { this.updateWake(dt); return; }
     if (this.bladeY === null) this.bladeY = g.world.surface(BLADE_X) * TILE;
-    this.updateGoals(dt);
+    if (!this.sv.tutDone) this.updateTutorial(dt); else this.updateGoals(dt);
+    if (this.dummy) { const d = this.dummy; d.c.x = this.dummyX; d.c.vx = 0; d.intent.mx = 0; }
     // walking into the blade takes it
     if (!this.sv.hasBlade && Math.abs(p.x - (BLADE_X * TILE + 16)) < 34 && Math.abs(p.y - this.bladeY) < 70 && !g.cinematic) this.takeBlade();
     // biome discovery
@@ -275,6 +293,58 @@ export class Story {
     if (p.lowHp && !this.lowSaid) { this.lowSaid = true; this.say(g.touch ? 'You’re hurt. Hold ❤ to mend.' : 'You’re hurt. Hold H to mend with breath.', 3.2); }
     if (!p.lowHp) this.lowSaid = false;
   }
+  // ------------------------------------------------------------ tutorial
+  updateTutorial(dt) {
+    const g = this.game, ui = this.ui, a = g.player.actor;
+    if (this.tutX0 === undefined) { this.tutX0 = g.player.x; this.tutB0 = this.sv.stats.blocks; this.tutP0 = this.sv.stats.placed; }
+    if (!a.c.ground && a.c.vy < -150) this.jumped = true;
+    if (a.c.dashT > 0) this.dashed = true;
+    const st = TUT[this.tutI];
+    if (!st) { this.finishTutorial(); return; }
+    if (st.id === 'strike' && !this.dummy) this.spawnDummy();
+    this.thread.target = st.id === 'blade' ? { x: BLADE_X * TILE + 16, y: this.bladeY - 40 } : st.id === 'strike' && this.dummy ? { x: this.dummyX, y: this.dummy.c.y - 60 } : null;
+    if (ui && !g.cinematic) ui.tutorial(st, this.tutI, TUT.length, !!g.touch, this.tutDoneT > 0);
+    if (this.tutDoneT > 0) { this.tutDoneT -= dt; if (this.tutDoneT <= 0) { this.tutI++; if (TUT[this.tutI] && TUT[this.tutI].id === 'mine') this.tutB0 = this.sv.stats.blocks; if (TUT[this.tutI] && TUT[this.tutI].id === 'place') this.tutP0 = this.sv.stats.placed; } return; }
+    if (st.done(this)) {
+      this.tutDoneT = 0.9;
+      Audio.play('confirm');
+      const say = { move: 'Good. Feet first, always.', jump: 'Higher than the grass. A start.', blade: 'It fits your hand. Of course it does.', strike: 'Again, and harder when it counts.', dash: 'Fast. You can slip through attacks like that.', mine: 'Everything here can be taken apart...', place: '...and put back the way you like it.', craft: 'Planks, bricks, lanterns, a hearth. You will want a home.' }[st.id];
+      if (say) this.say(say, 2.4, true);
+    }
+  }
+  spawnDummy() {
+    const g = this.game;
+    const x = (BLADE_X + 7) * TILE + 16, tx = BLADE_X + 7;
+    const y = g.world.surface(tx) * TILE;
+    const look = { body: '#c9b48a', limb: '#b8a07a', coat: '#b8a07a', mat: 'cloth', eyes: '#3a2c22', eyeStyle: 'x', head: 'none', cape: null, blade: null, marks: [], rim: '#ffe2bd', bootCol: '#6b4a32', beltCol: '#7a5a3c' };
+    const d = new Actor(g, { x, y, team: 'enemy', look, hp: 9999 });
+    d.kind = 'dummy'; d.noCrumple = true;
+    d.hurt = (dmg, info) => { this.dummyHits++; d.flash = 1; d.takeImpulse(info.x, info.y, info.dx * 600, -200, 0.9); Audio.play('hit', { pitch: 0.8 }); g.fx.text(d.c.x, d.c.y - 100, String(this.dummyHits), '#ffd9a0', 22); return null; };
+    g.actors.push(d);
+    this.dummy = d; this.dummyX = x;
+    g.fx.dust(x, y - 4, 10, '#e8dccb', -Math.PI / 2, 120);
+  }
+  skipTutorial() {
+    const g = this.game;
+    if (!this.sv.hasBlade) { this.sv.hasBlade = true; g.player.actor.blade = true; }
+    this.finishTutorial(true);
+  }
+  finishTutorial(skipped) {
+    const g = this.game;
+    this.sv.tutDone = 1; this.sv.obj = 0;
+    this.ui && this.ui.tutorial(null);
+    if (!skipped) { this.card('Tutorial complete', 'now the world is yours', 'small gain', 2.6); Audio.play('chime'); }
+    if (this.dummy) { this.dummy.team = 'npc'; this.dummy.kind = 'dummy'; }
+    g.saveNow();
+  }
+  // a repeat attempt: no cutscene, straight back in
+  bossQuick(B) {
+    const g = this.game;
+    g.cam.zoomT = 0.82;
+    Audio.play('roar', { vol: 0.6 }); g.shake(0.35);
+    setTimeoutGame(g, 0.35, () => B.wake());
+    this.say(['Again. Watch its hands.', 'You know its tricks now.', 'Breathe. Then go.'][Math.floor(Math.random() * 3)], 2.2, true);
+  }
   updateGoals(dt) {
     const g = this.game, sv = this.sv, ui = this.ui;
     let i = sv.obj ?? 0;
@@ -291,7 +361,7 @@ export class Story {
     if (ui && !g.cinematic) {
       let dist = '';
       if (T_) { const d = Math.round(Math.abs(T_.x - g.player.x) / TILE); dist = d > 4 ? `${d} m ${T_.x > g.player.x ? '→' : '←'}` : ''; }
-      ui.objective(G.text, G.hint(!!g.touch), dist);
+      ui.objective(typeof G.text === 'function' ? G.text(this) : G.text, G.hint(!!g.touch), dist);
     }
   }
   completed(G) {
@@ -303,10 +373,10 @@ export class Story {
   enterGoal(G) {
     const g = this.game, sv = this.sv;
     if (G.id === 'hollow') this.spawnFirstFoe();
-    if (G.id === 'dig') { sv.digBase = sv.stats.blocks; this.say('Everything here can be taken apart, and built again. Try the ground.', 3.6); }
+    if (G.id === 'lights') this.say('The gate ahead is sealed with her thread. Light opens it. Lost dolls, stitches, nests... let\u2019s find them.', 4.4);
     if (G.id === 'shrine') this.say('There’s a fire ahead. Someone’s keeping it. Follow me.', 3.4);
     if (G.id === 'rest') this.say('Rest by the fire. The shrine will remember you if you fall.', 3.4);
-    if (G.id === 'warden') this.say('The first gate. Its Warden holds a piece of her light. We take it back.', 4);
+    if (G.id === 'warden') this.say('Enough light. The gate will open now. Its Warden holds a piece of her. We take it back.', 4.2);
     if (G.id === 'home') this.say('You could stay somewhere. Build a home. Others might come.', 3.6);
     if (G.id === 'onward') this.say('Every gate holds more of her. The world has no edge. Neither do we.', 4);
   }
@@ -349,7 +419,7 @@ export class Story {
   draw(ctx, a, layer) {
     const g = this.game;
     if (layer === 'back') {
-      if (this.bladeY !== null && this.stage >= 5) drawBladeStone(ctx, BLADE_X * TILE + 16, this.bladeY + 2, 1, g.time, !this.sv.hasBlade);
+      if (this.bladeY !== null && this.stage >= 5) { if (this.sv.hasBlade || !drawSprite(ctx, 'props/bladestone', BLADE_X * TILE + 16, this.bladeY + 6, 150)) drawBladeStone(ctx, BLADE_X * TILE + 16, this.bladeY + 2, 1, g.time, !this.sv.hasBlade); }
       if (this.crater) {
         const c = this.crater, k = clamp(1 - c.t / 40, 0, 1);
         if (k > 0) {
@@ -374,6 +444,8 @@ export class Story {
         const pa = g.player.actor;
         ctx.save(); ctx.globalCompositeOperation = 'lighter';
         drawGlow(ctx, pa.c.x, pa.c.y - 40, 120, [1, 0.88, 0.7], 0.45);
+        ctx.translate(pa.c.x, pa.c.y - 40); ctx.rotate(g.time * 0.6);
+        drawSprite(ctx, 'props/seed', 0, 0, 190, { add: true, alpha: 0.55, anchorY: 0.5 });
         ctx.restore();
       }
       this.thread.draw(ctx, a, 'front');

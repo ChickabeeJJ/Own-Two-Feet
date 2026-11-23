@@ -2,6 +2,7 @@
 // Every effect has a flash/body/dissipation life with varied size, speed and colour over life.
 import { Pool, rand, TAU, clamp, lerp, rgba, mix, hash2 } from '../core/util.js';
 import { TILE, TILES } from '../world/tiles.js';
+import { IMG } from '../art/images.js';
 
 export class FX {
   constructor(game) {
@@ -10,6 +11,7 @@ export class FX {
     this.rings = [];
     this.slashes = [];
     this.texts = [];
+    this.flashes = [];
     this.reduce = false;
   }
   spawn(o) {
@@ -48,6 +50,7 @@ export class FX {
     for (let i = 0; i < n; i++) this.spawn({ x: x + rand(-8, 8), y: y + rand(-8, 8), vx: rand(-160, 160), vy: rand(-320, -80), life: rand(0.5, 0.9), size: rand(2.5, 5), size1: 1.5, col, grav: 1800, drag: 0.8, kind: 'chunk', vr: rand(-12, 12), bounce: 0.35 });
   }
   slash(pts, col, width = 1) { if (pts.length > 1) this.slashes.push({ pts: pts.map(p => [p[0], p[1], p[2], p[3]]), life: 0.16, max: 0.16, col, width }); }
+  flash(name, x, y, size, rot = 0, life = 0.22) { this.flashes.push({ name, x, y, size, rot, life, max: life }); }
   text(x, y, str, col = '#ffffff', size = 18, life = 0.9) { this.texts.push({ x, y, str, col, size, life, max: life, vy: -60 }); }
   souls(x, y, n, target, col = '#bff6ff', onArrive) {
     for (let i = 0; i < n; i++) {
@@ -104,6 +107,8 @@ export class FX {
     }
     for (const r of this.rings) r.life -= dt;
     this.rings = this.rings.filter(r => r.life > 0);
+    for (const f of this.flashes) f.life -= dt;
+    this.flashes = this.flashes.filter(f => f.life > 0);
     for (const s of this.slashes) s.life -= dt;
     this.slashes = this.slashes.filter(s => s.life > 0);
     for (const t of this.texts) { t.life -= dt; t.y += t.vy * dt; t.vy *= Math.exp(-3 * dt); }
@@ -149,6 +154,13 @@ export class FX {
       ctx.beginPath(); ctx.arc(r.x, r.y, rad, 0, TAU); ctx.stroke();
     }
     if (additive) {
+      for (const f of this.flashes) {
+        const im = IMG[f.name]; if (!im) continue;
+        const u = 1 - f.life / f.max;
+        const sc = f.size * (0.6 + u * 0.7) / Math.max(im.width, im.height);
+        ctx.save(); ctx.globalAlpha = (1 - u) * (1 - u); ctx.translate(f.x, f.y); ctx.rotate(f.rot);
+        ctx.drawImage(im, -im.width * sc / 2, -im.height * sc / 2, im.width * sc, im.height * sc); ctx.restore();
+      }
       // slash ribbons: blade base->tip samples swept through the swing
       for (const s of this.slashes) {
         const u = 1 - s.life / s.max;

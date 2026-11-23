@@ -11,8 +11,10 @@ import { drawThreadSprite } from '../js/game/thread.js';
 import { drawGlow } from '../js/world/light.js';
 import { hexToRgb, rgba, TAU } from '../js/core/util.js';
 import * as Props from '../js/art/props.js';
+import { drawChest, drawStitch, drawNest } from '../js/game/content.js';
 import { texture, grassLip, snowLip } from '../js/art/tex.js';
 import { BIOMES, T, TILES } from '../js/world/tiles.js';
+import { loadImages, setBase, IMG, drawSprite, TILE_ICON } from '../js/art/images.js';
 
 const fakeWorld = {
   get(tx, ty) { return ty >= 0 ? 3 : 0; },
@@ -57,6 +59,7 @@ function posed(look, scale, spec) {
   const b = new Body({ scale, x: 0, y: -41 * scale, facing: 1 });
   const an = new Animator(b);
   const cape = look.cape ? new Cape(7, (look.cape.len || 7) * scale) : null;
+  if (cape) cape.flare = look.cape.flare || (look.cape.wide > 10 ? 900 : 640);
   const dt = 1 / 120;
   const standH = (19 + 18) * 0.93 * scale + 3.6 * scale;
   const n = spec.ticks || 160;
@@ -153,7 +156,7 @@ function characters() {
   const G = new Golem(fakeG, mgr, TYPES.hollow, 0, 0, 0);
   G.state = 'float';
   g.save(); g.translate(2040, 1780); g.scale(1.3, 1.3);
-  G.c.x = 0; G.c.y = 0; for (const q of G.parts) { q.x = Math.cos(q.a) * 64; q.y = Math.sin(q.a) * 51; }
+  G.c.x = 0; G.c.y = 0; for (const q of G.parts) { q.x = Math.cos(q.a) * 62; q.y = Math.sin(q.a) * 62; }
   G.drawFront(g);
   g.restore();
   label(g, 2040, 2000, 'The Unmade Heart');
@@ -163,25 +166,24 @@ function characters() {
 function maps() {
   const W = 2400, H = 2060;
   const g = board('maps', W, H, 'World Materials', 'seamless hand-made textures per biome: soil, stone, deepstone, moss, sand and the things you build');
-  const mats = [['soil', 'dirt', 'Soil'], ['stone', 'stone', 'Stone'], ['deep', 'deep', 'Deepstone'], ['moss', 'stone', 'Mossstone'], ['bark', 'log', 'Bark'], ['leaf', 'leaf', 'Foliage']];
-  const built = [['plank', '#9b7653', 'Planks'], ['brick', '#8f8a96', 'Brick'], ['ruin', '#a39d93', 'Old stone'], ['marble', '#e9e4dc', 'Marble'], ['obsidian', '#2a2440', 'Nightglass'], ['ember', '#ff7a3a', 'Ember rock'], ['sand', '#b9a58c', 'Sand'], ['snow', '#eef4fa', 'Snow'], ['ice', '#a9d8f5', 'Ice']];
+  const cols = [['groundA', 'Surface'], ['groundB', 'Soil'], ['stone', 'Stone'], ['rock', 'Deepstone'], ['detail', 'Moss'], ['accent', 'Ore'], ['bark', 'Bark'], ['foliage', 'Foliage']];
   BIOMES.forEach((B, r) => {
     const y = 190 + r * 140;
     g.textAlign = 'left'; g.fillStyle = '#f3ece0'; g.font = '500 22px Cormorant'; g.fillText(B.name, 60, y + 60);
-    mats.forEach(([m, key, n], i) => {
-      const x = 330 + i * 140;
-      const tx = texture(m, B[key], m === 'moss' ? B.moss : undefined);
-      g.save(); g.beginPath(); g.roundRect(x, y, 120, 120, 14); g.clip(); g.drawImage(tx, x, y, 120, 120);
-      if (m === 'soil') { const lip = B.id === 'frost' ? snowLip() : grassLip(B.grass, B.grassHi); g.drawImage(lip, 0, 0, 128, lip.height, x, y - 6, 120, lip.height * 120 / 128); }
-      g.restore();
-      if (r === 0) { g.fillStyle = 'rgba(243,236,224,.55)'; g.font = '600 11px Manrope'; g.textAlign = 'center'; g.fillText(n.toUpperCase(), x + 60, 178); }
+    cols.forEach(([k, n], i) => {
+      const x = 290 + i * 118, im = IMG['tex/' + B.id + '_' + k];
+      g.save(); g.beginPath(); g.roundRect(x, y, 104, 104, 12); g.clip(); if (im) g.drawImage(im, x, y, 104, 104); g.restore();
+      if (r === 0) { g.fillStyle = 'rgba(243,236,224,.55)'; g.font = '600 11px Manrope'; g.textAlign = 'center'; g.fillText(n.toUpperCase(), x + 52, 178); }
     });
   });
-  section(g, 1230, 200, 'Built blocks');
+  section(g, 1300, 200, 'Built blocks');
+  const built = [['plank', '#9b7653', 'Planks'], ['brick', '#8f8a96', 'Brick'], ['ruin', '#a39d93', 'Old stone'], ['marble', '#e9e4dc', 'Plaster'], ['obsidian', '#2a2440', 'Nightglass'], ['ember', '#ff7a3a', 'Ember rock'], ['sand', '#b9a58c', 'Sand'], ['snow', '#eef4fa', 'Snow'], ['ice', '#a9d8f5', 'Ice']];
+  const bmap = { plank: 'plank', brick: 'brick', ruin: 'stone', marble: 'plaster', obsidian: 'obsidian', ember: 'lava', sand: 'sand', snow: 'snow', ice: 'ice' };
   built.forEach(([m, c, n], i) => {
-    const x = 1230 + (i % 3) * 150, y = 230 + Math.floor(i / 3) * 170;
-    g.save(); g.beginPath(); g.roundRect(x, y, 128, 128, 14); g.clip(); g.drawImage(texture(m, c), x, y); g.restore();
-    g.fillStyle = 'rgba(243,236,224,.6)'; g.font = '600 11px Manrope'; g.textAlign = 'center'; g.fillText(n.toUpperCase(), x + 64, y + 148);
+    const x = 1300 + (i % 3) * 140, y = 230 + Math.floor(i / 3) * 170;
+    const im = IMG['tex/build_' + bmap[m]];
+    g.save(); g.beginPath(); g.roundRect(x, y, 120, 120, 14); g.clip(); g.drawImage(im || texture(m, c), x, y, 120, 120); g.restore();
+    g.fillStyle = 'rgba(243,236,224,.6)'; g.font = '600 11px Manrope'; g.textAlign = 'center'; g.fillText(n.toUpperCase(), x + 60, y + 140);
   });
   section(g, 60, 1000, 'In the world · captured from the game');
   const sc = [['meadow', 'The Pale Meadow'], ['glass', 'The Glass Wood'], ['hollow', 'The Hollow Below'], ['ember', 'The Ember Reach'], ['frost', 'The Frost Spires'], ['shrine', 'A shrine and its keeper']];
@@ -191,8 +193,7 @@ function maps() {
     if (img) { g.save(); g.beginPath(); g.roundRect(x, y, 740, 416, 16); g.clip(); g.drawImage(img, x, y, 740, 416); g.restore(); }
     label(g, x + 370, y + 450, n);
   });
-  section(g, 1720, 200, 'Trees');
-  if (Props.drawTreeSample) BIOMES.forEach((B, i) => Props.drawTreeSample(g, 1790 + (i % 3) * 200, 520 + Math.floor(i / 3) * 360, B));
+  
 }
 
 // ---------------------------------------------------------------- props, items, ui, vfx
@@ -201,31 +202,32 @@ function assets() {
   const g = board('assets', W, H, 'Props, Items & Effects', 'everything you find, carry, build and break');
   if (!Props.drawCampfire) return;
   section(g, 60, 200, 'Props');
+  const sp = (n, h) => (x, y) => drawSprite(g, 'props/' + n, x, y + 10, h);
   const props = [
-    ['Shrine', 'rest · save · respawn', (x, y) => Props.drawShrine(g, x, y, 1.6, 1.2)],
-    ['Campfire', '', (x, y) => Props.drawCampfire(g, x, y, 1.6, 1.2)],
-    ['Blade in stone', 'your first weapon', (x, y) => Props.drawBladeStone(g, x, y, 1.6, 1.2)],
-    ['Hearth', 'makes a home', (x, y) => Props.drawHearth(g, x, y, 1.6, 1.2)],
-    ['Lantern', '', (x, y) => Props.drawLanternPost(g, x, y, 1.6, 1.2)],
-    ['Gate banner', 'a warden holds this gate', (x, y) => Props.drawGateBanner(g, x, y, 1.4, '#ffb36b', 1.2)],
-    ['Seed of light', 'how you arrived', (x, y) => Props.drawSeed(g, x, y - 80, 1.6, 1.2)],
+    ['Shrine', 'rest · save · respawn', sp('shrine', 180)], ['Campfire', '', sp('campfire', 130)], ['Blade in stone', 'your first weapon', sp('bladestone', 230)],
+    ['Hearth', 'makes a home', sp('hearth', 120)], ['Lantern', '', sp('lantern', 180)], ['Gate banner', 'a warden holds this gate', sp('banner', 210)], ['Seed of light', 'how you arrived', sp('seed', 190)],
+    ['Chest', 'glimmer, blocks, looks', (x, y) => { g.save(); g.translate(x, y); g.scale(2.4, 2.4); drawChest(g, 0, 0, 0, 1); g.restore(); }],
+    ['Lost stitch', 'a line of lore', (x, y) => { g.save(); g.translate(x, y - 70); g.scale(2.2, 2.2); drawStitch(g, 0, 0, 1); g.restore(); }],
+    ['Hollow nest', 'break it for light', (x, y) => { g.save(); g.translate(x, y); g.scale(1.4, 1.4); drawNest(g, 0, 0, 1, 0); g.restore(); }],
   ];
-  props.forEach(([n, sub, fn], i) => { const x = 180 + i * 310, y = 520; floorGlow(g, x, y, 120); fn(x, y); label(g, x, y + 50, n, sub); });
+  props.forEach(([n, sub, fn], i) => { const x = 140 + i * 228, y = 520; floorGlow(g, x, y, 120); fn(x, y); label(g, x, y + 50, n, sub); });
   section(g, 60, 650, 'Blocks you carry');
   const blocks = [T.DIRT, T.STONE, T.DEEP, T.SAND, T.SNOW, T.LOG, T.PLANK, T.BRICK, T.GLASS, T.MARBLE, T.OBSIDIAN, T.CRYSTAL, T.GOLD, T.EMBER, T.ICE, T.LANTERN, T.HEARTH];
-  blocks.forEach((t, i) => { const x = 110 + i * 132, y = 760; Props.drawBlockIcon(g, x, y, t, 46); g.fillStyle = 'rgba(243,236,224,.55)'; g.font = '600 10px Manrope'; g.textAlign = 'center'; g.fillText(TILES[t].name.toUpperCase(), x, y + 70); });
+  blocks.forEach((t, i) => { const x = 110 + i * 132, y = 760; const ic = IMG['icons/b_' + TILE_ICON[t]]; if (ic) g.drawImage(ic, x - 32, y - 28, 64, 64 * ic.height / ic.width); else Props.drawBlockIcon(g, x, y, t, 46); g.fillStyle = 'rgba(243,236,224,.55)'; g.font = '600 10px Manrope'; g.textAlign = 'center'; g.fillText(TILES[t].name.toUpperCase(), x, y + 70); });
   section(g, 60, 900, 'Interface');
-  const ui = [['Vessel', (x, y) => Props.drawVessel(g, x, y, 34, true)], ['Empty vessel', (x, y) => Props.drawVessel(g, x, y, 34, false)], ['Glimmer', (x, y) => Props.drawGlimmer(g, x, y, 22)],
-    ['Second Wind', (x, y) => Props.drawRelic(g, x, y, 'djump', 40)], ['Grip of Glass', (x, y) => Props.drawRelic(g, x, y, 'wall', 40)], ['Plunge', (x, y) => Props.drawRelic(g, x, y, 'plunge', 40)], ['Ember Surge', (x, y) => Props.drawRelic(g, x, y, 'surge', 40)], ['Stillheart', (x, y) => Props.drawRelic(g, x, y, 'vessel', 40)]];
+  const icon = (n) => (x, y) => { const im = IMG['icons/' + n]; if (im) g.drawImage(im, x - 36, y - 36, 72, 72 * im.height / im.width); };
+  const ui = [['Vessel', icon('vessel')], ['Empty vessel', icon('vessel_empty')], ['Glimmer', icon('glimmer')], ['Second Wind', icon('r_djump')], ['Grip of Glass', icon('r_wall')], ['Plunge', icon('r_plunge')], ['Ember Surge', icon('r_surge')], ['Stillheart', icon('r_vessel')]];
   ui.forEach(([n, fn], i) => { const x = 130 + i * 200, y = 1000; fn(x, y); label(g, x, y + 70, n); });
   section(g, 60, 1130, 'Effects');
-  const fx = [['Slash', (x, y) => Props.drawSlashFrame(g, x, y, 1.6)], ['Hit spark', (x, y) => Props.drawSparkFrame(g, x, y, 1.6)], ['Shockwave', (x, y) => Props.drawWaveFrame(g, x, y, 1.6)], ['Soul glimmer', (x, y) => Props.drawSoulFrame(g, x, y, 1.6)], ['Dust', (x, y) => Props.drawDustFrame(g, x, y, 1.6)], ['Thread trail', (x, y) => { const tr = []; for (let i = 0; i < 24; i++) tr.push(x - 80 + i * 4, y + Math.sin(i * 0.5) * 14); drawThreadSprite(g, x + 20, y, 2, 80, tr); }]];
+  const fxi = (n) => (x, y) => { const im = IMG['fx/' + n]; if (im) { const h = 150, w = im.width * h / im.height; g.drawImage(im, x - w / 2, y - h / 2, w, h); } };
+  const fx = [['Slash', fxi('slash')], ['Hit spark', fxi('spark')], ['Shockwave', fxi('wave')], ['Soul glimmer', fxi('souls')], ['Dust', fxi('dust')], ['Thread trail', fxi('thread')]];
   fx.forEach(([n, fn], i) => { const x = 180 + i * 330, y = 1240; fn(x, y); label(g, x, y + 110, n); });
 }
 
+setBase('../assets/');
 const loadImg = (src) => new Promise(r => { const i = new Image(); i.onload = () => r(i); i.onerror = () => r(null); i.src = src; });
 Promise.all(['meadow', 'glass', 'hollow', 'ember', 'frost', 'shrine'].map(id => loadImg('../art/sheets/scenes/' + id + '.png').then(i => [id, i])))
-  .then(list => { window.__scenes = Object.fromEntries(list); return document.fonts.ready; }).then(() => {
+  .then(list => { window.__scenes = Object.fromEntries(list); return loadImages(); }).then(() => document.fonts.ready).then(() => {
   try { characters(); } catch (e) { console.error('characters', e.stack); }
   try { maps(); } catch (e) { console.error('maps', e.stack); }
   try { assets(); } catch (e) { console.error('assets', e.stack); }

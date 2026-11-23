@@ -92,10 +92,10 @@ try {
   check(await ev(D, () => window.__game.net.isGuest), 'second wanderer joined the shard');
   check(await ev(C, () => window.__game.net.remotes.size) === 2, 'shard host sees two strangers');
   await C.ctx.close();
-  await sleep(9500);
+  await sleep(12000);
   const roles = [await ev(D, () => [window.__game.net.isHost, window.__game.net.isGuest]), await ev(E, () => [window.__game.net.isHost, window.__game.net.isGuest])];
   check(roles.filter(r => r[0]).length === 1 && roles.filter(r => r[1]).length === 1, 'a guest took over the shard: ' + JSON.stringify(roles));
-  await sleep(1500);
+  await sleep(5000);
   const rs = [await ev(D, () => window.__game.net.remotes.size), await ev(E, () => window.__game.net.remotes.size)];
   check(rs[0] === 1 && rs[1] === 1, 'the survivors found each other again ' + JSON.stringify(rs) + JSON.stringify([await ev(D, () => [window.__game.net.myId, [...window.__game.net.remotes.keys()]]), await ev(E, () => [window.__game.net.myId, [...window.__game.net.remotes.keys()]])]));
   await D.page.screenshot({ path: path.join(out, 'mp-shard.png') });

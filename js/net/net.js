@@ -158,6 +158,7 @@ export class Net {
       Platform.updateRoom({ roomId, isJoinable: true, inviteParams: { room: roomId } });
       return true;
     } catch (e) {
+      try { this.peer && this.peer.connections && Object.values(this.peer.connections).flat().forEach(c => c.close()); } catch (e2) {}
       this.teardown(false);
       if (e && e.full) throw e;
       if (!isPublic) { this.toast('That world could not be reached'); this.status = 'Could not join.'; }
@@ -373,7 +374,7 @@ export class Net {
     }
     if (this.isHost) for (const [id, c] of this.conns) {
       const last = this.lastRx.get(id) || (this.lastRx.set(id, now), now);
-      if (now - last > 6000) { this.lastRx.delete(id); try { c.close(); } catch (e) {} this.dropPeer(id); }
+      if (now - last > 4500) { this.lastRx.delete(id); try { c.close(); } catch (e) {} this.dropPeer(id); }
     }
     // puppets for remote players / host enemies
     for (const r of this.remotes.values()) this.drivePuppet(r.actor, dt);

@@ -63,6 +63,7 @@ export class Player {
     const a = this.actor;
     a.look = lookFromSave(this.sv);
     a.cape = a.look.cape ? new Cape(7, (a.look.cape.len || 7) * a.scale) : null;
+    if (a.cape) a.cape.flare = 640;
     a.blade = !!this.sv.hasBlade;
   }
 
@@ -317,6 +318,7 @@ export class Player {
     Audio.play(armored ? 'clang' : 'hit', { pitch: rand(0.9, 1.1) });
     g.fx.sparks(hx, hy, Math.atan2(diry, dirx || 0.0001), armored ? 14 : 9, armored ? '#ffe3a0' : '#ffffff');
     g.fx.ring(hx, hy, 4, 26, 0.18, '#ffffff', 3);
+    g.fx.flash('fx/spark', hx, hy, armored ? 70 : 90, Math.random() * 0.6, 0.2);
     g.pulse(0.5);
     // recoil and pogo
     if (kind === 'down') { a.c.vy = -680; a.bounced = true; a.c.jumps = 0; a.c.airDash = 1; }

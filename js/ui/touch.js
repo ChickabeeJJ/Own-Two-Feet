@@ -1,5 +1,6 @@
-// On-screen controls for phones and tablets: a floating stick plus action buttons, all feeding Input.virt.
-// In build mode a tap on the world mines (hold) or places (tap on empty space).
+// Phone and tablet controls. A floating stick appears wherever the left thumb lands; action buttons are
+// sized to the screen; a contextual action button (Talk, Rest, Open, Wake) appears only when it can be used.
+// In build mode a tap on the world breaks (hold) or places (tap on empty space).
 import { Input } from '../core/input.js';
 import { TILE, TILES } from '../world/tiles.js';
 
@@ -7,13 +8,15 @@ export class Touch {
   constructor(game) {
     this.game = game;
     this.root = document.getElementById('touch');
+    this.zone = document.getElementById('tzone');
     this.stick = document.getElementById('stick');
     this.knob = document.getElementById('knob');
-    this.sid = null; this.tapped = false;
-    this.build = false;
+    this.act = document.getElementById('tact');
+    this.sid = null; this.tapped = false; this.build = false;
+    this.home = null;
     const isTouch = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
     this.enabled = isTouch;
-    if (isTouch) { game.touch = this; this.show(true); document.body.classList.add('touch'); }
+    if (isTouch) this.show(true);
     this.bind();
   }
   show(on) {
@@ -22,35 +25,53 @@ export class Touch {
     document.body.classList.toggle('touch', on);
   }
   bind() {
-    const st = this.stick;
+    const st = this.stick, z = this.zone;
+    const R = () => st.getBoundingClientRect().width / 2;
+    const place = (x, y) => {
+      const r = R();
+      st.style.left = (x - r) + 'px'; st.style.top = (y - r) + 'px'; st.style.bottom = 'auto';
+      this.cx = x; this.cy = y;
+    };
     const setAxis = (e) => {
-      const r = st.getBoundingClientRect();
-      const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
-      let dx = (e.clientX - cx) / (r.width / 2), dy = (e.clientY - cy) / (r.height / 2);
+      const r = R();
+      let dx = (e.clientX - this.cx) / r, dy = (e.clientY - this.cy) / r;
       const d = Math.hypot(dx, dy);
       if (d > 1) { dx /= d; dy /= d; }
-      Input.virt.axisX = Math.abs(dx) > 0.18 ? dx : 0;
+      Input.virt.axisX = Math.abs(dx) > 0.16 ? dx : 0;
       Input.virt.axisY = Math.abs(dy) > 0.45 ? dy : 0;
-      Input.virt.up = dy < -0.6; Input.virt.down = dy > 0.6;
-      this.knob.style.transform = `translate(${dx * 38}px, ${dy * 38}px)`;
+      Input.virt.up = dy < -0.62; Input.virt.down = dy > 0.62;
+      this.knob.style.transform = `translate(${dx * r * 0.62}px, ${dy * r * 0.62}px)`;
     };
-    st.addEventListener('pointerdown', e => { this.sid = e.pointerId; st.setPointerCapture(e.pointerId); setAxis(e); this.tapped = true; e.preventDefault(); });
-    st.addEventListener('pointermove', e => { if (e.pointerId === this.sid) setAxis(e); });
-    const end = e => { if (e.pointerId !== this.sid) return; this.sid = null; Input.virt.axisX = 0; Input.virt.axisY = 0; Input.virt.up = Input.virt.down = false; this.knob.style.transform = ''; };
-    st.addEventListener('pointerup', end); st.addEventListener('pointercancel', end);
-    for (const b of document.querySelectorAll('#tbtns .tb')) {
-      const a = b.dataset.a;
+    z.addEventListener('pointerdown', e => {
+      e.preventDefault();
+      this.sid = e.pointerId; z.setPointerCapture(e.pointerId);
+      place(e.clientX, e.clientY); st.classList.add('live');
+      setAxis(e); this.tapped = true;
+    });
+    z.addEventListener('pointermove', e => { if (e.pointerId === this.sid) setAxis(e); });
+    const end = e => {
+      if (e.pointerId !== this.sid) return;
+      this.sid = null; st.classList.remove('live');
+      st.style.left = ''; st.style.top = ''; st.style.bottom = '';
+      Input.virt.axisX = 0; Input.virt.axisY = 0; Input.virt.up = Input.virt.down = false;
+      this.knob.style.transform = '';
+    };
+    z.addEventListener('pointerup', end); z.addEventListener('pointercancel', end);
+    const press = (b, a) => {
       b.addEventListener('pointerdown', e => {
         e.preventDefault(); e.stopPropagation();
         b.setPointerCapture(e.pointerId);
         this.tapped = true;
+        if (navigator.vibrate) navigator.vibrate(8);
         if (a === 'tbuild') { this.toggleBuild(); return; }
         Input.virt[a] = true; b.classList.add('down');
       });
       const up = () => { if (a !== 'tbuild') { Input.virt[a] = false; b.classList.remove('down'); } };
       b.addEventListener('pointerup', up); b.addEventListener('pointercancel', up);
-    }
-    // world taps
+    };
+    for (const b of document.querySelectorAll('#tbtns .tb')) press(b, b.dataset.a);
+    press(this.act, 'interact');
+    // world taps in build mode
     const cv = document.getElementById('game');
     cv.addEventListener('pointerdown', e => {
       if (e.pointerType === 'mouse') return;
@@ -70,11 +91,20 @@ export class Touch {
     const tend = e => { const tb = this.game.touchBuild; if (tb && tb.pid === e.pointerId) { tb.mine = false; tb.pid = null; } };
     cv.addEventListener('pointerup', tend); cv.addEventListener('pointercancel', tend);
   }
+  // called every frame by the UI: show the contextual action when something can be used
+  frame() {
+    const p = this.game.player;
+    const it = p && p.interact && !this.game.cinematic && !(this.game.ui && this.game.ui.modal);
+    if (it) {
+      const verb = p.interact.verb || (p.interact.label.startsWith('Talk') ? 'Talk' : p.interact.label.startsWith('Rest') ? 'Rest' : p.interact.label.split(' ')[0]);
+      if (this.act.dataset.v !== verb) { this.act.dataset.v = verb; this.act.querySelector('span').textContent = verb; }
+      this.act.classList.remove('hidden');
+    } else this.act.classList.add('hidden');
+  }
   toggleBuild() {
     this.build = !this.build;
     document.querySelector('.tb[data-a="tbuild"]').classList.toggle('active', this.build);
-    if (!this.build) this.game.touchBuild = null;
-    else this.game.touchBuild = { mine: false, place: false };
+    this.game.touchBuild = this.build ? { mine: false, place: false } : null;
     this.game.ui && this.game.ui.toast(this.build ? 'Build: tap a block to break it, tap empty space to place' : 'Build off');
   }
 }

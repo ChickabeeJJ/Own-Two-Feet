@@ -7,7 +7,8 @@ import { TILE, T, TILES, biomeOf, biomeIndexAt, gateNear } from '../world/tiles.
 import { clamp, rand, hash2, mulberry, TAU, sign } from '../core/util.js';
 import { drawGlow } from '../world/light.js';
 import { drawShrine, drawCampfire } from '../art/props.js';
-import { upgradeCost, RELICS } from './progress.js';
+import { drawSprite } from '../art/images.js';
+import { upgradeCost, RELICS, COSMETICS, Save } from './progress.js';
 import { TYPES as BOSS_TYPES } from './bosses.js';
 
 const KINDS = ['wanderer', 'smith', 'sage', 'tailor'];
@@ -19,10 +20,10 @@ const NAMES = {
 };
 const TITLE = { wanderer: 'a wanderer', smith: 'a smith', sage: 'a sage', tailor: 'a tailor' };
 export const LOOKS = {
-  wanderer: { body: '#d9b99a', shade: '#b0907a', mat: 'cloth', eyes: '#ffd9a0', eyeStyle: 'dots', head: 'widehat', hatCol: '#5a4636', accent: '#c8473d', pack: true, cape: { col: '#8a5a3c', style: 'scarf', len: 7 }, marks: [], rim: '#ffe2bd', bootCol: '#4a3a33' },
-  smith: { body: '#b98a5e', shade: '#8f6745', mat: 'cloth', eyes: '#ffb36b', eyeStyle: 'slit', head: 'none', cape: null, apron: '#3e2c22', hammer: true, gaunt: true, armor: null, bulk: 1.18, arms: 1.22, marks: [], rim: '#ffcf9e', bootCol: '#3a2c2a' },
-  sage: { body: '#ece7df', shade: '#c4bdb2', mat: 'porcelain', eyes: '#c4b5ff', eyeStyle: 'slit', head: 'halo', accent: '#f2c86a', cape: { col: '#d8d0c0', style: 'cape', len: 9 }, robe: '#e3dccd', staff: true, marks: [{ col: '#f2c86a' }], rim: '#ffffff' },
-  tailor: { body: '#e3b1aa', shade: '#bd8c86', mat: 'cloth', eyes: '#9ff3ff', eyeStyle: 'dots', head: 'tophat', accent: '#d9a441', cape: { col: '#5b3f8f', style: 'scarf', len: 9 }, tape: true, sash: '#5b3f8f', marks: [], rim: '#ffe2bd', bootCol: '#2b2530' },
+  wanderer: { body: '#efe6d6', limb: '#efe6d6', coat: '#d8c8ae', mat: 'cloth', eyes: '#9ff3ff', eyeStyle: 'dots', head: 'widehat', hatCol: '#6b4a32', cloakLong: '#8a6a4a', fringe: true, cape: null, marks: [], rim: '#ffe2bd', bootCol: '#5a4030', belt: false },
+  smith: { body: '#c08f62', limb: '#c08f62', coat: '#7a5a40', mat: 'cloth', eyes: '#ffd9a0', eyeStyle: 'dots', head: 'none', cloakLong: '#8a6a4a', cape: null, apron: '#4a3428', gaunt: true, gloves: '#5e4230', hammer: true, bulk: 1.1, marks: [], rim: '#ffcf9e', bootCol: '#3a2c2a', belt: false },
+  sage: { body: '#f4f1ea', limb: '#f4f1ea', coat: '#efe9df', mat: 'porcelain', eyes: '#9ff3ff', eyeStyle: 'dots', head: 'halo', accent: '#f2c86a', cape: null, robe: '#efe9df', cloakLong: '#f6f2ea', cloakToGround: true, staff: true, marks: [], rim: '#ffffff', belt: false },
+  tailor: { body: '#eab3b8', limb: '#eab3b8', coat: '#e2a6ad', mat: 'cloth', eyes: '#9ff3ff', eyeStyle: 'dots', head: 'tophat', hatBand: '#7a4a8f', cloakLong: '#a88bd0', cape: null, tape: true, marks: [], rim: '#ffe2bd', bootCol: '#2b2530', belt: false },
 };
 const SHOP = [
   { tile: T.LANTERN, n: 2, cost: 18 }, { tile: T.PLANK, n: 10, cost: 12 }, { tile: T.GLASS, n: 6, cost: 14 },
@@ -192,9 +193,57 @@ export class Shrines {
         ui.toast(`${name} will wait for you at home`); Audio.play('chime'); g.saveNow();
       } });
     }
+    if (shrine) {
+      const rq = sv.requests.find(r => r.sx === shrine.sx && !r.claimed);
+      if (!rq) opts.unshift({ label: 'Any work for me?', act: () => this.offer(kind, name, shrine) });
+      else if (this.requestDone(rq)) opts.unshift({ label: 'It is done', act: () => this.claim(rq, name) });
+      else opts.unshift({ label: `About that favour: ${this.requestText(rq)}`, act: () => { g.ui.toast(this.requestText(rq) + ' · ' + this.requestProgress(rq)); } });
+    }
     opts.push({ label: 'Farewell', act: () => {} });
     Audio.play('talk');
     ui.dialog(name, lines, opts);
+  }
+  // ---------------- favours: small tasks that pay in glimmer, light and looks
+  offer(kind, name, shrine) {
+    const g = this.game, sv = this.sv;
+    const k = Math.round((shrine.sx - 20) / 85);
+    const pick = (arr) => arr[((k % arr.length) + arr.length) % arr.length];
+    const req = { sx: shrine.sx, kind, name, claimed: false };
+    if (kind === 'wanderer') Object.assign(req, pick([{ type: 'bring', tile: T.DIRT, n: 15 }, { type: 'bring', tile: T.LOG, n: 6 }, { type: 'bring', tile: T.STONE, n: 12 }]));
+    else if (kind === 'smith') Object.assign(req, pick([{ type: 'bring', tile: T.GOLD, n: 2 }, { type: 'bring', tile: T.STONE, n: 20 }, { type: 'bring', tile: T.CRYSTAL, n: 3 }]));
+    else if (kind === 'sage') Object.assign(req, pick([{ type: 'wake', n: 1 }, { type: 'stitch', n: 1 }]));
+    else Object.assign(req, pick([{ type: 'chest', n: 1 }, { type: 'kill', n: 5 }]));
+    req.base = this.counter(req.type);
+    sv.requests.push(req);
+    g.ui.closeDialog();
+    g.ui.dialog(name, [this.offerLine(req)], [{ label: 'I will', act: () => { g.ui.toast('Favour accepted: ' + this.requestText(req)); Audio.play('confirm'); } }]);
+  }
+  counter(type) {
+    const sv = this.sv;
+    return type === 'wake' ? Object.keys(sv.rescued).length : type === 'stitch' ? Object.keys(sv.stitches).length : type === 'chest' ? Object.keys(sv.chests).length : type === 'kill' ? sv.stats.kills : 0;
+  }
+  requestDone(r) { return r.type === 'bring' ? (this.sv.inv[r.tile] || 0) >= r.n : this.counter(r.type) - r.base >= r.n; }
+  requestProgress(r) { return r.type === 'bring' ? `${Math.min(this.sv.inv[r.tile] || 0, r.n)}/${r.n}` : `${Math.min(this.counter(r.type) - r.base, r.n)}/${r.n}`; }
+  requestText(r) {
+    return r.type === 'bring' ? `bring ${r.n} ${TILES[r.tile].name}` : r.type === 'wake' ? 'wake a lost doll' : r.type === 'stitch' ? 'find a lost stitch' : r.type === 'chest' ? 'open a chest' : `undo ${r.n} Hollows`;
+  }
+  offerLine(r) {
+    return { bring: `I could use ${r.n} ${TILES[r.tile || 2].name}. My fire is hungry and my back is old.`, wake: 'Somewhere out there a doll is lying where it fell. Wake it, would you?', stitch: 'Her thread is scattered. Bring back one lost stitch and I will read it to you.', chest: 'There are chests out there nobody remembers burying. Open one. Tell me what is inside.', kill: 'Hollows keep circling my fire. Undo a few of them for me.' }[r.type];
+  }
+  claim(r, name) {
+    const g = this.game, sv = this.sv;
+    if (r.type === 'bring') g.player.take(r.tile, r.n);
+    r.claimed = true;
+    const gl = 30 + Math.floor(Math.random() * 30);
+    sv.glimmer += gl; sv.lights = (sv.lights || 0) + 1;
+    let extra = '';
+    const locked = COSMETICS.filter(c => c.cost && !sv.unlocked.includes(c.id));
+    if (locked.length && Math.random() < 0.5) { const c = locked[Math.floor(Math.random() * locked.length)]; Save.unlock(c.id); extra = `, and ${c.name}`; }
+    Audio.play('chime'); g.ui.glimmerBump();
+    g.ui.closeDialog();
+    g.ui.dialog(name, ['Thank you. Truly. Take this, and this light.'], [{ label: 'Farewell', act: () => {} }]);
+    g.ui.toast(`Favour done: +${gl} glimmer, +1 Thread of Light${extra}`);
+    g.saveNow();
   }
   buy(cost, fn) {
     const g = this.game, sv = this.sv;
@@ -253,8 +302,8 @@ export class Shrines {
     const g = this.game;
     for (const s of this.map.values()) {
       if (Math.abs(s.x - g.cam.x) > 1400) continue;
-      drawShrine(ctx, s.x - 78, s.y + 1, 0.95, g.time, true);
-      drawCampfire(ctx, s.x, s.y + 1, 0.95, g.time);
+      if (!drawSprite(ctx, 'props/shrine', s.x - 84, s.y + 6, 112)) drawShrine(ctx, s.x - 78, s.y + 1, 0.95, g.time, true);
+      if (!drawSprite(ctx, 'props/campfire', s.x, s.y + 8, 58)) drawCampfire(ctx, s.x, s.y + 1, 0.95, g.time);
     }
     if (this.sv.home && Math.abs(this.sv.home.x - g.cam.x) < 1400) drawCampfire(ctx, this.sv.home.x + 54, this.sv.home.y + 1, 0.7, g.time + 1);
   }

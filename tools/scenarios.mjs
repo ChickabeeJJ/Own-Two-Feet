@@ -18,6 +18,60 @@ export default ({ page, sleep, key, shot, evalg }) => ({
     await sleep(1500); await shot('b11-foe');
     console.log('state', JSON.stringify(await evalg(() => { const g = window.__game; return { obj: g.save.obj, blade: g.save.hasBlade, glimmer: g.save.glimmer, enemies: g.enemies.list.length }; })));
   },
+  async tut() {
+    await sleep(900);
+    await evalg(() => { window.__game.story.skipBirth(); window.__game.enemies.calm = 999; });
+    await sleep(800); await shot('t0-move');
+    await page.keyboard.down('KeyD'); await sleep(1200); await page.keyboard.up('KeyD'); await sleep(1100);
+    await key('Space', 200); await sleep(1300); await shot('t1-blade');
+    const dbg = () => evalg(() => { const a = window.__game.player.actor; return [a.mode, Math.round(a.c.x / 32), Math.round(a.c.y / 32), Math.round(a.c.vy), window.__game.story.tutI]; });
+    console.log('d1', JSON.stringify(await dbg()));
+    await page.keyboard.down('KeyD'); await sleep(1500); await page.keyboard.up('KeyD'); await sleep(1300);
+    console.log('d2', JSON.stringify(await dbg()));
+    await evalg(() => { const g = window.__game, d = g.story.dummy; if (d) { g.player.respawnAt(d.c.x - 50, g.world.surface(Math.floor((d.c.x - 50) / 32)) * 32); g.player.actor.face(1); } });
+    await sleep(700); await shot('t2-strike');
+    console.log('d3', JSON.stringify(await dbg()), JSON.stringify(await evalg(() => { const d = window.__game.story.dummy; return d ? [Math.round(d.c.x / 32), d.mode] : null; })));
+    for (let i = 0; i < 6; i++) { await key('KeyJ', 60); await sleep(420); }
+    await sleep(1200); await key('ShiftLeft', 80); await sleep(1300); await shot('t3-mine');
+    await evalg(() => { window.__game.save.stats.blocks += 3; }); await sleep(1200);
+    await evalg(() => { window.__game.save.stats.placed += 1; }); await sleep(1200);
+    await key('KeyQ'); await sleep(600); await key('Escape'); await sleep(1500); await shot('t4-done');
+    const st = await evalg(() => { const g = window.__game; return { tutDone: g.save.tutDone, tutI: g.story.tutI, dummyHits: g.story.dummyHits, blade: g.save.hasBlade, obj: g.save.obj }; });
+    console.log('tut', JSON.stringify(st));
+  },
+  async content() {
+    await sleep(900);
+    const info = await evalg(() => { const g = window.__game; g.story.skipBirth(); g.save.tutDone = 1; g.save.hasBlade = true; g.player.actor.blade = true; g.enemies.calm = 999;
+      const c = g.content; return { dolls: c.sites('doll', -200, 200), chests: c.sites('chest', -200, 200), stitches: c.sites('stitch', -200, 200), nests: c.sites('nest', -300, 300) }; });
+    console.log('sites', JSON.stringify(info));
+    const go = async (x, name) => { if (x === undefined) { console.log('skip', name); return; } await evalg((x) => { const g = window.__game; const tx = x - 3; g.player.respawnAt(tx * 32, g.world.surface(tx) * 32); g.cam.x = tx * 32; g.cam.y = g.player.y - 100; }, x); await sleep(1600); await shot(name); };
+    await go(info.dolls[0], 'c0-doll');
+    await evalg((x) => { window.__game.content.wakeDoll(x); }, info.dolls[0]);
+    await sleep(1800); await shot('c1-woken');
+    await go(info.chests[1], 'c2-chest');
+    await evalg(() => { const g = window.__game; const ch = [...g.content.chests.keys()]; g.content.openChest(ch[0]); });
+    await sleep(900); await shot('c3-opened');
+    await go(info.stitches[0], 'c4-stitch');
+    await go(info.nests[0], 'c5-nest');
+    console.log('state', JSON.stringify(await evalg(() => { const g = window.__game; return { lights: g.save.lights, rescued: Object.keys(g.save.rescued).length, chests: Object.keys(g.save.chests).length, glimmer: g.save.glimmer }; })));
+  },
+  async gates() {
+    await sleep(900);
+    await evalg(() => { const g = window.__game; g.story.skipBirth(); g.save.tutDone = 1; g.save.lights = 0; g.save.hasBlade = true; g.player.actor.blade = true; g.enemies.calm = 999;
+      const x = (220 - 40) * 32; g.player.respawnAt(x, g.world.surface(220 - 40) * 32); });
+    await page.keyboard.down('KeyD'); await sleep(2600); await page.keyboard.up('KeyD'); await sleep(400); await shot('g0-sealed');
+    const a = await evalg(() => { const g = window.__game; return { active: !!g.bosses.active, sealed: !!g.bosses.sealed, x: Math.round(g.player.x / 32) }; });
+    await evalg(() => { window.__game.save.lights = 10; });
+    await page.keyboard.down('KeyD'); await sleep(1800); await page.keyboard.up('KeyD'); await sleep(600);
+    const b = await evalg(() => { const g = window.__game; return { active: !!g.bosses.active, cinematic: g.cinematic, seen: g.save.bossSeen }; });
+    await sleep(4000);
+    await evalg(() => { const g = window.__game; g.bosses.abort(); g.player.respawnAt((220 - 40) * 32, g.world.surface(180) * 32); });
+    await sleep(4500);
+    await page.keyboard.down('KeyD'); await sleep(2600); await page.keyboard.up('KeyD'); await sleep(300);
+    const c = await evalg(() => { const g = window.__game; return { active: !!g.bosses.active, cinematic: g.cinematic }; });
+    await shot('g1-quick');
+    console.log('gates', JSON.stringify({ a, b, c }));
+  },
   async look() {
     // q: x,y (tiles), zoom — frame an arbitrary spot of the world
     await sleep(1200);
@@ -42,8 +96,8 @@ export default ({ page, sleep, key, shot, evalg }) => ({
   },
   async boss() {
     await sleep(1200);
-    const gx = Number(process.env.GATE || 170);
-    await evalg((gx) => { const g = window.__game; g.story.skipBirth(); g.save.hasBlade = true; g.player.actor.blade = true; g.enemies.calm = 999;
+    const gx = Number(process.env.GATE || 220);
+    await evalg((gx) => { const g = window.__game; g.story.skipBirth(); g.save.tutDone = 1; g.save.lights = 99; g.save.hasBlade = true; g.player.actor.blade = true; g.enemies.calm = 999;
       const x = (gx - 22) * 32; g.player.respawnAt(x, g.world.surface(gx - 22) * 32); g.cam.x = x; g.cam.y = g.player.y - 80; }, gx);
     await page.keyboard.down('KeyD'); await sleep(900); await page.keyboard.up('KeyD');
     await sleep(600); await shot('k0-intro');
@@ -71,10 +125,10 @@ export default ({ page, sleep, key, shot, evalg }) => ({
     await shot('n2-opts');
     await key('Escape'); await sleep(400);
     await key('Escape'); await sleep(600); await shot('n3-menu');
-    await page.click('.tab:nth-child(2)'); await sleep(900); await shot('n4-look');
+    await page.click('.tab:nth-child(3)'); await sleep(900); await shot('n4-look');
     await page.click('.slots .tab:nth-child(3)'); await sleep(600); await shot('n5-heads');
-    await page.click('.tab:nth-child(3)'); await sleep(400); await shot('n6-craft');
-    await page.click('.tab:nth-child(4)'); await sleep(400); await shot('n7-together');
+    await page.click('.tab:nth-child(4)'); await sleep(400); await shot('n6-craft');
+    await page.click('.tab:nth-child(2)'); await sleep(400); await shot('n7-journal');
   },
   async editor() {
     await sleep(1200);
@@ -92,6 +146,13 @@ export default ({ page, sleep, key, shot, evalg }) => ({
     const r = await evalg(() => { const P = window.__prof, n = P.frames; const o = {}; for (const k in P) if (k !== 'frames') o[k] = +(P[k] / n).toFixed(2); o.frames = n; return o; });
     console.log('prof', JSON.stringify(r));
     await page.keyboard.up('KeyD');
+  },
+  async mobile2() {
+    await sleep(900);
+    await evalg(() => { const g = window.__game; g.story.skipBirth(); g.save.tutDone = 1; g.save.hasBlade = true; g.player.actor.blade = true; g.enemies.calm = 999; const x = 100 * 32; g.player.respawnAt(x, g.world.surface(100) * 32); });
+    await sleep(1500);
+    await page.touchscreen.tap(150, 300); await sleep(300);
+    await shot('m3-play');
   },
   async mobile() {
     await sleep(6000); await shot('m0');

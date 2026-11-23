@@ -1,0 +1,346 @@
+// Things to do in the world, placed deterministically from the seed:
+//  - Lost dolls lying where they fell: wake them (E). They thank you and walk home.
+//  - Chests: open them (E or strike) for glimmer, blocks and sometimes a new look.
+//  - Lost stitches: glowing spools of her thread, often up a ledge or down a cave. Each holds a line of lore.
+//  - Hollow nests: thorned mounds that keep birthing Hollows until you break them.
+// Every doll, stitch and nest gives a Thread of Light. Gates stay sealed until you carry enough of them.
+import { Audio } from '../core/audio.js';
+import { Actor } from './actor.js';
+import { P } from '../physics/body.js';
+import { TILE, T, TILES, gateNear } from '../world/tiles.js';
+import { ARENA_HALF } from '../world/world.js';
+import { hash2, rand, clamp, lerp, sign, TAU, rgba } from '../core/util.js';
+import { drawGlow } from '../world/light.js';
+import { softDisc, capsule, ballShade, shade } from '../art/paint.js';
+import { lookFromSave, newSave, COSMETICS, Save } from './progress.js';
+
+export const LORE = [
+  'She sewed the sky first, so the dolls would have something to look up at.',
+  'The first doll was made of a curtain and a button. It never stood. She made the second one better.',
+  'Every doll has a thread inside. Hers ran through all of them, like one long stitch.',
+  'When she left, she took the needle and left the thread. The thread began to fray.',
+  'The Wardens were her needles once. Without her hand they only know how to pierce and hold.',
+  'Hollows are dolls whose thread snapped. They remember walking. They hate that they remember.',
+  'The keepers light fires because she said she would come back to the brightest one.',
+  'She cut the Glass Wood from a broken mirror, so the light would have somewhere to stay.',
+  'The Hollow Below is a pocket she forgot to stitch shut.',
+  'Embers are the last warm thing she touched. They have not cooled since.',
+  'In the Frost Spires the wind stopped to listen for her footsteps. It is still listening.',
+  'Some say the world has no edge. Others say she never finished the hem.',
+  'A doll on its own two feet frightens the Wardens. It means the stitch held.',
+  'Every gate holds a piece of her light. Put them back together and you might see her face.',
+  'Thread is not a moth. Thread is the last thing she said.',
+  'If you are reading this, you were made with care. Keep walking.',
+];
+export const gateReq = (tier) => 4 + tier * 3;
+
+const near = (a, b, d) => Math.abs(a - b) < d;
+
+export class Content {
+  constructor(game) {
+    this.game = game;
+    this.dolls = new Map(); this.chests = new Map(); this.stitches = new Map(); this.nests = new Map();
+    this.scanT = 0;
+  }
+  get sv() { return this.game.save; }
+  ok(x) {
+    const W = this.game.world;
+    if (Math.abs(x) < 26) return false;
+    const g = gateNear(x);
+    if (Math.abs(x - g.gx) < ARENA_HALF + 12) return false;
+    if (W.shrineNear(x) !== null) return false;
+    return true;
+  }
+  // deterministic sites in [a, b] tiles
+  sites(kind, a, b) {
+    const spec = { doll: [58, 37, 1], chest: [73, 51, 2], stitch: [91, 17, 3], nest: [150, 75, 4] }[kind];
+    const [step, off, salt] = spec;
+    const out = [];
+    for (let k = Math.floor((a - off) / step) - 1; k <= Math.ceil((b - off) / step) + 1; k++) {
+      const x = k * step + off + Math.floor(hash2(k, salt, this.game.world.seed) * 16);
+      if (x < a || x > b || !this.ok(x)) continue;
+      if (kind === 'nest' && Math.abs(x) < 70) continue;
+      out.push(x);
+    }
+    return out;
+  }
+  // a cave floor under the surface, if one is close
+  caveSpot(tx) {
+    const W = this.game.world, s = W.surface(tx);
+    for (let ty = s + 6; ty < s + 40; ty++) if (!W.solid(tx, ty) && !W.solid(tx, ty - 1) && !W.solid(tx, ty - 2) && W.solid(tx, ty + 1)) return ty + 1;
+    return null;
+  }
+  update(dt) {
+    const g = this.game, p = g.player;
+    if (!p || (g.net && g.net.visiting)) return;
+    this.scanT -= dt;
+    const ptx = Math.floor(p.x / TILE);
+    if (this.scanT <= 0) {
+      this.scanT = 0.5;
+      const a = ptx - 80, b = ptx + 80;
+      for (const x of this.sites('doll', a, b)) if (!this.dolls.has(x) && !this.sv.rescued[x]) this.spawnDoll(x);
+      for (const x of this.sites('chest', a, b)) if (!this.chests.has(x)) this.chests.set(x, this.makeChest(x));
+      for (const x of this.sites('stitch', a, b)) if (!this.stitches.has(x) && !this.sv.stitches[x]) this.stitches.set(x, this.makeStitch(x));
+      for (const x of this.sites('nest', a, b)) if (!this.nests.has(x) && !this.sv.nests[x]) this.spawnNest(x);
+      for (const m of [this.dolls, this.chests, this.stitches, this.nests]) for (const [x, o] of m) if (Math.abs(x - ptx) > 110) { if (o.actor) o.actor.removed = true; if (o.ent) o.ent.removed = true; m.delete(x); }
+    }
+    // dolls being woken walk away
+    for (const [x, d] of this.dolls) {
+      if (d.state === 'thanks') {
+        d.t -= dt;
+        const a = d.actor;
+        a.look_at = { x: p.x, y: p.y - 60 };
+        if (d.t < 2.2 && !d.waved) { d.waved = true; a.doEmote('wave', 1.6); }
+        if (d.t < 0) { d.state = 'leave'; d.t = 3; }
+      } else if (d.state === 'leave') {
+        d.t -= dt; d.actor.intent.mx = d.dir; d.alpha = clamp(d.t / 1.2, 0, 1);
+        if (d.t <= 0) { d.actor.removed = true; this.dolls.delete(x); }
+      }
+    }
+    // stitches are taken by touch
+    for (const [x, st] of this.stitches) {
+      if (st.got) continue;
+      st.t += dt;
+      if (Math.abs(p.x - st.px) < 34 && Math.abs((p.y - 50) - st.py) < 60) this.takeStitch(x, st);
+    }
+    // nests birth hollows while you are near
+    for (const [x, n] of this.nests) {
+      const e = n.ent;
+      if (e.mode === 'dead') continue;
+      n.t -= dt;
+      if (n.t <= 0 && Math.abs(p.x - e.c.x) < 620 && !g.cinematic) {
+        n.t = 7;
+        n.kids = n.kids.filter(k => !k.removed && k.mode !== 'dead');
+        if (n.kids.length < 2) {
+          const k = g.enemies.spawn('husk', e.c.x + rand(-30, 30), e.c.y + 30, g.world.tierAtX(e.c.x), '#c4b5ff');
+          k.knockdown(0.5, 0, -700);
+          g.fx.dust(e.c.x, e.c.y + 20, 8, '#3a3044', -Math.PI / 2, 160);
+          n.kids.push(k);
+        }
+      }
+    }
+  }
+
+  // ------------------------------------------------------------ lost dolls
+  spawnDoll(x) {
+    const g = this.game, W = g.world;
+    const inCave = hash2(x, 9, W.seed) < 0.3 ? this.caveSpot(x) : null;
+    const ty = inCave ?? W.surface(x);
+    const sv = newSave(Math.floor(hash2(x, 2, W.seed) * 1e9));
+    const colors = COSMETICS.filter(c => c.slot === 'color'), heads = ['h_none', 'h_leaf', 'h_hood', 'h_horns', 'h_tophat', 'h_antlers'], capes = COSMETICS.filter(c => c.slot === 'cape' && c.v);
+    sv.look.color = colors[Math.floor(hash2(x, 3, W.seed) * colors.length)].id;
+    sv.look.head = heads[Math.floor(hash2(x, 4, W.seed) * heads.length)];
+    sv.look.cape = capes[Math.floor(hash2(x, 5, W.seed) * capes.length)].id;
+    const look = lookFromSave(sv); look.thread = false;
+    const a = new Actor(g, { x: x * TILE + 16, y: ty * TILE, team: 'npc', look, facing: hash2(x, 6, W.seed) < 0.5 ? 1 : -1 });
+    a.mode = 'limp'; a.limpT = 1e9; a.strength = 0; a.noCrumple = true;
+    a.body.impulseAll(rand(-60, 60), 0);
+    g.actors.push(a);
+    this.dolls.set(x, { actor: a, state: 'lying', cave: inCave !== null, t: 0 });
+  }
+  wakeDoll(x) {
+    const g = this.game, d = this.dolls.get(x);
+    if (!d || d.state !== 'lying') return;
+    const a = d.actor;
+    d.state = 'thanks'; d.t = 4.2; d.dir = sign(a.c.x - g.player.x) || 1;
+    a.limpT = 0; a.mode = 'limp';
+    this.sv.rescued[x] = 1;
+    this.sv.lights = (this.sv.lights || 0) + 1;
+    const n = Object.keys(this.sv.rescued).length;
+    Audio.play('chime'); Audio.play('heal');
+    g.fx.ring(a.c.x, a.c.y - 30, 6, 90, 0.7, '#9ff3ff', 4);
+    g.fx.souls(a.c.x, a.c.y - 30, 8, g.player.actor.c, '#bff6ff', () => { this.sv.glimmer += 2; Audio.play('soul', { gap: 0.02 }); g.ui && g.ui.glimmerBump(); });
+    const lines = ['...I can feel my feet.', 'You stood? Then so can I.', 'Thank you. I’ll find the fire.', 'I was dreaming of her hands.', 'Is it morning? It feels like morning.'];
+    g.story && g.story.say(lines[n % lines.length], 2.8, true);
+    g.ui && g.ui.toast(`Doll woken · +1 Thread of Light (${this.sv.lights})`);
+    g.saveNow();
+  }
+
+  // ------------------------------------------------------------ chests
+  makeChest(x) {
+    const W = this.game.world;
+    const cave = hash2(x, 7, W.seed) < 0.45 ? this.caveSpot(x) : null;
+    const ty = cave ?? W.surface(x);
+    return { x: x * TILE + 16, y: ty * TILE, open: !!this.sv.chests[x], t: this.sv.chests[x] ? 1 : 0, ent: this.chestTarget(x, ty) };
+  }
+  chestTarget(x, ty) {
+    // a hittable proxy so a blade strike opens it too
+    const self = this;
+    const e = { id: 'chest' + x, team: 'prop', mode: 'ctrl', scale: 1, hitR: 18, removed: false, glows: [], c: { x: x * TILE + 16, y: ty * TILE - 14, vx: 0, vy: 0, w: 30, h: 26 },
+      get cx() { return this.c.x; }, get cy() { return this.c.y; }, update() {}, draw() {}, hurt() { self.openChest(x); return 'armor'; } };
+    return e;
+  }
+  openChest(x) {
+    const g = this.game, c = this.chests.get(x);
+    if (!c || c.open) return;
+    c.open = true;
+    this.sv.chests[x] = 1;
+    const R = () => hash2(x, Math.floor(Math.random() * 1000), 1);
+    const gl = 12 + Math.floor(R() * 22) + g.world.tierAtX(c.x) * 10;
+    g.fx.souls(c.x, c.y - 20, 10, g.player.actor.c, '#ffe7a8', () => { this.sv.glimmer += Math.ceil(gl / 10); Audio.play('soul', { gap: 0.02, pitch: 1.2 }); g.ui && g.ui.glimmerBump(); });
+    const pool = [[T.LANTERN, 2], [T.PLANK, 8], [T.GLASS, 4], [T.CRYSTAL, 2], [T.GOLD, 2], [T.BRICK, 6], [T.MARBLE, 4]];
+    const [tile, n] = pool[Math.floor(Math.random() * pool.length)];
+    g.player.give(tile, n); g.ui && g.ui.pickup(tile, n);
+    let found = null;
+    if (Math.random() < 0.3) {
+      const locked = COSMETICS.filter(cm => cm.cost && !this.sv.unlocked.includes(cm.id));
+      if (locked.length) { found = locked[Math.floor(Math.random() * locked.length)]; Save.unlock(found.id); }
+    }
+    Audio.play('chime'); Audio.play('break', { pitch: 0.7 });
+    g.fx.burst(c.x, c.y - 18, { n: 26, speed: 300, col: '#ffffff', col1: '#ffd98a', add: true, life: 0.7, size: 2.6, dir: -Math.PI / 2, spread: 1.1, grav: 400 });
+    g.shake(0.15);
+    g.ui && g.ui.toast(found ? `Chest: ${gl} glimmer, ${TILES[tile].name}, and ${found.name}!` : `Chest: ${gl} glimmer and ${n} ${TILES[tile].name}`);
+    g.saveNow();
+  }
+
+  // ------------------------------------------------------------ stitches
+  makeStitch(x) {
+    const W = this.game.world;
+    const r = hash2(x, 8, W.seed);
+    let px = x * TILE + 16, py;
+    const cave = r < 0.4 ? this.caveSpot(x) : null;
+    if (cave) py = cave * TILE - 40;
+    else py = W.surface(x) * TILE - (r < 0.75 ? 150 : 70);   // some hover out of reach: build up or double jump
+    return { x, px, py, t: r * 6, got: false, cave: !!cave };
+  }
+  takeStitch(x, st) {
+    const g = this.game, sv = this.sv;
+    st.got = true; sv.stitches[x] = 1;
+    sv.lights = (sv.lights || 0) + 1;
+    const idx = (sv.lore = sv.lore || []).length;
+    const line = LORE[idx % LORE.length];
+    sv.lore.push(idx % LORE.length);
+    Audio.play('chime'); Audio.play('soul', { pitch: 1.4 });
+    g.slowmo(0.4, 0.6);
+    g.fx.ring(st.px, st.py, 4, 80, 0.6, '#bff6ff', 4);
+    g.fx.burst(st.px, st.py, { n: 20, speed: 260, col: '#ffffff', col1: '#9ff3ff', add: true, life: 0.7, size: 2.4 });
+    g.ui && g.ui.card('A Lost Stitch', line, 'small gain', 5);
+    g.ui && g.ui.toast(`+1 Thread of Light (${sv.lights}) · lore added to your journal`);
+    setTimeout(() => this.stitches.delete(x), 1500);
+    g.saveNow();
+  }
+
+  // ------------------------------------------------------------ nests
+  spawnNest(x) {
+    const g = this.game, W = g.world;
+    const ty = W.surface(x);
+    const self = this;
+    const e = { id: 'nest' + x, team: 'enemy', kind: 'nest', mode: 'ctrl', scale: 1.6, hitR: 30, hp: 140 + W.tierAtX(x * TILE) * 60, removed: false, glows: [], flash: 0,
+      c: { x: x * TILE + 16, y: ty * TILE - 26, vx: 0, vy: 0, w: 60, h: 50 },
+      get cx() { return this.c.x; }, get cy() { return this.c.y; },
+      update(dt) { this.flash = Math.max(0, this.flash - dt * 5); }, draw() {},
+      hurt(dmg, info) { this.hp -= dmg; this.flash = 1; if (this.hp <= 0 && this.mode !== 'dead') self.breakNest(x); return null; } };
+    g.actors.push(e);
+    this.nests.set(x, { ent: e, t: 2, kids: [] });
+  }
+  breakNest(x) {
+    const g = this.game, n = this.nests.get(x);
+    if (!n) return;
+    const e = n.ent;
+    e.mode = 'dead'; e.removed = true;
+    this.sv.nests[x] = 1;
+    this.sv.lights = (this.sv.lights || 0) + 1;
+    Audio.play('boom'); g.shake(0.5); g.hitstop(0.08); g.flash([0.8, 0.7, 1], 0.25);
+    g.fx.ring(e.c.x, e.c.y, 8, 140, 0.6, '#c4b5ff', 6);
+    g.fx.burst(e.c.x, e.c.y, { n: 30, speed: 400, col: '#ffffff', col1: '#9d8cff', add: true, life: 0.7, size: 3 });
+    for (let i = 0; i < 4; i++) g.fx.debris(e.c.x + rand(-20, 20), e.c.y, T.OBSIDIAN, 4);
+    g.fx.souls(e.c.x, e.c.y, 14, g.player.actor.c, '#c4b5ff', () => { this.sv.glimmer += 3; Audio.play('soul', { gap: 0.02 }); g.ui && g.ui.glimmerBump(); });
+    g.story && g.story.say('The nest is quiet now. The Hollows came from somewhere... someone.', 3.4, true);
+    g.ui && g.ui.toast(`Nest broken · +1 Thread of Light (${this.sv.lights})`);
+    this.nests.delete(x);
+    g.saveNow();
+  }
+
+  // ------------------------------------------------------------ queries for goals and Thread
+  nearestActivity(px) {
+    let best = null, bd = 1e9;
+    const consider = (x, y, kind) => { const d = Math.abs(x - px); if (d < bd) { bd = d; best = { x, y, kind }; } };
+    for (const [x, d] of this.dolls) if (d.state === 'lying') consider(d.actor.c.x, d.actor.c.y - 40, 'doll');
+    for (const [x, s] of this.stitches) if (!s.got) consider(s.px, s.py, 'stitch');
+    for (const [x, n] of this.nests) consider(n.ent.c.x, n.ent.c.y, 'nest');
+    if (!best) {
+      // look further ahead along the road
+      const ptx = Math.floor(px / TILE);
+      for (const kind of ['doll', 'stitch', 'nest']) for (const x of this.sites(kind, ptx - 200, ptx + 200)) {
+        const done = kind === 'doll' ? this.sv.rescued[x] : kind === 'stitch' ? this.sv.stitches[x] : this.sv.nests[x];
+        if (!done) consider(x * TILE + 16, this.game.world.surface(x) * TILE - 40, kind);
+      }
+    }
+    return best;
+  }
+  interactables() {
+    const out = [];
+    for (const [x, d] of this.dolls) if (d.state === 'lying') out.push({ x: d.actor.c.x, y: d.actor.c.y - 20, r: 80, label: 'Wake the doll', verb: 'Wake', act: () => this.wakeDoll(x) });
+    for (const [x, c] of this.chests) if (!c.open) out.push({ x: c.x, y: c.y - 20, r: 70, label: 'Open the chest', verb: 'Open', act: () => this.openChest(x) });
+    return out;
+  }
+  targets() { const out = []; for (const c of this.chests.values()) if (!c.open) out.push(c.ent); return out; }
+  lights(arr) {
+    for (const s of this.stitches.values()) if (!s.got) arr.push({ x: s.px, y: s.py, c: [0.6, 0.95, 1], s: 0.85 });
+    for (const n of this.nests.values()) arr.push({ x: n.ent.c.x, y: n.ent.c.y, c: [0.55, 0.4, 0.9], s: 0.7 });
+    for (const c of this.chests.values()) if (!c.open) arr.push({ x: c.x, y: c.y - 16, c: [1, 0.85, 0.5], s: 0.45 });
+  }
+  draw(ctx, a, layer) {
+    const g = this.game, t = g.time;
+    if (layer === 'back') {
+      for (const n of this.nests.values()) drawNest(ctx, n.ent.c.x, n.ent.c.y + 26, t, n.ent.flash);
+      for (const c of this.chests.values()) { if (c.open) c.t = Math.min(1, c.t + 0.05); drawChest(ctx, c.x, c.y, c.t, t); }
+    }
+    if (layer === 'front') {
+      for (const s of this.stitches.values()) if (!s.got) drawStitch(ctx, s.px, s.py + Math.sin(t * 2 + s.t) * 5, t + s.t);
+      // sleeping dolls glint so you notice them
+      for (const d of this.dolls.values()) if (d.state === 'lying') { ctx.save(); ctx.globalCompositeOperation = 'lighter'; drawGlow(ctx, d.actor.c.x, d.actor.c.y - 20, 40 + Math.sin(t * 2) * 6, [0.62, 0.95, 1], 0.35); ctx.restore(); }
+    }
+  }
+}
+
+export function drawChest(g, x, y, open, t) {
+  g.save();
+  softDisc(g, x, y, 30, '#000000', 0.35);
+  const w = 30, h = 20;
+  const gr = g.createLinearGradient(x - w / 2, 0, x + w / 2, 0);
+  gr.addColorStop(0, '#5e4230'); gr.addColorStop(0.5, '#8a6142'); gr.addColorStop(1, '#4a3424');
+  g.fillStyle = gr; g.beginPath(); g.roundRect(x - w / 2, y - h, w, h, 3); g.fill();
+  g.fillStyle = '#d9a441'; g.fillRect(x - w / 2, y - h + 6, w, 2.5); g.fillRect(x - 9, y - h, 2.5, h); g.fillRect(x + 6.5, y - h, 2.5, h);
+  // lid opening on a hinge at the back
+  g.save(); g.translate(x - w / 2, y - h); g.rotate(-open * 1.9);
+  const lg = g.createLinearGradient(0, -12, 0, 0); lg.addColorStop(0, '#a07450'); lg.addColorStop(1, '#5e4230');
+  g.fillStyle = lg; g.beginPath(); g.roundRect(0, -11, w, 11, [8, 8, 1, 1]); g.fill();
+  g.fillStyle = '#d9a441'; g.fillRect(w / 2 - 2.5, -6, 5, 6);
+  g.restore();
+  if (open > 0) { g.globalCompositeOperation = 'lighter'; softDisc(g, x, y - h, 40, '#ffd98a', 0.5 * (1 - open * 0.6)); }
+  else { g.globalCompositeOperation = 'lighter'; softDisc(g, x, y - h / 2, 22, '#ffd98a', 0.15 + Math.sin(t * 2.5) * 0.08); }
+  g.restore();
+}
+export function drawStitch(g, x, y, t) {
+  g.save();
+  g.globalCompositeOperation = 'lighter';
+  softDisc(g, x, y, 46, '#9ff3ff', 0.35 + Math.sin(t * 3) * 0.08);
+  g.globalCompositeOperation = 'source-over';
+  // a spool wound with her thread
+  g.translate(x, y); g.rotate(Math.sin(t) * 0.2);
+  capsule(g, -9, -8, 9, -8, 2.2, 2.2, '#c9a45c', { dark: 0.4, hi: 0.3 });
+  capsule(g, -9, 8, 9, 8, 2.2, 2.2, '#c9a45c', { dark: 0.4, hi: 0.3 });
+  const gr = g.createLinearGradient(-6, 0, 6, 0); gr.addColorStop(0, '#5fb8c8'); gr.addColorStop(0.5, '#e9fbff'); gr.addColorStop(1, '#5fb8c8');
+  g.fillStyle = gr; g.beginPath(); g.roundRect(-6, -7, 12, 14, 2); g.fill();
+  g.strokeStyle = '#bff6ff'; g.lineWidth = 1.2;
+  g.beginPath(); g.moveTo(6, 2); g.bezierCurveTo(14, 6, 10, 16, 18 + Math.sin(t * 4) * 3, 20); g.stroke();
+  g.restore();
+}
+export function drawNest(g, x, y, t, flash) {
+  g.save();
+  softDisc(g, x, y, 60, '#000000', 0.4);
+  // thorned mound
+  g.fillStyle = flash > 0 ? '#5a4e6a' : '#241e2c';
+  g.beginPath(); g.moveTo(x - 44, y);
+  for (let i = 0; i <= 10; i++) { const u = i / 10, xx = x - 44 + u * 88, h = Math.sin(u * Math.PI) * 46; g.lineTo(xx, y - h - (i % 2 ? 14 : 0)); }
+  g.lineTo(x + 44, y); g.closePath(); g.fill();
+  g.strokeStyle = '#3a3044'; g.lineWidth = 3; g.lineCap = 'round';
+  for (let i = 0; i < 6; i++) { const a = -Math.PI * (0.15 + i * 0.14); g.beginPath(); g.moveTo(x + Math.cos(a) * 26, y + Math.sin(a) * 26); g.lineTo(x + Math.cos(a) * 52, y + Math.sin(a) * 52); g.stroke(); }
+  // pulsing heart inside
+  g.globalCompositeOperation = 'lighter';
+  const p = 0.6 + Math.sin(t * 3) * 0.25;
+  softDisc(g, x, y - 20, 34, '#9d8cff', 0.5 * p);
+  g.fillStyle = rgba('#e6deff', 0.8 * p); g.beginPath(); g.ellipse(x, y - 20, 5, 8, 0, 0, TAU); g.fill();
+  g.restore();
+}

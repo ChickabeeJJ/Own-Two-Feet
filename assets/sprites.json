@@ -1,0 +1,158 @@
+{
+ "props/shrine": [
+  187,
+  156
+ ],
+ "props/campfire": [
+  158,
+  113
+ ],
+ "props/bladestone": [
+  180,
+  208
+ ],
+ "props/hearth": [
+  146,
+  120
+ ],
+ "props/lantern": [
+  150,
+  150
+ ],
+ "props/banner": [
+  158,
+  175
+ ],
+ "props/seed": [
+  168,
+  175
+ ],
+ "icons/b_stone": [
+  62,
+  64
+ ],
+ "icons/b_deepstone": [
+  61,
+  64
+ ],
+ "icons/b_shadowstone": [
+  61,
+  64
+ ],
+ "icons/b_sandstone": [
+  61,
+  64
+ ],
+ "icons/b_snow": [
+  63,
+  64
+ ],
+ "icons/b_earth": [
+  61,
+  64
+ ],
+ "icons/b_wood": [
+  62,
+  64
+ ],
+ "icons/b_planks": [
+  61,
+  64
+ ],
+ "icons/b_brick": [
+  61,
+  64
+ ],
+ "icons/b_ice": [
+  62,
+  64
+ ],
+ "icons/b_marble": [
+  64,
+  64
+ ],
+ "icons/b_obsidian": [
+  60,
+  64
+ ],
+ "icons/b_rootcrystal": [
+  63,
+  64
+ ],
+ "icons/b_sunstone": [
+  63,
+  64
+ ],
+ "icons/b_emberrock": [
+  61,
+  64
+ ],
+ "icons/b_rime": [
+  60,
+  64
+ ],
+ "icons/b_lantern": [
+  69,
+  64
+ ],
+ "icons/b_brazier": [
+  66,
+  64
+ ],
+ "icons/vessel": [
+  69,
+  67
+ ],
+ "icons/vessel_empty": [
+  47,
+  62
+ ],
+ "icons/glimmer": [
+  65,
+  66
+ ],
+ "icons/r_djump": [
+  68,
+  66
+ ],
+ "icons/r_wall": [
+  68,
+  66
+ ],
+ "icons/r_plunge": [
+  70,
+  66
+ ],
+ "icons/r_surge": [
+  68,
+  65
+ ],
+ "icons/r_vessel": [
+  68,
+  65
+ ],
+ "fx/slash": [
+  196,
+  137
+ ],
+ "fx/spark": [
+  128,
+  129
+ ],
+ "fx/wave": [
+  241,
+  132
+ ],
+ "fx/souls": [
+  218,
+  110
+ ],
+ "fx/dust": [
+  172,
+  107
+ ],
+ "fx/thread": [
+  207,
+  95
+ ]
+}

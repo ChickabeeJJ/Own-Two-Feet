@@ -82,7 +82,7 @@ export const BIOMES = [
   },
 ];
 
-export const BIOME_W = 340;   // tiles per biome; each biome ends in a boss gate
+export const BIOME_W = 440;   // tiles per biome; each biome ends in a boss gate
 export const SHRINE_EVERY = 85;
 
 // biome 0 is centred on the spawn; a boss gate stands on every boundary between two biomes

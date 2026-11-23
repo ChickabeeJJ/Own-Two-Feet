@@ -22,7 +22,7 @@ const browser = await chromium.launch({ args: ['--use-gl=swiftshader', '--enable
 // 1) in-game scene captures for the maps sheet
 const scenesDir = path.join(outDir, 'scenes');
 fs.mkdirSync(scenesDir, { recursive: true });
-const scenes = [['meadow', 18], ['glass', 300], ['hollow', 690], ['ember', 1020], ['frost', -330], ['shrine', 103]];
+const scenes = [['meadow', 18], ['glass', 400], ['hollow', 850], ['ember', 1290], ['frost', -420], ['shrine', 103]];
 if (!process.argv[2] || process.argv[2] === 'maps') for (const [name, x] of scenes) {
   const p = await browser.newPage({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1 });
   await p.route(/crazygames-sdk/, r => r.abort());

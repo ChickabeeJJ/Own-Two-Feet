@@ -28,7 +28,7 @@ export class Cape {
       const vx = (this.x[i] - this.ox[i]) * 0.965, vy = (this.y[i] - this.oy[i]) * 0.965;
       this.ox[i] = this.x[i]; this.oy[i] = this.y[i];
       // a little stiffness: the cloth flares back from the shoulders instead of hanging flat
-      this.x[i] += vx + (wind * 25 - facing * 380) * dt * dt * (i / n);
+      this.x[i] += vx + (wind * 25 - facing * (this.flare || 380)) * dt * dt * (i / n);
       this.y[i] += vy + g;
     }
     for (let it = 0; it < 4; it++) {

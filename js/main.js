@@ -9,9 +9,11 @@ import { Enemies } from './game/enemies.js';
 import { Bosses } from './game/bosses.js';
 import { Shrines } from './game/npcs.js';
 import { Story } from './game/story.js';
+import { Content } from './game/content.js';
 import { UI } from './ui/ui.js';
 import { Touch } from './ui/touch.js';
 import { TILE, T } from './world/tiles.js';
+import { loadImages } from './art/images.js';
 
 async function boot() {
   Platform.loadingStart();
@@ -35,20 +37,22 @@ async function boot() {
   if (!st.post && game.post.setEnabled) game.post.setEnabled(false);
 
   // world + player
+  const art = loadImages();
   game.setWorld(sv.seed);
   game.world.loadEdits(sv.edits);
   const start = sv.born && sv.pos ? sv.pos : { x: 4 * TILE + 16, y: game.world.surface(4) * TILE };
   game.player = new Player(game, sv, start.x, start.y);
   game.player.actor.unstick();
   game.cam.x = start.x; game.cam.y = start.y - 70;
-  game.targets = () => game.actors.filter(a => a.team === 'enemy' && a.mode !== 'dead' && !a.removed);
+  game.targets = () => { const t = game.actors.filter(a => a.team === 'enemy' && a.mode !== 'dead' && !a.removed); return game.content ? t.concat(game.content.targets()) : t; };
 
   // systems
   game.enemies = new Enemies(game);
   game.bosses = new Bosses(game);
   game.shrines = new Shrines(game);
   game.story = new Story(game);
-  game.systems.push(game.story, game.shrines, game.enemies, game.bosses);
+  game.content = new Content(game);
+  game.systems.push(game.story, game.content, game.shrines, game.enemies, game.bosses);
   game.systems.push({ draw: (ctx, a, layer) => { if (layer === 'front') game.player.drawCursor(ctx); } });
   game.ui = new UI(game);
   game.touchCtl = new Touch(game);
@@ -91,6 +95,7 @@ async function boot() {
   requestAnimationFrame(probe);
   window.__perf = () => { const s = [...ft].sort((a, b) => a - b); return { avg: +(ft.reduce((a, b) => a + b, 0) / ft.length).toFixed(2), p95: +s[Math.floor(s.length * 0.95)].toFixed(2), actors: game.actors.length, chunks: game.world.chunks.size }; };
 
+  art.then(() => { document.body.classList.add('art'); if (game.wr) game.wr.refreshArt(); if (game.ui) game.ui.hotbarDirty = true; });
   game.start();
   Platform.loadingStop();
   if (!sv.born) game.story.startBirth(); else game.story.quickStart();

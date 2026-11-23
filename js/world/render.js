@@ -6,6 +6,33 @@ import { pattern, grassLip, snowLip } from '../art/tex.js';
 import { drawLantern, drawHearth } from '../art/props.js';
 import { capsule } from '../art/paint.js';
 import { makeLayers, drawClouds, drawSkyFeature } from '../art/bg.js';
+import { texPattern, drawSprite } from '../art/images.js';
+
+// painted texture for a tile in a biome (from the art sheets); null -> procedural fallback
+function texName(t, id) {
+  switch (t) {
+    case T.GRASS: return id === 'frost' ? 'build_snow' : id + '_groundA';
+    case T.DIRT: return id + '_groundB';
+    case T.STONE: return id + '_stone';
+    case T.DEEP: return id + '_rock';
+    case T.MOSS: return id + '_detail';
+    case T.CRYSTAL: return id + '_accent';
+    case T.GOLD: return id + '_ore';
+    case T.EMBER: return 'build_lava';
+    case T.SAND: return 'build_sand';
+    case T.SNOW: return 'build_snow';
+    case T.ICE: return 'build_ice';
+    case T.PLANK: return 'build_plank';
+    case T.BRICK: return 'build_brick';
+    case T.RUIN: case T.GATE: return 'build_stone';
+    case T.MARBLE: return 'build_plaster';
+    case T.OBSIDIAN: return 'build_obsidian';
+    case T.LOG: return id + '_bark';
+    case T.LEAVES: return id + '_foliage';
+  }
+  return null;
+}
+const tp = (g, t, id) => { const n = texName(t, id); return n ? texPattern(g, n) : null; };
 
 const RC = 16;           // render block size in tiles
 const PAD = 14;          // world px of overdraw around a block (grass, caps, rounded bits)
@@ -114,7 +141,7 @@ export class WorldRenderer {
       if (!dn) { g.fillStyle = shade(col, -0.32); g.beginPath(); g.arc(x + 16, y + 21, 22, 0, TAU); g.fill(); }
     } else if (pass === 1) {
       // one merged mass filled with painted foliage
-      g.fillStyle = pattern(g, 'leaf', col);
+      g.fillStyle = tp(g, T.LEAVES, kind) || pattern(g, 'leaf', col);
       g.beginPath(); g.arc(x + 16, y + 16, 23.5, 0, TAU); g.fill();
       const disc = (cx, cy, r) => { g.beginPath(); g.arc(cx, cy, r, 0, TAU); g.fill(); };
       if (!up) disc(x + 16 + ox * 1.5, y + 2 + oy, 11 + h * 5);
@@ -136,7 +163,7 @@ export class WorldRenderer {
     const [mat, col, extra] = matOf(w, p);
     const n = !W.wall(tx, ty - 1), s = !W.wall(tx, ty + 1), e = !W.wall(tx + 1, ty), wv = !W.wall(tx - 1, ty);
     const R = 9;
-    g.fillStyle = pattern(g, mat, col, extra);
+    g.fillStyle = tp(g, w, p.id) || pattern(g, mat, col, extra);
     roundTile(g, x, y, TILE, TILE, n && wv ? R : 0, n && e ? R : 0, s && e ? R : 0, s && wv ? R : 0);
     // back walls sit in shadow and haze
     g.fillStyle = rgba(mix('#05040a', p.fog, 0.18), 0.62);
@@ -163,13 +190,14 @@ export class WorldRenderer {
       return;
     }
     const [mat, col, extra] = matOf(t, p);
-    g.fillStyle = pattern(g, mat, col, extra);
-    if (t === T.ICE) g.globalAlpha = 0.85;
+    const painted = tp(g, t, p.id);
+    g.fillStyle = painted || pattern(g, mat, col, extra);
+    if (t === T.ICE) g.globalAlpha = 0.9;
     roundTile(g, x, y, TILE, TILE, rNW, rNE, rSE, rSW);
     g.globalAlpha = 1;
     // ore and veins
     if (t === T.CRYSTAL) {
-      for (let k = 0; k < 3; k++) {
+      for (let k = 0; k < (painted ? 1 : 3); k++) {
         const hx = hash2(tx, ty, 10 + k), hy = hash2(tx, ty, 20 + k);
         const cx = x + 6 + hx * 20, cy = y + 6 + hy * 20, r = 4 + hash2(tx, ty, 30 + k) * 5;
         g.fillStyle = shade(base, -0.25); g.beginPath(); g.moveTo(cx, cy - r * 1.4); g.lineTo(cx + r * 0.7, cy); g.lineTo(cx, cy + r); g.lineTo(cx - r * 0.7, cy); g.closePath(); g.fill();
@@ -186,10 +214,14 @@ export class WorldRenderer {
     }
     // exposed faces: turf / snow cap on top, lit rim, shade underneath and on the far side
     if (n) {
-      if (t === T.GRASS) {
+      if (t === T.GRASS && painted && p.id !== 'frost') {
+        const lg = g.createLinearGradient(0, y, 0, y + 7);
+        lg.addColorStop(0, rgba('#ffffff', 0.28)); lg.addColorStop(1, rgba('#ffffff', 0));
+        g.fillStyle = lg; g.fillRect(x + (rNW ? 6 : 0), y, TILE - (rNW ? 6 : 0) - (rNE ? 6 : 0), 7);
+      } else if (t === T.GRASS && p.id !== 'frost') {
         const lip = grassLip(p.grass, p.grassHi);
         g.drawImage(lip, ((tx % 4) + 4) % 4 * 32, 0, 32, lip.height, x - 0.3, y - 7, 32.6, lip.height);
-      } else if (t === T.SNOW || (p.id === 'frost' && (t === T.STONE || t === T.DIRT))) {
+      } else if (t === T.SNOW || (p.id === 'frost' && (t === T.GRASS || t === T.STONE || t === T.DIRT))) {
         const lip = snowLip();
         g.drawImage(lip, ((tx % 4) + 4) % 4 * 32, 0, 32, lip.height, x - 0.3, y - 5, 32.6, lip.height);
       } else {
@@ -232,7 +264,7 @@ export class WorldRenderer {
       if (foot) { g.quadraticCurveTo(x + 16 + 6, y + TILE - 6, x + 16 + wBot / 2, y + TILE + 0.5); g.lineTo(x + 16 - wBot / 2, y + TILE + 0.5); g.quadraticCurveTo(x + 16 - 6, y + TILE - 6, x + 16 - wTop / 2, y); }
       else { g.lineTo(x + 16 + wBot / 2, y + TILE + 0.5); g.lineTo(x + 16 - wBot / 2, y + TILE + 0.5); }
       g.closePath();
-      g.fillStyle = pattern(g, 'bark', col); g.fill();
+      g.fillStyle = tp(g, T.LOG, kind) || pattern(g, 'bark', col); g.fill();
       const sh = g.createLinearGradient(x + 16 - 9, 0, x + 16 + 9, 0);
       sh.addColorStop(0, rgba('#ffffff', 0.12)); sh.addColorStop(0.45, rgba('#000000', 0)); sh.addColorStop(1, rgba('#000000', 0.42));
       g.fillStyle = sh; g.fill();
@@ -255,15 +287,17 @@ export class WorldRenderer {
       g.fillStyle = '#e6deff'; g.beginPath(); g.arc(x + 12, y + 15, 1.5, 0, TAU); g.arc(x + 19, y + 16, 1.2, 0, TAU); g.fill();
       return;
     }
+    if (t === T.LANTERN && drawSprite(g, 'icons/b_lantern', x + 16, y + 30, 28)) return;
     if (t === T.LANTERN) {
       const hang = TILES[W.get(tx, ty - 1)].solid && !TILES[W.get(tx, ty + 1)].solid;
       if (hang) { g.strokeStyle = '#2d2a30'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(x + 16, y); g.lineTo(x + 16, y + 8); g.stroke(); drawLantern(g, x + 16, y + 17, 1, 0); }
       else { capsule(g, x + 16, y + TILE, x + 16, y + 20, 2.2, 2, '#3a3036', { dark: 0.5 }); drawLantern(g, x + 16, y + 12, 1, 0); }
       return;
     }
-    if (t === T.HEARTH) { drawHearth(g, x + 16, y + TILE, 0.62, 0.5); return; }
+    if (t === T.HEARTH) { if (!drawSprite(g, 'icons/b_brazier', x + 16, y + TILE + 2, 34)) drawHearth(g, x + 16, y + TILE, 0.62, 0.5); return; }
   }
 
+  refreshArt() { for (const c of this.cache.values()) c.dirty = true; }
   ensureScale(s) {
     const q = Math.max(0.5, Math.round(s * 8) / 8);
     if (Math.abs(q - this.scale) > 1e-3) {

@@ -7,6 +7,7 @@ import { TILE, T, TILES, SHRINE_EVERY, gateNear } from '../world/tiles.js';
 import { ARENA_HALF } from '../world/world.js';
 import { clamp, lerp, rand, sign, TAU, rgba, hash2 } from '../core/util.js';
 import { drawGlow } from '../world/light.js';
+import { IMG } from '../art/images.js';
 
 // ---------------------------------------------------------------- projectiles
 export class Proj {
@@ -65,7 +66,11 @@ export class Proj {
   draw(ctx) {
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
-    if (this.kind === 'wave') {
+    if (this.kind === 'wave' && IMG['fx/wave']) {
+      const im = IMG['fx/wave'], h = 64, w = im.width * h / im.height;
+      ctx.globalAlpha = Math.min(1, this.life * 2);
+      ctx.drawImage(im, this.x - w / 2, this.y - h + 6, w, h);
+    } else if (this.kind === 'wave') {
       const g = ctx.createLinearGradient(0, this.y - 46, 0, this.y);
       g.addColorStop(0, rgba(this.col, 0)); g.addColorStop(1, rgba(this.col, 0.85));
       ctx.fillStyle = g;
@@ -195,8 +200,8 @@ export function drawWispSprite(ctx, x, y, t, col, o = {}) {
 }
 
 // ---------------------------------------------------------------- ragdoll enemies
-export const HUSK_LOOK = (eye) => ({ body: '#1f1b26', shade: '#15121a', mat: 'cloth', eyes: eye, eyeStyle: 'none', head: 'mask', maskCol: '#ece6da', cape: null, blade: null, marks: [], rim: '#ffcf9e', cloak: '#3b3346', claws: '#e6dfd2', seams: false, arms: 0.9, legs: 0.85 });
-export const BRUTE_LOOK = (eye) => ({ body: '#3a3440', shade: '#26222b', mat: 'cloth', eyes: eye, eyeStyle: 'none', head: 'mask', maskCol: '#d8d0c2', maskHorns: true, cape: { col: '#4a3a3a', style: 'cape', len: 6 }, blade: null, marks: [], rim: '#ffcf9e', armor: '#5a5262', gaunt: true, bulk: 1.18, arms: 1.15, seams: false, cloak: '#3b3346' });
+export const HUSK_LOOK = (eye) => ({ body: '#2a2630', limb: '#2a2630', coat: '#2a2630', maskCol: '#d8c7a8', hoodCol: '#24202a', head: 'crescent', mat: 'cloth', eyes: eye, eyeStyle: 'slit', cape: { col: '#3b3640', style: 'scarf', len: 5, wide: 3.4 }, cloakLong: '#33303a', blade: null, marks: [], rim: '#ffcf9e', claws: '#e6dfd2', bootCol: '#1e1b22', belt: false, arms: 0.95 });
+export const BRUTE_LOOK = (eye) => ({ body: '#3a3238', limb: '#2e2930', coat: '#2e2930', head: 'ears', headK: 1.35, mat: 'cloth', eyes: eye, eyeStyle: 'slit', cape: null, cloakLong: '#2b2730', trim: '#c9a45c', blade: null, marks: [], rim: '#ffcf9e', gaunt: true, gloves: '#3a3238', bulk: 1.25, arms: 1.15, bootCol: '#1e1b22', belt: false });
 
 export class Enemies {
   constructor(game) {
@@ -204,7 +209,7 @@ export class Enemies {
     this.spawnT = 4;
     this.calm = 50;        // seconds of peace at the very start
   }
-  get list() { return this.game.actors.filter(a => a.team === 'enemy' && !a.isBoss); }
+  get list() { return this.game.actors.filter(a => a.team === 'enemy' && !a.isBoss && a.kind !== 'nest' && a.kind !== 'dummy'); }
   update(dt) {
     const g = this.game, P0 = g.player;
     if (!P0 || g.cinematic) return;

@@ -17,7 +17,10 @@ No loading screen, no menu. The game opens mid-fall:
 1. **Seconds 0–10: the fall.** You are already plummeting through a dusk sky, steering left and right to catch motes of light (each one is glimmer) while four lines of lore are told over the wind, clouds and speed lines.
 2. **The impact.** Slow motion, white-out, a shockwave across the meadow, and your body tumbles physically across the grass.
 3. **Getting up.** Thread climbs out of your chest: *"Up. You have to get up."* Two presses and the ragdoll pushes onto a knee, then stands. A Warden roars somewhere far away, a horned giant watches from the horizon, and the title card lands.
-4. **A clear chain of goals** (always shown top left with the keys to press, and Thread flies ahead to point the way): take the blade, defeat the Hollow that claws out of the ground, break 5 blocks, follow Thread to the fire, rest at the shrine, defeat the Hollow Warden, make a home, walk on.
+4. **A short tutorial** (a slim banner at the top, skippable, with the right keys or touch buttons shown): walk, jump, take the blade, strike a straw training doll, dash, break a block, place it. Then the first Hollow claws out of the ground.
+5. **A clear chain of goals** (always shown top left, and Thread flies ahead to point the way): reach the shrine, rest, gather Threads of Light, then face the Hollow Warden, make a home, walk on.
+
+The first boss is about 220 tiles away and its gate stays sealed until you carry enough Threads of Light, so the opening is exploration, not a boss rush. A warden's cinematic intro plays only the first time you meet it; later attempts get a short name card and the fight starts at once.
 
 Returning players drop straight back where they were. Esc skips the opening.
 
@@ -40,7 +43,7 @@ Returning players drop straight back where they were. Esc skips the opening.
 | M | Mute |
 | Esc | Menu |
 
-Gamepad and touch are supported. Phones get a floating stick, action buttons and a build toggle (tap a block to break it, tap empty space to place).
+Gamepad and touch are supported. Phones get a floating stick that appears wherever the left thumb lands, large thumb-sized buttons arranged in an arc (Strike biggest, then Jump, Dash, Mend, Build), sized from the screen so they stay comfortable on any phone, haptic ticks, and a contextual action button (Talk, Rest, Open, Wake, Read) that appears only when there is something to use. Build mode: tap a block to break it, tap empty space to place.
 
 ## The ragdoll: new physics
 
@@ -59,18 +62,31 @@ The character keeps the look of the Rag Toss and Rag Showdown mannequin (cream b
 - **Five biomes** that cycle with distance and darken with each loop: the Pale Meadow, the Glass Wood, the Hollow Below, the Ember Reach and the Frost Spires. Each has its own palette, parallax silhouettes, ambient particles, colour grade and generative score.
 - **Boss gates.** Every boundary between biomes is an arena held by a warden. Three archetypes with stronger variants: the Hollow Warden and the Pyre Knight (giant ragdolls: slam waves, wall-stunning charges, leaps), the Glass Widow and the Still Queen (flying ragdolls: volleys, dives, summons, rings, icefall), and the Unmade Heart (a core wrapped in torn-up blocks: throws, pound, spin). Tier scales health and adds patterns; a second phase starts at half health.
 - **Shrines** every ~85 tiles. Rest to heal, save and set your respawn. Each is kept by someone: a wanderer (trades blocks), a smith (hones your blade, forges hearths), a sage (more vessels, faster mending) or a tailor (cosmetics). Invite them to live at your hearth.
+- **Things to do between gates** (`js/game/content.js`), all placed by the world seed:
+  - *Threads of Light*: the currency that opens warden gates (4, then 7, 10, ... per gate). You earn them from everything below.
+  - *Lost dolls* lying limp in the grass. Wake them and they thank you with a Thread.
+  - *Chests* with glimmer, blocks and sometimes a cosmetic.
+  - *Lost stitches*: glowing scraps that each hold one line of the world's lore, kept in the Journal.
+  - *Hollow nests* that keep birthing husks until you break them.
+  - *Keeper favours*: every keeper asks for something (blocks, nests broken, dolls woken) and pays in Threads, glimmer or looks.
+  - The **Journal** tab tracks Threads, rescues, chests, lore and open favours.
 - **Home.** Place a Hearth and that spot becomes home: your respawn point, and where the people you invite go to live.
 
 ## Art pipeline and asset sheets
 
-All art is generated in code from one art bible (`js/art/paint.js`, header comment): painterly gradients and soft-shaded forms, key light from the upper left, rim light from behind, no outlines.
+The painted art comes from hand-made reference sheets, cut up by `tools/extract_assets.py` into `assets/`:
 
-- `js/art/doll.js`: characters. Tapered capsule anatomy shaded like cylinders, a torso hull, mitten hands and boots, stitched seams and mouth, the glowing thread in the chest, and accessories that give every role one readable silhouette (sash, cloak, robe, apron, pack, wide hat, staff, hammer, armour plates, bone masks, claws).
-- `js/art/tex.js`: seamless 128 px material textures per biome (soil with pebbles and roots, faceted cracked stone, deepstone, moss, sand, snow, ice, planks, brick, old stone, marble, nightglass, ember rock, bark, foliage), grass and snow lips.
-- `js/art/props.js`: shrine, campfire, blade in stone, hearth, lanterns, gate banners, the seed of light, isometric block icons, vessels, glimmer, relic medallions, effect frames.
+- `assets/tex/`: seamless 128 px textures per biome (surface, soil, stone, deepstone, moss, ore, bark, foliage) and built blocks (planks, brick, stone, plaster, nightglass, ember rock, sand, snow, ice). Edges are made seamless by rolling and blending each tile.
+- `assets/props/`: shrine, campfire, blade in stone, hearth, lantern, gate banner, seed of light, with the sheet background removed.
+- `assets/icons/`: block icons, vessels, glimmer, relic medallions.
+- `assets/fx/`: slash, hit spark, shockwave, soul glimmer, dust, thread trail.
+
+`js/art/images.js` loads them (pattern fills for tiles, sprites for props and icons). Characters are drawn in code to match the character reference (`js/art/doll.js`): round heads with dot eyes, scarves, belts and boots, cloaks and hoods, painted with soft shading and no outlines. Anything not on the sheets is still generated in code from the art bible (`js/art/paint.js`): key light from the upper left, rim light from behind.
+
+- `js/art/tex.js`, `js/art/props.js`: code-drawn fallbacks used if an image fails to load.
 - `js/art/bg.js`: painted parallax flats with rim light and haze, cloud banks, and one sky set piece per biome (floating isles, glowing crystal spires, a stone sky, a smoking volcano, an aurora).
 
-The asset sheets in `art/sheets/` are rendered from that same code (so they always match the game): `characters.png`, `maps.png` (materials, trees and in-game captures of every biome) and `assets.png` (props, items, interface, effects). Rebuild them with `node tools/sheets.mjs`.
+The asset sheets in `art/sheets/` are rendered from that same code (so they always match the game): `characters.png`, `maps.png` (materials and in-game captures of every biome) and `assets.png` (props, items, interface, effects). Rebuild them with `node tools/sheets.mjs`.
 
 ## Look and feel
 
@@ -106,13 +122,16 @@ js/core/                input, audio synth + generative music, WebGL post FX, ma
 js/physics/             body.js (XPBD ragdoll), pose.js (procedural animation), skin.js (rendering, cape)
 js/world/               tiles.js (tiles, biomes), world.js (generation, chunks, edits), render.js, light.js
 js/game/                game.js (loop, camera, render pipeline), actor.js, player.js, enemies.js,
-                        bosses.js, npcs.js (shrines, keepers, home), story.js (cinematics, hints),
+                        bosses.js, npcs.js (shrines, keepers, favours, home), content.js (dolls, chests,
+                        lore, nests, Threads of Light), story.js (cinematics, tutorial, goals), thread.js,
                         progress.js (save, cosmetics, relics, recipes), fx.js
-js/ui/                  ui.js (HUD, cards, dialog, menus, editor), touch.js
+js/art/                 images.js (sheet art loader), doll.js (characters), bg.js, paint.js, tex.js, props.js
+js/ui/                  ui.js (HUD, tutorial, journal, cards, dialog, menus, editor), touch.js
+assets/tex, props, icons, fx   art cut from the reference sheets
 js/net/net.js           multiplayer
 vendor/peerjs.min.js    PeerJS 1.5.4 (MIT)
 assets/fonts/           Cormorant Garamond, Manrope (OFL)
-tools/                  headless test harness
+tools/                  headless test harness, extract_assets.py (sheet cutter)
 ```
 
 ## Testing
@@ -121,8 +140,11 @@ The `tools/` folder drives the real game in headless Chromium (Playwright):
 
 ```bash
 node tools/shot.mjs birth      # the first-launch sequence, screenshots to /tmp/otf-shots
+node tools/shot.mjs tut        # the tutorial runs start to finish (training doll, dash, mine, place)
+node tools/shot.mjs content    # wake a doll, open a chest, read a stitch, break a nest
+node tools/shot.mjs gates      # a gate stays sealed without Threads of Light
 node tools/shot.mjs fight      # husk, brute and wisp combat
-node tools/shot.mjs boss       # first gate: intro, fight, death, relic
+node tools/shot.mjs boss       # first gate: intro once, fight, death, relic; no intro on a retry
 node tools/shot.mjs build      # mine with the mouse, place a hearth, home is set
 node tools/shot.mjs persist    # save, reload, edits and progress survive; death and respawn
 node tools/shot.mjs shrine     # meet a keeper, dialogue, menus, editor, craft
