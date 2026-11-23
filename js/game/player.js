@@ -460,6 +460,7 @@ export class Player {
     // the hammer's slam meets the ground
     if (step.quake && at.t > 0.55 && !at.quaked) { at.quaked = true; this.quake(step); }
     const tipSpeed = Math.hypot(seg.x1 - prev.x1, seg.y1 - prev.y1) / dt;
+    if (g.trees) g.trees.bladeHit(seg, at, a.facing, W);
     for (const e of g.targets()) {
       if (at.hits.has(e.id) || e.mode === 'dead') continue;
       if (Math.abs(e.c.x - a.c.x) > 260 * e.scale || Math.abs(e.cy - a.cy) > 260 * e.scale) continue;

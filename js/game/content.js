@@ -12,6 +12,7 @@ import { ARENA_HALF } from '../world/world.js';
 import { hash2, rand, clamp, lerp, sign, TAU, rgba } from '../core/util.js';
 import { drawGlow } from '../world/light.js';
 import { softDisc, capsule, ballShade, shade } from '../art/paint.js';
+import { IMG } from '../art/images.js';
 import { lookFromSave, newSave, COSMETICS, Save } from './progress.js';
 
 export const LORE = [
@@ -293,12 +294,31 @@ export class Content {
     for (const n of this.nests.values()) arr.push({ x: n.ent.c.x, y: n.ent.c.y, c: [0.55, 0.4, 0.9], s: 0.7 });
     for (const c of this.chests.values()) if (!c.open) arr.push({ x: c.x, y: c.y - 16, c: [1, 0.85, 0.5], s: 0.45 });
   }
+  // the painted cave mouth sits over each tunnel opening (world.mouthEntrances finds them)
+  drawMouths(ctx) {
+    const g = this.game, W = g.world, im = IMG['req/cave_mouth'];
+    if (!im || !W.mouthEntrances) return;
+    const v = g.view, tx0 = Math.floor((v.x0 - 200) / TILE), tx1 = Math.ceil((v.x1 + 200) / TILE);
+    for (const m of W.mouthEntrances(tx0, tx1)) {
+      const w = 6.2 * TILE, h = w * im.height / im.width;
+      ctx.drawImage(im, m.x - w / 2, m.y - h + 10, w, h);
+    }
+  }
   draw(ctx, a, layer) {
     const g = this.game, t = g.time;
     if (layer === 'back') {
+      this.drawMouths(ctx, a);
       for (const n of this.nests.values()) drawNest(ctx, n.ent.c.x, n.ent.c.y + 26, t, n.ent.flash);
-      for (const d of this.dolls.values()) if (d.state === 'lying' || d.state === 'thanks') drawMossBed(ctx, d.bedX ?? (d.bedX = d.actor.c.x), d.bedY ?? (d.bedY = d.actor.c.y), d.state === 'thanks' ? clamp(d.t / 5.2, 0, 1) : 1);
-      for (const c of this.chests.values()) { if (c.open) c.t = Math.min(1, c.t + 0.05); drawChest(ctx, c.x, c.y, c.t, t); }
+      // an opened chest lingers a moment, then fades away
+      for (const c of this.chests.values()) {
+        if (c.open) { c.t = Math.min(1, c.t + 0.05); if (c.openT == null) c.openT = t; }
+        const fade = c.open ? 1 - clamp((t - c.openT - 2.2) / 0.9, 0, 1) : 1;
+        if (fade <= 0) continue;
+        ctx.save(); ctx.globalAlpha *= fade;
+        if (fade < 1) { ctx.translate(c.x, c.y); ctx.scale(1, 0.85 + 0.15 * fade); ctx.translate(-c.x, -c.y); }
+        drawChest(ctx, c.x, c.y, c.t, t); ctx.restore();
+        if (fade < 1 && !c.puffed) { c.puffed = true; g.fx.dust(c.x, c.y - 6, 10, '#e8dccb', -Math.PI / 2, 90); g.fx.burst(c.x, c.y - 14, { n: 10, speed: 70, col: '#fff1d0', col1: '#ffd9a0', add: true, life: 0.8, size: 2, kind: 'mote' }); }
+      }
     }
     if (layer === 'front') {
       for (const s of this.stitches.values()) if (!s.got) drawStitch(ctx, s.px, s.py + Math.sin(t * 2 + s.t) * 5, t + s.t);
@@ -362,6 +382,19 @@ export function drawStitch(g, x, y, t) {
   g.restore();
 }
 export function drawNest(g, x, y, t, flash) {
+  const im = IMG['req/nest'];
+  if (im) {
+    g.save();
+    softDisc(g, x, y, 62, '#000000', 0.4);
+    const p = 0.6 + Math.sin(t * 3) * 0.25, br = 1 + Math.sin(t * 3) * 0.02, w = 120 * br, h = w * im.height / im.width;
+    if (flash > 0) g.filter = 'brightness(1.8)';
+    g.drawImage(im, x - w / 2, y - h + 6, w, h);
+    g.filter = 'none';
+    g.globalCompositeOperation = 'lighter';
+    softDisc(g, x, y - h * 0.42, 40, '#9d8cff', 0.45 * p);
+    g.restore();
+    return;
+  }
   g.save();
   softDisc(g, x, y, 60, '#000000', 0.4);
   // thorned mound

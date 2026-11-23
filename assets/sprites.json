@@ -8,8 +8,8 @@
   113
  ],
  "props/bladestone": [
-  180,
-  208
+  149,
+  125
  ],
  "props/hearth": [
   146,
@@ -174,5 +174,81 @@
  "trees/frost": [
   119,
   248
+ ],
+ "req/cave_mouth": [
+  208,
+  116
+ ],
+ "req/nest": [
+  130,
+  95
+ ],
+ "req/satchel": [
+  131,
+  102
+ ],
+ "req/ladder": [
+  57,
+  95
+ ],
+ "req/platform": [
+  101,
+  43
+ ],
+ "req/door": [
+  60,
+  100
+ ],
+ "req/step": [
+  83,
+  44
+ ],
+ "req/chest": [
+  82,
+  66
+ ],
+ "req/bench": [
+  97,
+  77
+ ],
+ "req/forge": [
+  88,
+  92
+ ],
+ "req/loom": [
+  83,
+  84
+ ],
+ "req/draught": [
+  56,
+  80
+ ],
+ "req/flare": [
+  61,
+  64
+ ],
+ "req/charge": [
+  58,
+  80
+ ],
+ "req/lamp": [
+  47,
+  76
+ ],
+ "req/pick_gilt": [
+  67,
+  76
+ ],
+ "req/pick_crystal": [
+  69,
+  76
+ ],
+ "req/charm_thread": [
+  51,
+  77
+ ],
+ "req/charm_ember": [
+  51,
+  76
  ]
 }

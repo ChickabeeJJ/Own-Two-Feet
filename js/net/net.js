@@ -202,7 +202,15 @@ export class Net {
     this.peer = null; this.hostConn = null; this.active = false; this.isGuest = false;
     if (wasPublic) {
       // take over the shard if it is free, keeping this world exactly as it is
-      setTimeout(() => this.claimShard(this.shard, true), rand(300, 1800));
+      // the old host's id can linger on the server, and the other guests race for it: keep trying for a while
+      let tries = 0;
+      const attempt = async () => {
+        if (this.active) return;
+        const r = await this.claimShard(this.shard, true);
+        if (r !== 'ok' && !this.active && ++tries < 10) setTimeout(attempt, rand(1200, 2600));
+        else if (r !== 'ok' && !this.active) this.toast('The open world is out of reach right now');
+      };
+      setTimeout(attempt, rand(300, 1800));
     } else this.returnHome();
   }
 

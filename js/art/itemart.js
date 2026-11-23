@@ -82,6 +82,16 @@ export function drawPart(g, t, x, y, nb = () => 0) {
       g.fillStyle = rgba('#ffffff', 0.18); g.fillRect(x + 2, y + 16, 28, 2);
       return;
     }
+    case T.STORE: case T.BENCH: case T.FORGE: case T.LOOM: {
+      const im = IMG['req/' + { [T.STORE]: 'chest', [T.BENCH]: 'bench', [T.FORGE]: 'forge', [T.LOOM]: 'loom' }[t]];
+      if (!im) break;
+      const hgt = { [T.STORE]: 27, [T.BENCH]: 32, [T.FORGE]: 40, [T.LOOM]: 36 }[t], w = im.width * hgt / im.height;
+      softDisc(g, x + 16, y + 31, w * 0.55, '#000000', 0.28);
+      g.drawImage(im, x + 16 - w / 2, y + 32.5 - hgt, w, hgt);
+      return;
+    }
+  }
+  switch (t) {
     case T.STORE: {
       softDisc(g, x + 16, y + 31, 16, '#000000', 0.25);
       woodRect(g, x + 3, y + 14, 26, 18, WOOD, 3);
@@ -239,9 +249,16 @@ function drawSpecial(g, id, cx, cy, s) {
   g.restore();
 }
 
+// the painted request sheet: items and parts that have a hand-painted icon
+const REQ_ICON = { i_draught: 'draught', i_flare: 'flare', i_charge: 'charge', g_lamp: 'lamp', g_pick_gilt: 'pick_gilt', g_pick_crystal: 'pick_crystal',
+  g_charm_thread: 'charm_thread', g_charm_ember: 'charm_ember', [T.LADDER]: 'ladder', [T.PLATFORM]: 'platform', [T.DOOR]: 'door', [T.STEP]: 'step',
+  [T.STORE]: 'chest', [T.BENCH]: 'bench', [T.FORGE]: 'forge', [T.LOOM]: 'loom' };
+function reqImg(id) { const n = REQ_ICON[id]; return n ? IMG['req/' + n] : null; }
 // draw any item's icon centred at (cx, cy) inside an s x s box
 export function drawItemIcon(g, id, cx, cy, s) {
   if (typeof id === 'string' && /^\d+$/.test(id)) id = +id;
+  const rq = reqImg(id);
+  if (rq) { const k = Math.min(s * 0.86 / rq.width, s * 0.86 / rq.height); const w = rq.width * k, h = rq.height * k; g.drawImage(rq, cx - w / 2, cy - h / 2, w, h); return; }
   if (typeof id !== 'number') { drawSpecial(g, id, cx, cy, s); return; }
   const im = TILE_ICON[id] && IMG['icons/b_' + TILE_ICON[id]];
   if (im) { const h = s * 0.92, w = im.width * h / im.height; g.drawImage(im, cx - w / 2, cy - h / 2, w, h); return; }
@@ -264,7 +281,7 @@ export function drawItemIcon(g, id, cx, cy, s) {
 // cached DOM-ready icon (canvas copy) for menus and the hotbar
 const cache = new Map();
 export function itemIconEl(id, size = 40) {
-  const key = id + '|' + size + '|' + (IMG['icons/b_stone'] ? 1 : 0);
+  const key = id + '|' + size + '|' + (IMG['icons/b_stone'] ? 1 : 0) + (IMG['req/bench'] ? 1 : 0);
   let src = cache.get(key);
   if (!src) {
     const d = Math.min(2, devicePixelRatio || 1);

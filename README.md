@@ -1,6 +1,6 @@
 # On Two Feet
 
-An open-world, cinematic 2D sandbox. You are a ragdoll that falls out of the sky as a seed of light, learns to stand, and then makes an endless world its own: you dig and build, meet the people who keep its shrines, raise a home, and walk through gate after gate held by stronger and stronger wardens. Every warden you beat leaves a mark on your body, so no two players end up looking alike.
+An open-world, cinematic 2D sandbox. You are a cloth doll that falls out of the sky as a seed of light, learns to stand, and then makes an endless world its own: you dig and build, meet the people who keep its shrines, raise a home, and walk through gate after gate held by stronger and stronger wardens. Every warden you beat leaves a mark on your body, so no two players end up looking alike.
 
 Pure HTML5 and vanilla JavaScript (ES modules). No build step, no runtime dependencies. All art is drawn in code, every sound is synthesized, fonts and PeerJS are vendored. CrazyGames SDK v3 is wrapped and fully guarded.
 
@@ -12,13 +12,15 @@ Before the world, there was a needle and a thread. The Seamstress stitched the l
 
 ## The first minute (the hook)
 
-No loading screen, no menu. The game opens mid-fall:
+No loading screen, no menu. The game opens on a short, skippable prologue (any key after a moment, or Esc):
 
-1. **Seconds 0–10: the fall.** You are already plummeting through a dusk sky, steering left and right to catch motes of light (each one is glimmer) while four lines of lore are told over the wind, clouds and speed lines.
-2. **The impact.** Slow motion, white-out, a shockwave across the meadow, and your body tumbles physically across the grass.
-3. **Getting up.** Thread climbs out of your chest: *"Up. You have to get up."* Two presses and the ragdoll pushes onto a knee, then stands. A Warden roars somewhere far away, a horned giant watches from the horizon, and the title card lands.
-4. **A short tutorial** (a slim banner at the top, skippable, with the right keys or touch buttons shown): walk, jump, take the blade, strike a straw training doll, dash, break a block, place it. Then the first Hollow claws out of the ground.
-5. **A clear chain of goals** (always shown top left, and Thread flies ahead to point the way): reach the shrine, rest, gather Threads of Light, then face the Hollow Warden, make a home, walk on.
+1. **Black.** A heartbeat and the first line: the Seamstress stitched the land awake, and dolls to walk it.
+2. **The seed of light** drifts down through layered clouds, flaring as it falls.
+3. **The five Wardens** stand on a dark horizon, each a silhouette with its own glow and name, while the second line explains how her needles shut every gate.
+4. **The fall.** A burst of light, and you are plummeting through a dusk sky, steering to catch motes of light (glimmer) while the last lines are told over the wind.
+5. **The impact and getting up.** Slow motion, white-out, a shockwave across the meadow; Thread climbs out of your chest (*"Up. You have to get up."*), the doll pushes onto a knee and stands, a Warden roars far away and the title card lands.
+6. **A short tutorial** (a compact banner with a progress ring, the keys or touch button to use, the matching touch button pulsing; skippable): walk, jump, take the blade from the stone, strike a glowing training doll, dash, break a block, place it, then turn timber into planks in the satchel. Then the first Hollow claws out of the ground.
+7. **A clear chain of goals** (always shown top left, and Thread flies ahead to point the way): reach the shrine, rest, gather Threads of Light, then face the Hollow Warden, make a home, walk on.
 
 The first boss is about 220 tiles away and its gate stays sealed until you carry enough Threads of Light, so the opening is exploration, not a boss rush. A warden's cinematic intro plays only the first time you meet it; later attempts get a short name card and the fight starts at once.
 
@@ -31,8 +33,9 @@ Returning players drop straight back where they were. Esc skips the opening.
 | A / D, arrows | Walk |
 | Space, W | Jump. Again in the air once you earn *Second Wind* |
 | Shift, K | Dash |
-| J, left click | Strike. Hold up or down to aim (down in the air bounces off enemies) |
-| Hold left click on a block | Break it (only blocks you can see; with an enemy close, a click strikes instead). Cutting a trunk fells the whole tree for timber |
+| Hold Ctrl or C | Crawl through one-block gaps |
+| J, left click | Strike: a combo chain per weapon. Hold to charge a heavy attack; strike just as a foe's blow lands to parry. Hold up to launch, down in the air to bounce |
+| Hold left click on a block | Break it (only blocks you can see; with an enemy close, a click strikes instead). Strike a trunk a few times and the tree topples for timber |
 | Right click | Place the chosen block: a ghost shows where it goes, red when it can't (with the reason on click). Click a block's face to build onto it, hold and drag to lay a line. Shift places a back wall |
 | 1-9, mouse wheel | Choose what's in hand (blocks, parts, flares, draughts) |
 | R | Use what's in hand (throw a flare or charge toward the pointer, drink a draught); right click works too |
@@ -46,35 +49,67 @@ Returning players drop straight back where they were. Esc skips the opening.
 | M | Mute |
 | Esc | Menu |
 
-Gamepad and touch are supported. Phones get a floating stick that appears wherever the left thumb lands, large thumb-sized buttons arranged in an arc (Strike biggest, then Jump, Dash, Mend, Build), sized from the screen so they stay comfortable on any phone, haptic ticks, and a contextual action button (Talk, Rest, Open, Wake, Read) that appears only when there is something to use. Build mode: hold a block to dig it, touch open space to place, drag to dig or lay a whole line.
+Moving into a wall two or three blocks high while in the air grabs the ledge and pulls you up.
+
+Gamepad and touch are supported. Phones get a floating stick that appears wherever the left thumb lands, large thumb-sized buttons arranged in an arc (Strike biggest, then Jump, Dash, Mend, Build, Bag, and Crawl under Jump), sized from the screen so they stay comfortable on any phone, haptic ticks, and a contextual action button (Talk, Rest, Open, Wake, Read) at the top right, under the menu, that appears only when there is something to use. Build mode: hold a block to dig it, touch open space to place, drag to dig or lay a whole line.
 
 ## The satchel: inventory and crafting
 
-Press I (or the Bag button on touch) and the game becomes a small cutscene: time slows, the camera leans in, the world dims and the doll sits down and opens its bag. Everything you carry is on the left, sorted into Blocks, Parts, Use and Gear, with three worn slots (lamp, pick, charm) and the hotbar underneath (drag items onto it, or tap an item then a slot). The crafting book is on the right.
+Press I (or the Bag button on touch) and the game becomes a small cutscene: time slows, the camera leans in, the world dims and the doll sits down and opens its bag. Two lacquered panels slide in: the **satchel** on the left, the **crafting book** on the right, with the In hand row (hotbar) underneath.
 
+- **Satchel.** Items sit in bevelled sockets tinted by rarity (Common, Fine, Rare, Storied), filterable by Blocks, Parts, Use and Gear with counts. Tap one for its card: a large icon, rarity, description and, for weapons, bars for damage, reach, speed and stagger (mining speed for picks), plus Wield, Wear, Drink or Take in hand. With a mouse, hovering shows the same as a tooltip. The Worn row holds the weapon, lamp, pick and charm. Drag to the In hand row, or tap an item and then a slot.
+- **Crafting book.** Stations in reach light up (By hand, Workbench, Forge, Loom). Recipes are grouped into All, Build, Arms, Tools and Use, each with a count of what you can make now; ready recipes have a green mark and show how many you could make. Pick a count with the stepper (or Max).
 - **Where you craft.** Simple things by hand anywhere (planks, ladders, platforms, torches, steps, bricks, a Workbench). The rest needs a station within a few blocks: a **Workbench** (doors, storage chests, lanterns, flares, hearths, and the other stations), a **Forge** (glass, nightglass, blast charges, picks, the miner's lamp) or a **Loom** (draughts, charms). A shrine's fire counts as a workbench.
-- **Crafting** is a little ceremony: the ingredients fly into a ring, it turns and flashes, and the result drops into the satchel. Hold the button to make several.
+- **Crafting** is a little ceremony: the ingredients fly into a turning ring of marks, it spins and flashes, sparks fly in the item's rarity colour, a *Crafted* card rises, and the result drops into the satchel. Hold the button to keep making more.
 - **Building parts:** ladders (climb, step off at the top), one-way platforms (jump up through, hold down to drop), torches, two-high doors (open and close with E), half steps, storage chests (their contents stay where you built them).
 - **Consumables:** mending draughts, flares (thrown, a strong light for twenty seconds) and blast charges (thrown, break the blocks around them and knock Hollows flying; the pieces come back to you).
+- **Weapons** (Workbench) and **infusions** (Forge): see Combat below.
 - **Gear,** shown on the doll: a miner's lamp (wider light), gilt and crystal picks (much faster mining), the thread charm (breath fills twice as fast) and the ember charm (your dash cuts Hollows).
 
 Nothing attacks while the satchel, a dialog or a cutscene is open.
 
-## The ragdoll: new physics
+## The character: animated, not a ragdoll
 
-The character keeps the look of the Rag Toss and Rag Showdown mannequin (cream body, rounded block head, thick capsule limbs, darker far-side limbs), but the physics is written from scratch (`js/physics/body.js`):
+Every doll (you, Hollows, keepers, remote players, wardens' bodies) is an animated character (`js/physics/body.js`, `js/physics/pose.js`). There are no springs or muscles, so nothing wobbles:
 
-- **XPBD particles.** 15 particles with mass and collision radius, rigid bones solved twice per substep, 4 substeps per 1/120 s tick.
-- **Angular joints.** 13 joints with one-way limits (knees, elbows, ankles, hips, spine, neck, shoulders). The shoulder range is offset so a full overhead swing never wraps across plus or minus pi.
-- **Muscles act on joint angles.** Each joint is driven toward a target angle with momentum-conserving angular constraints. Only two forces come from outside the body: a root drive that carries the pelvis with the controller, and a balance torque that keeps the torso upright. Both scale with a single `strength` value, so the same body blends continuously between fully animated and fully limp.
-- **Hybrid control.** A tight platformer controller (coyote time, jump buffer, variable jump, dash, wall slide, step-up) owns gameplay. The ragdoll follows it through muscles. When knocked down the roles swap and the controller rides the pelvis until the body physically gets back up.
-- **Procedural animation** (`js/physics/pose.js`). The gait is distance-driven so feet never skate, feet are placed on the real terrain with two-bone IK, landings squash through a spring, double jumps turn into a front flip driven by the balance torque, and attacks are keyframed arm arcs that the physical arm then has to actually travel. Hits are tested against the real blade position, so a lagging arm swings late.
-- **Insane but honest.** Big hits, warden slams and very long falls make the body crumple and tumble; killed enemies are launched as limp bodies; flying wardens drag slack legs; capes are cloth chains.
+- **Forward kinematics.** A 15-point skeleton is placed every 1/120 s tick from smoothed joint angles (spine, neck, shoulders, elbows, hips, knees, ankles), mirrored by facing and clamped to each joint's range.
+- **Procedural animation.** The gait is distance-driven so feet never skate, feet land on the real terrain with two-bone IK, landings squash, double jumps flip. Walking down stairs keeps the feet on the ground (no falling pose).
+- **Attacks** are keyframed arcs per weapon (wind-up, strike, follow-through) with the body leaning and stepping into the blow; the blade's real position is what hits.
+- **Hits and falls** are animated states: a flinch, knockback that tumbles you through the air, lying down, getting up.
+- **Ledge mantle:** jump at a wall 2-3 blocks high and the doll grabs the edge, pulls up, swings a knee over and stands, then eases back into control.
+- **Crawl:** hold Ctrl or C to drop onto hands and knees and slip through one-block gaps; you can't stand up under a ceiling.
+- Capes are still cloth chains.
+
+## Combat and weapons
+
+Five weapons, each with its own combo chain, charged heavy attack, numbers and drawing on the doll (`js/game/weapons.js`):
+
+| Weapon | Feel |
+| --- | --- |
+| Blade | Balanced three-step chain, rising cleave when charged |
+| Spear (Workbench) | Long reach, quick thrusts, a wide sweep, a lunging charge |
+| Greathammer (Workbench) | Slow and crushing; breaks guards and blocks; the charged slam shakes the ground |
+| Twin daggers (Workbench) | Very fast five-step chain, Hollows bleed, dash-cancel, a whirling charge |
+| Sling (Workbench) | Ranged: hurls stone from the satchel (crystal pierces), knocks floating Hollows down |
+
+- **Combos** with input buffering; **hold** to charge a heavy; **parry** by striking just as a blow lands (slow-mo flash, the attacker staggers, a counter window opens); **launcher** up-strike and air juggles.
+- **Poise.** Enemies have a stagger bar; heavy weapons break it faster. **Finishers** trigger on staggered or nearly beaten foes (and sometimes on a combo ender): slow motion, a camera punch-in, extra sparks and hit-stop.
+- **Infusions** from the Forge: Ember (hits burn) and Frost (hits slow).
+- Every hit is weighted: hit-stop and shake by weapon, directional sparks, an impact flash on the enemy, haptic ticks on phones. Floating wisps telegraph longer and shoot slower than before.
+
+## Quests and side content
+
+- **Keeper quest chains** (`js/game/quests.js`): each kind of keeper has a chain of steps with dialogue and rewards (recipes, weapons, looks, vessels). The first one, after your first rest, teaches the Workbench: build one, craft a ladder, craft a spear.
+- **Daily commissions:** three small tasks a day (light torches, break blocks, wake a doll...), with a bonus from any keeper when all three are done.
+- **World puzzles** (`js/game/sites.js`): brazier rings (light them all before the first goes out), pressure plates (stand on one, put a block on the other), Thread races (fly through the rings before they fade). Each opens a sealed chest.
+- **Hollow camps:** guards around a named elite with a shield or a brute chief, with health and poise nameplates, guarding loot.
+- **Tracking.** The Quests tab lists every quest; track one and a marker shows where to go (an edge-of-screen chevron with distance when it is off screen). Navigation can be turned off.
+- Opened chests linger a moment, then fade away.
 
 ## The world
 
-- **Ground you can read.** Thick, uneven topsoil (the soil line rolls with the land, pockets reach into the rock, thin strata below), grass roots hanging into the soil, and sloped **cave mouths** and ravines every so often so the caves can be walked into.
-- **Endless and seeded** (`js/world/world.js`). Generated per 32x32 chunk, in both directions and downward without end. Caves, floating islands, crystal pillars, ice spikes, ember vents, ore veins, sand pockets, and each biome's painted tree from the materials sheet (round crowns, glass trees, giant mushrooms, dead trees, pines) leaning in the wind and away from anyone brushing past. Only your edits are saved; everything else regenerates identically.
+- **Ground you can read.** Thick, uneven topsoil (the soil line rolls with the land, pockets reach into the rock, thin strata below), one layer of turf with a short ragged edge, and sloped **cave mouths** (with a painted rock arch over each tunnel) and ravines every so often so the caves can be walked into. Crystal and gilt ore are graded into their host rock.
+- **Endless and seeded** (`js/world/world.js`). Generated per 32x32 chunk, in both directions and downward without end. Caves, floating islands, crystal pillars, ice spikes, ember vents, ore veins, sand pockets, and each biome's painted tree from the materials sheet (round crowns, glass trees, giant mushrooms, dead trees, pines), rooted in the turf, leaning in the wind and away from anyone brushing past. Strike a trunk and chips fly and the crown shakes; a few hits (fewer with the hammer) and it topples, lands with a thump and leaves its timber in your satchel. Only your edits are saved; everything else regenerates identically.
 - **Five biomes** that cycle with distance and darken with each loop: the Pale Meadow, the Glass Wood, the Hollow Below, the Ember Reach and the Frost Spires. Each has its own palette, parallax silhouettes, ambient particles, colour grade and generative score.
 - **Boss gates.** Every boundary between biomes is an arena held by a warden. Three archetypes with stronger variants: the Hollow Warden and the Pyre Knight (giant ragdolls: slam waves, wall-stunning charges, leaps), the Glass Widow and the Still Queen (flying ragdolls: volleys, dives, summons, rings, icefall), and the Unmade Heart (a core wrapped in torn-up blocks: throws, pound, spin). Tier scales health and adds patterns; a second phase starts at half health.
 - **Shrines** every ~85 tiles. Rest to heal, save and set your respawn. Each is kept by someone: a wanderer (trades blocks), a smith (hones your blade, forges hearths), a sage (more vessels, faster mending) or a tailor (cosmetics). Invite them to live at your hearth.
@@ -98,7 +133,9 @@ The painted art comes from hand-made reference sheets, cut up by `tools/extract_
 - `assets/fx/`: slash, hit spark, shockwave, soul glimmer, dust, thread trail.
 - `assets/trees/`: the five flora sprites, cut by a flood fill from the border (shadow and halo removed, clean edges).
 
-In the world, sheet sprites are colour graded per biome (`gradedImg` in `js/art/images.js`) so they sit in its light. Crafted parts, stations and item icons are painted in code for now (`js/art/itemart.js`); `art/sheets/requests.png` lists every one of them with its target size, ready to be replaced by hand-painted art.
+In the world, sheet sprites are colour graded per biome (`gradedImg` in `js/art/images.js`) so they sit in its light. - `assets/req/`: the hand-painted request sheet, cut the same way: cave mouth, Hollow nest, satchel, ladder, platform, door, step, storage chest, workbench, forge, loom, and the item icons (draught, flare, blast charge, lamp, picks, charms). Stations stand in the world as these sprites; the icons appear in the satchel and hotbar (`js/art/itemart.js`). The torch keeps its code-drawn version (its painted halo could not be separated cleanly), and the interface frames on the sheet are matched in CSS.
+
+The blade in the stone has its painted light beam removed (`clean_bladestone`) and gets a soft additive shaft with drifting motes drawn in code instead; it stands on a level shelf.
 
 `js/art/images.js` loads them (pattern fills for tiles, sprites for props and icons). Characters are drawn in code to match the character reference (`js/art/doll.js`), matte with blank faces: round heads, scarves, belts and boots, cloaks and hoods, painted with soft shading and no outlines. Anything not on the sheets is still generated in code from the art bible (`js/art/paint.js`): key light from the upper left, rim light from behind.
 
@@ -111,7 +148,7 @@ The asset sheets in `art/sheets/` are rendered from that same code (so they alwa
 
 - **Sleek, no outlines.** Tiles are soft voxels with rounded exposed corners, a rim light on top faces and a shade underneath; tree canopies merge into one mass. Shape and depth come from coloured flood-fill lighting (sky light, lanterns, crystals, embers, your own soul glow) multiplied over the scene and upsampled smoothly.
 - **Cinematic.** Letterbox bars, serif title cards, biome cards, boss name cards, a warden looming on the horizon as you approach, slow motion and white-out on finishing blows, hit-stop and screen shake scaled by importance, a WebGL post pass with two-level bloom, grade, vignette, grain and a chromatic pulse on impacts.
-- **UI.** Glass panels, a minimal HUD (vessels, breath, glimmer, hotbar, a compass to the next gate), typewriter dialogue as subtitles, a character editor with a live ragdoll preview and a generated sigil.
+- **UI.** Glass panels, a minimal HUD (vessels, breath, glimmer, hotbar, a compass to the next gate; the boss bar only during a fight), typewriter dialogue as subtitles, a menu with a sliding tab line, staggered entrances and a Back button, and an Appearance tab with the doll turning on a lit pedestal. Painted clouds with lit tops and soft bases. Quality defaults to high with post-processing on.
 - Accessibility: toggles for screen shake, bright flashes, bloom and touch controls, three quality levels, and an automatic quality step-down if frames stay slow.
 
 ## Making the character yours
@@ -123,8 +160,8 @@ Body colour, material (linen, porcelain, bronze, lumen, umbra), head (sprout, ho
 CrazyGames provides invites and rooms, not servers, so play is peer to peer over WebRTC (PeerJS, vendored; the public PeerJS broker handles signalling).
 
 - **Invite a friend.** Menu, Together, Invite. Your world opens, the CrazyGames invite button appears (`showInviteButton`), the room is published with `updateRoom`, and an `inviteLink` is copied. Friends who follow it, or who join through CrazyGames (`addJoinRoomListener`, `getInviteParam`), land in your world.
-- **The open world.** Serverless matchmaking: each player tries to claim a well-known shard id; whoever gets it hosts that shard's shared world, everyone else joins it (up to 6 per shard, then the next shard). If the host leaves, a guest takes the shard over and the world carries on. `isInstantMultiplayer` sends players straight in.
-- **What is shared.** The host owns the world, enemies and wardens; guests see them as puppets and their hits are applied by the host. Block edits replicate both ways. Remote players are full ragdolls driven by their controller state, so they walk, fall and get knocked about physically on every screen. Friendly blades shove each other but never hurt. Wardens grow stronger for every soul in the session, and everyone in the session earns a relic when one falls. Emotes, name tags (CrazyGames username when signed in), a live soul counter.
+- **The open world.** Serverless matchmaking: each player tries to claim a well-known shard id; whoever gets it hosts that shard's shared world, everyone else joins it (up to 6 per shard, then the next shard). If the host leaves, a guest takes the shard over (retrying while the old id lingers on the broker) and the world carries on. `isInstantMultiplayer` sends players straight in.
+- **What is shared.** The host owns the world, enemies and wardens; guests see them as puppets and their hits are applied by the host. Block edits replicate both ways. Remote players are animated from their controller state, so they walk, fall and get knocked about the same on every screen. Friendly blades shove each other but never hurt. Wardens grow stronger for every soul in the session, and everyone in the session earns a relic when one falls. Emotes, name tags, a live soul counter. Your name is your CrazyGames username plus a title ("Ash, the Unfinished"), or *Wren, the Unfinished* when signed out.
 - Visiting never touches your own save's world; your glimmer, relics and cosmetics travel with you.
 
 ## CrazyGames integration (`js/platform.js`)
@@ -147,16 +184,17 @@ index.html, css/style.css
 js/main.js              boot and wiring
 js/platform.js          CrazyGames SDK wrapper
 js/core/                input, audio synth + generative music, WebGL post FX, math/noise
-js/physics/             body.js (XPBD ragdoll), pose.js (procedural animation), skin.js (rendering, cape)
+js/physics/             body.js (skeleton, forward kinematics), pose.js (procedural animation), skin.js (rendering, cape)
 js/world/               tiles.js (tiles, biomes), world.js (generation, chunks, edits), render.js, light.js
 js/game/                game.js (loop, camera, render pipeline), actor.js, player.js, enemies.js,
                         bosses.js, npcs.js (shrines, keepers, favours, home), content.js (dolls, chests,
                         lore, nests, Threads of Light), story.js (cinematics, tutorial, goals), thread.js,
                         items.js (items, recipes, stations), parts.js (doors, chests, stations), throwables.js,
-                        progress.js (save, cosmetics, relics, recipes), fx.js
+                        progress.js (save, cosmetics, relics, recipes), fx.js, weapons.js (weapons, infusions),
+                        quests.js (quest chains, commissions, tracking), sites.js (puzzles, camps), trees.js (felling)
 js/art/                 images.js (sheet art loader), doll.js (characters), bg.js, paint.js, tex.js, props.js
 js/ui/                  ui.js (HUD, tutorial, journal, cards, dialog, menus, editor, terms), bag.js (satchel), touch.js
-assets/tex, props, icons, fx   art cut from the reference sheets
+assets/tex, props, icons, fx, trees, req   art cut from the reference sheets
 js/net/net.js           multiplayer
 vendor/peerjs.min.js    PeerJS 1.5.4 (MIT)
 assets/fonts/           Cormorant Garamond, Manrope (OFL)
@@ -175,6 +213,15 @@ node tools/shot.mjs climb      # a Hollow follows you up ledges of 2, 3, 4 and 5
 node tools/shot.mjs doll       # a lost doll sleeps, then wakes, stands, stretches and waves
 node tools/shot.mjs mouth      # visit a cave mouth
 node tools/shot.mjs sdk --cg   # CrazyGames SDK flow against the mock
+node tools/shot.mjs moves      # stairs without a falling pose, ledge mantle, crawl through a gap
+node tools/shot.mjs weapons    # craft every weapon, damage, parry, finisher, sling stun
+node tools/shot.mjs wfilm      # filmstrip of spear, hammer and dagger combos
+node tools/shot.mjs quests     # keeper chain, commission, brazier puzzle, camp
+node tools/shot.mjs opening    # the prologue, shot by shot
+node tools/shot.mjs uitour     # tutorial banner, menus, satchel and crafting (add --mobile --size 844x390)
+node tools/shot.mjs fell       # fell a tree for timber
+node tools/shot.mjs artcheck   # painted stations, item icons, Hollow nest
+node tools/shot.mjs looks      # blade light, cave ore, Thread's trail
 ```
 
 The `tools/` folder drives the real game in headless Chromium (Playwright):

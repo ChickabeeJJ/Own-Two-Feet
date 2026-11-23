@@ -51,6 +51,9 @@ export class World {
       const base = this.rawHeight(4) * 0.3;
       const k = tx < SPAWN_L ? smooth((tx - (SPAWN_L - 20)) / 20) : tx > SPAWN_R ? smooth(1 - (tx - SPAWN_R) / 20) : 1;
       h = lerp(h, base + Math.sin(tx * 0.21) * 0.8, k);
+      // the blade in the stone (tile 12) stands on a level shelf
+      const db = Math.abs(tx - 12);
+      if (db <= 4) h = lerp(h, base + Math.sin(12 * 0.21) * 0.8, db <= 2 ? 1 : 0.5);
     }
     const bi = biomeIndexAt(tx);
     // boss arena on the biome boundary
@@ -201,6 +204,29 @@ export class World {
       if (roof < 2.8 ? (ty >= this.col(tx).h - 1 && ty <= cy + half) : (ty >= cy - half && ty <= cy + half)) return true;
     }
     return false;
+  }
+  // where each sloping tunnel stops being an open cut and gets a roof: the spot for a cave-mouth arch
+  mouthEntrances(a, b) {
+    const s = this.seed, STEP = 67, out = [];
+    this.mouthCache = this.mouthCache || new Map();
+    for (let kk = Math.floor(a / STEP) - 1; kk <= Math.ceil(b / STEP) + 1; kk++) {
+      if (this.mouthCache.has(kk)) { const m = this.mouthCache.get(kk); if (m) out.push(m); continue; }
+      let m = null;
+      const r = hash2(kk, 51, s);
+      const mx = kk * STEP + Math.floor(hash2(kk, 52, s) * 22) - 11;
+      const g = gateNear(mx);
+      if (r >= 0.2 && r <= 0.86 && !(mx > SPAWN_L - 16 && mx < SPAWN_R + 16) && !(Math.abs(mx - g.gx) < ARENA_HALF + 10 || this.shrineNear(mx) !== null)) {
+        const dir = hash2(kk, 55, s) < 0.5 ? -1 : 1, len = 18 + Math.floor(hash2(kk, 56, s) * 14);
+        const top = this.col(mx).h, half = 1.6;
+        for (let u = 1; u <= len; u++) {
+          const tx = mx + u * dir, cy = top - half + u * 0.62 + Math.sin(u * 0.35 + kk) * 0.25;
+          if ((cy - half) - this.col(tx).h >= 2.8) { m = { x: (tx - dir) * TILE + 16, y: (Math.floor(cy + half) + 1) * TILE, dir }; break; }
+        }
+      }
+      this.mouthCache.set(kk, m);
+      if (m) out.push(m);
+    }
+    return out;
   }
   stampTrees(cx, cy, fg) {
     const x0 = cx * CH, y0 = cy * CH;

@@ -324,6 +324,46 @@ export default ({ page, sleep, key, shot, evalg }) => ({
     await evalg(() => window.__game.ui.closeMenu()); await sleep(300); await shot('quests-hud');
     if (!r.benchStarted || !r.benchDone || !r.smithStarted || !r.brazierSolved || !r.chestOpened || !r.campCleared) throw new Error('quests broken');
   },
+  async looks() {
+    await sleep(900);
+    await evalg(() => { const g = window.__game, W = g.world, p = g.player; g.story.skipBirth(); g.enemies.calm = 999; g.save.tutDone = 1; g.story.tutI = 9; g.cam.zoomT = 1.3; p.respawnAt(7 * 32, W.surface(7) * 32); });
+    await sleep(2200); await shot('look-0-sword');
+    // a cave with ore
+    await evalg(() => { const g = window.__game, W = g.world, p = g.player, T = window.__T;
+      for (let tx = 60; tx < 400; tx++) { const h = W.surface(tx); for (let ty = h + 8; ty < h + 40; ty++) { if (W.get(tx, ty) === T.CRYSTAL && !W.solid(tx + 2, ty - 1) && W.solid(tx + 2, ty)) { p.respawnAt((tx + 2) * 32 + 16, ty * 32); return; } } } });
+    await sleep(2500); await shot('look-1-cave');
+    // Thread on the move: run, then stop
+    await evalg(() => { const g = window.__game, W = g.world, p = g.player; p.respawnAt(70 * 32, W.surface(70) * 32); g.cam.zoomT = 1.5; });
+    await sleep(800); await page.keyboard.down('KeyD'); await sleep(1300); await shot('look-2-thread'); await page.keyboard.up('KeyD');
+  },
+  async fell() {
+    await sleep(900);
+    const info = await evalg(() => { const g = window.__game, W = g.world, p = g.player; g.story.skipBirth(); g.story.skipTutorial(); g.enemies.calm = 999; g.story.firstFoeDown = true; g.save.tut.foe = 1;
+      let tx = 40; while (!g.wr.treeSprite(tx) && tx < 400) tx++;
+      p.respawnAt((tx - 1) * 32 + 4, W.surface(tx - 1) * 32); p.actor.face(1); g.cam.zoomT = 1.5;
+      return { tx, logs0: p.sv.inv[window.__T.LOG] || 0 }; });
+    console.log('tree', JSON.stringify(info));
+    await sleep(1500); await shot('fell-0');
+    for (let i = 0; i < 3; i++) { await key('KeyJ', 60); await sleep(520); }
+    await sleep(250); await shot('fell-1');
+    await sleep(700); await shot('fell-2');
+    const r = await evalg((tx) => { const g = window.__game; return { logs: g.player.sv.inv[window.__T.LOG] || 0, standing: !!g.wr.treeSprite(tx), falling: g.trees.falling.length }; }, info.tx);
+    console.log('fell', JSON.stringify(r));
+  },
+  async artcheck() {
+    await sleep(900);
+    await evalg(() => { const g = window.__game, W = g.world, p = g.player; g.story.skipBirth(); g.story.skipTutorial(); g.enemies.calm = 999; g.story.firstFoeDown = true; g.save.tut.foe = 1;
+      const x0 = 60; p.respawnAt(x0 * 32, W.surface(x0) * 32);
+      const ids = [25, 26, 27, 28];
+      const T = { STORE: 0, BENCH: 0 };
+      [['STORE'], ['BENCH'], ['FORGE'], ['LOOM']].forEach(([k], i) => { const tx = x0 + 2 + i * 2, ty = W.surface(tx) - 1; W.set(tx, ty, window.__T[k]); });
+      for (const id of ['i_draught', 'i_flare', 'i_charge', 'g_lamp', 'g_pick_gilt', 'g_charm_thread', 'g_charm_ember', 'w_spear']) p.give(id, 2);
+      p.give(window.__T.LADDER, 4); p.give(window.__T.DOOR, 2); g.ui.hotbarDirty = true; g.cam.zoomT = 1.6; });
+    await sleep(1800); await shot('art-0-stations');
+    const nest = await evalg(() => { const g = window.__game, C = g.content; for (let x = 140; x < 900; x++) { const s = C.sites('nest', x, x + 1); if (s.length) { g.player.respawnAt((s[0] - 5) * 32, g.world.surface(s[0] - 5) * 32); return s[0]; } } return null; });
+    console.log('nest', nest);
+    await sleep(2200); await shot('art-1-nest');
+  },
   async uitour() {
     await sleep(900);
     await evalg(() => { window.__game.story.skipBirth(); window.__game.enemies.calm = 999; });
@@ -441,10 +481,10 @@ export default ({ page, sleep, key, shot, evalg }) => ({
     await shot('n2-opts');
     await key('Escape'); await sleep(400);
     await key('Escape'); await sleep(600); await shot('n3-menu');
-    await page.click('.tab:nth-child(3)'); await sleep(900); await shot('n4-look');
-    await page.click('.slots .tab:nth-child(3)'); await sleep(600); await shot('n5-heads');
-    await page.click('.tab:nth-child(4)'); await sleep(400); await shot('n6-craft');
-    await page.click('.tab:nth-child(2)'); await sleep(400); await shot('n7-journal');
+    await evalg(() => window.__game.ui.openMenu('look')); await sleep(900); await shot('n4-look');
+    await page.click('#menu .slots .chip:nth-child(3)'); await sleep(600); await shot('n5-heads');
+    await evalg(() => window.__game.ui.openMenu('craft')); await sleep(400); await shot('n6-craft');
+    await evalg(() => window.__game.ui.openMenu('journal')); await sleep(400); await shot('n7-journal');
   },
   async editor() {
     await sleep(1200);

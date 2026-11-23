@@ -357,6 +357,24 @@ export class Story {
       if (say) this.say(say, 2.4, true);
     }
   }
+  // our own light on the blade: a soft shaft falling from above, motes drifting down it, a glow at the hilt
+  drawBladeLight(ctx, x, y, t) {
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    const H = 300, top = y - H, br = 0.85 + Math.sin(t * 1.3) * 0.15;
+    for (const [w0, w1, al] of [[26, 70, 0.10], [12, 34, 0.12]]) {
+      const gr = ctx.createLinearGradient(0, top, 0, y);
+      gr.addColorStop(0, rgba('#fff4dc', 0)); gr.addColorStop(0.55, rgba('#fff1d0', al * br)); gr.addColorStop(1, rgba('#ffe2b0', al * 1.6 * br));
+      ctx.fillStyle = gr;
+      ctx.beginPath(); ctx.moveTo(x - w0 / 2 + 10, top); ctx.lineTo(x + w0 / 2 + 10, top); ctx.lineTo(x + w1 / 2, y - 6); ctx.lineTo(x - w1 / 2, y - 6); ctx.closePath(); ctx.fill();
+    }
+    for (let i = 0; i < 7; i++) {
+      const u = ((t * 0.12 + i / 7) % 1), mx = x + 10 * (1 - u) + Math.sin(t * 1.7 + i * 2.1) * 9 * u, my = top + 40 + u * (H - 50);
+      ctx.fillStyle = rgba('#fff6e0', 0.55 * Math.sin(u * Math.PI)); ctx.beginPath(); ctx.arc(mx, my, 1.6, 0, TAU); ctx.fill();
+    }
+    drawGlow(ctx, x + 4, y - 46, 46 * br, [1, 0.86, 0.6], 0.35);
+    drawGlow(ctx, x, y - 8, 70, [1, 0.8, 0.55], 0.18);
+    ctx.restore();
+  }
   spawnDummy() {
     const g = this.game;
     const x = (BLADE_X + 7) * TILE + 16, tx = BLADE_X + 7;
@@ -517,7 +535,11 @@ export class Story {
       }
     }
     if (layer === 'back') {
-      if (this.bladeY !== null && this.stage >= 5) { if (!this.sv.hasBlade && !drawSprite(ctx, 'props/bladestone', BLADE_X * TILE + 16, this.bladeY + 6, 150, { grade: g.biomeAt(BLADE_X * TILE) })) drawBladeStone(ctx, BLADE_X * TILE + 16, this.bladeY + 2, 1, g.time, true); }
+      if (this.bladeY !== null && this.stage >= 5 && !this.sv.hasBlade) {
+        const bx = BLADE_X * TILE + 16, by = this.bladeY;
+        this.drawBladeLight(ctx, bx, by, g.time);
+        if (!drawSprite(ctx, 'props/bladestone', bx, by + 4, 90, { grade: g.biomeAt(BLADE_X * TILE) })) drawBladeStone(ctx, bx, by + 2, 1, g.time, true);
+      }
       if (this.crater) {
         const c = this.crater, k = clamp(1 - c.t / 40, 0, 1);
         if (k > 0) {

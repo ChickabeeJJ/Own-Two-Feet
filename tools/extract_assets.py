@@ -201,3 +201,113 @@ def tree_sprites(p3, outdir, meta):
         bx0, bx1, by0, by1 = xs.min(), xs.max() + 1, ys.min(), ys.max() + 1
         save(col[by0:by1, bx0:bx1], f'{outdir}/trees/{k}.png', a[by0:by1, bx0:bx1])
         meta['trees/' + k] = (int(bx1 - bx0), int(by1 - by0))
+
+
+# ---------------------------------------------------------------- the painted request sheet (art requests board)
+# boxes are in a 1000-wide frame of the sheet and scaled to the real size; each box holds only the art, not the label
+REQ_BOXES = {
+    'cave_mouth': (424, 96, 584, 184), 'nest': (640, 104, 742, 180), 'satchel': (830, 100, 944, 182),
+    'ladder': (30, 262, 112, 344), 'platform': (136, 262, 224, 344), 'torch': (246, 262, 328, 344),
+    'door': (352, 262, 434, 344), 'step': (458, 262, 542, 344), 'chest': (566, 262, 650, 344),
+    'bench': (674, 262, 758, 344), 'forge': (782, 262, 866, 344), 'loom': (890, 262, 974, 344),
+    'draught': (40, 418, 118, 484), 'flare': (160, 418, 240, 484), 'charge': (282, 418, 360, 484),
+    'lamp': (404, 418, 480, 484), 'pick_gilt': (526, 418, 602, 484), 'pick_crystal': (646, 418, 722, 484),
+    'charm_thread': (766, 418, 846, 484), 'charm_ember': (886, 418, 966, 484),
+}
+REQ_DISC = {'torch': 30, 'lamp': 58, 'flare': 30, 'charm_thread': 34, 'charm_ember': 34}
+REQ_GLOW = set()   # the game lights these itself; a halo cut from the board reads as a dark disc
+
+def request_sprites(p, outdir):
+    """cut the painted requests off their dark cards. Board pixels connected to the crop border are flooded
+    away; a light source keeps a soft halo (brightness above the board becomes alpha)."""
+    from collections import deque
+    from PIL import ImageFilter
+    img = load(p)
+    k = img.shape[1] / 1000
+    os.makedirs(outdir + '/req', exist_ok=True)
+    meta = json.load(open(outdir + '/sprites.json'))
+    for name, box in REQ_BOXES.items():
+        x0, y0, x1, y1 = [int(round(v * k)) for v in box]
+        reg = img[y0:y1, x0:x1]
+        h, w, _ = reg.shape
+        ring = np.concatenate([reg[:2].reshape(-1, 3), reg[-2:].reshape(-1, 3), reg[:, :2].reshape(-1, 3), reg[:, -2:].reshape(-1, 3)])
+        bg = np.median(ring, axis=0)
+        d = np.sqrt(((reg - bg) ** 2).sum(axis=2))
+        bgl = d < (16 if name in ('cave_mouth', 'nest') else 22)
+        if name in REQ_DISC:   # a dark painted disc behind light sources: board-dark tones count as board
+            bgl |= (reg.mean(axis=2) - bg.mean()) < REQ_DISC[name]
+        flood = np.zeros((h, w), bool); q = deque()
+        for y in range(h):
+            for x in (0, w - 1):
+                if bgl[y, x]: flood[y, x] = True; q.append((y, x))
+        for x in range(w):
+            for y in (0, h - 1):
+                if bgl[y, x] and not flood[y, x]: flood[y, x] = True; q.append((y, x))
+        while q:
+            y, x = q.popleft()
+            for ny, nx in ((y + 1, x), (y - 1, x), (y, x + 1), (y, x - 1)):
+                if 0 <= ny < h and 0 <= nx < w and not flood[ny, nx] and bgl[ny, nx]:
+                    flood[ny, nx] = True; q.append((ny, nx))
+        a = (~flood).astype(np.float32)
+        edge = np.asarray(Image.fromarray((a * 255).astype(np.uint8)).filter(ImageFilter.MinFilter(3))).astype(np.float32) / 255
+        rim = (a > 0) & (edge < 1)
+        a[rim] = np.clip((d[rim] - 10) / 40, 0.3, 1)
+        a = np.asarray(Image.fromarray((a * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(0.5))).astype(np.float32) / 255
+        col = reg.copy()
+        if name in REQ_GLOW:
+            # the halo: what is brighter than the board, as additive-looking coverage
+            lum = (reg - bg).clip(0).max(axis=2)
+            halo = np.clip(lum / 120, 0, 1) * flood
+            a = np.maximum(a, halo)
+            a3 = np.maximum(a, 1e-3)[..., None]
+            col = np.where(flood[..., None], (reg - bg * (1 - a3)) / a3, col)
+        # bleed solid colours into the rim so scaling leaves no dark fringe
+        solid = edge >= 1
+        for _ in range(2):
+            acc = np.zeros_like(col); n = np.zeros(solid.shape, np.float32)
+            for sy, sx in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                m = np.roll(np.roll(solid, sy, 0), sx, 1); c = np.roll(np.roll(col, sy, 0), sx, 1)
+                acc += c * m[..., None]; n += m
+            grow = (~solid) & (n > 0) & (rim)
+            col[grow] = acc[grow] / n[grow][:, None]; solid = solid | grow
+        ys, xs = np.where(a > 0.04)
+        bx0, bx1, by0, by1 = xs.min(), xs.max() + 1, ys.min(), ys.max() + 1
+        save(col[by0:by1, bx0:bx1], f'{outdir}/req/{name}.png', a[by0:by1, bx0:bx1])
+        meta['req/' + name] = (int(bx1 - bx0), int(by1 - by0))
+    json.dump(meta, open(outdir + '/sprites.json', 'w'), indent=1)
+    return meta
+
+
+def clean_bladestone(outdir):
+    """the blade-in-stone was cut with its light beam, which mattes to a dark slab: flood the beam's dark
+    blue-grey tones away from the border and keep the stone, sword and flowers"""
+    from collections import deque
+    p = f'{outdir}/props/bladestone.png'
+    im = np.asarray(Image.open(p).convert('RGBA')).astype(np.float32)
+    rgb, a = im[..., :3], im[..., 3] / 255
+    h, w = a.shape
+    lum = rgb.mean(axis=2)
+    beam = (a < 0.08) | ((lum < 100) & (rgb[..., 2] >= rgb[..., 0] - 6))
+    flood = np.zeros((h, w), bool); q = deque()
+    for y in range(h):
+        for x in (0, w - 1):
+            if beam[y, x]: flood[y, x] = True; q.append((y, x))
+    for x in range(w):
+        for y in (0, h - 1):
+            if beam[y, x] and not flood[y, x]: flood[y, x] = True; q.append((y, x))
+    while q:
+        y, x = q.popleft()
+        for ny, nx in ((y + 1, x), (y - 1, x), (y, x + 1), (y, x - 1)):
+            if 0 <= ny < h and 0 <= nx < w and not flood[ny, nx] and beam[ny, nx]:
+                flood[ny, nx] = True; q.append((ny, nx))
+    a2 = a * (~flood)
+    from PIL import ImageFilter
+    a2 = np.asarray(Image.fromarray((a2 * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(0.5))).astype(np.float32) / 255
+    a2 = np.minimum(a2, a)
+    a2[a2 < 0.22] = 0          # faint beam haze
+    ys, xs = np.where(a2 > 0.3)
+    out = np.dstack([rgb, a2 * 255])[ys.min():ys.max() + 1, xs.min():xs.max() + 1]
+    Image.fromarray(np.clip(out, 0, 255).astype(np.uint8), 'RGBA').save(p, optimize=True)
+    meta = json.load(open(outdir + '/sprites.json'))
+    meta['props/bladestone'] = (int(out.shape[1]), int(out.shape[0]))
+    json.dump(meta, open(outdir + '/sprites.json', 'w'), indent=1)

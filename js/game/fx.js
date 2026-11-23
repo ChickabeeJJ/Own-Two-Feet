@@ -95,6 +95,7 @@ export class FX {
         p.vy += (dy / d * 1400 - p.vy) * Math.min(1, dt * 4 * k);
         if (d < 18) { p.alive = false; if (p.onArrive) p.onArrive(); continue; }
       }
+      if (p.kind === 'leaf') { p.vx += Math.sin(p.life * 5 + p.y * 0.05) * 140 * dt; p.vy = Math.min(p.vy, 90); }
       if (p.kind === 'firefly') { p.vx += Math.sin(p.life * 3 + p.x) * 30 * dt; p.vy += Math.cos(p.life * 2.3 + p.y) * 30 * dt; }
       const dr = Math.exp(-p.drag * dt);
       p.vx *= dr; p.vy *= dr;
@@ -133,8 +134,10 @@ export class FX {
       } else if (p.kind === 'soft') {
         ctx.globalAlpha = clamp(a * 0.45, 0, 1);
         ctx.beginPath(); ctx.arc(p.x, p.y, sz, 0, TAU); ctx.fill();
-      } else if (p.kind === 'chunk') {
-        ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.fillRect(-sz, -sz, sz * 2, sz * 2); ctx.restore();
+      } else if (p.kind === 'chunk' || p.kind === 'chip') {
+        ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot + (p.kind === 'chip' ? p.life * 14 : 0)); ctx.fillRect(-sz, -sz * (p.kind === 'chip' ? 0.5 : 1), sz * 2, sz * (p.kind === 'chip' ? 1 : 2)); ctx.restore();
+      } else if (p.kind === 'leaf') {
+        ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot + Math.sin(p.life * 6 + p.x * 0.1) * 1.2); ctx.beginPath(); ctx.ellipse(0, 0, sz * 1.3, sz * 0.6, 0, 0, TAU); ctx.fill(); ctx.restore();
       } else if (p.kind === 'soul') {
         ctx.beginPath(); ctx.arc(p.x, p.y, sz, 0, TAU); ctx.fill();
         ctx.globalAlpha = clamp(a * 0.35, 0, 1);

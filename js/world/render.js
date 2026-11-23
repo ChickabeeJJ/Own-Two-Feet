@@ -211,25 +211,31 @@ export class WorldRenderer {
     }
     const [mat, col, extra] = matOf(t, p);
     const painted = tp(g, t, p.id);
+    const ore = t === T.CRYSTAL || t === T.GOLD;
+    if (ore) {
+      // ore sits in its rock: the host stone first, the vein texture over it at part strength
+      g.fillStyle = tp(g, T.STONE, p.id) || pattern(g, 'stone', p.stone || col);
+      roundTile(g, x, y, TILE, TILE, rNW, rNE, rSE, rSW);
+      g.globalAlpha = t === T.CRYSTAL ? 0.5 : 0.6;
+    }
     g.fillStyle = painted || pattern(g, mat, col, extra);
     if (t === T.ICE) g.globalAlpha = 0.9;
     roundTile(g, x, y, TILE, TILE, rNW, rNE, rSE, rSW);
     g.globalAlpha = 1;
-    // turf roots: the grass layer hangs down into the soil below it with a ragged, uneven edge (and thins out
-    // over a second tile), so the surface reads as living topsoil instead of a flat stripe
+    // turf edge: the grass layer ends in a short ragged fringe on the soil below it (one layer of turf)
     if (t === T.DIRT && p.id !== 'frost') {
       const up1 = W.get(tx, ty - 1), up2 = W.get(tx, ty - 2);
-      const depth = up1 === T.GRASS ? 1 : up2 === T.GRASS && up1 === T.DIRT ? 2 : 0;
+      const depth = up1 === T.GRASS ? 1 : 0;   // one layer of turf: only a short ragged fringe below the grass
       if (depth) {
         const gp = tp(g, T.GRASS, p.id) || pattern(g, 'soil', p.grass);
-        const reach = depth === 1 ? 14 + hash2(tx, ty, 91) * 14 : 4 + hash2(tx, ty, 92) * 8;
+        const reach = 3 + hash2(tx, ty, 91) * 5;
         g.save(); roundTile(g, x, y, TILE, TILE, rNW, rNE, rSE, rSW, true); g.clip();
         g.fillStyle = gp; g.globalAlpha = depth === 1 ? 0.95 : 0.6;
         g.beginPath(); g.moveTo(x - 1, y - 1); g.lineTo(x + TILE + 1, y - 1);
         for (let i = 8; i >= 0; i--) {
           const px = x + i * (TILE / 8);
           const k = hash2(tx * 8 + i, ty, 93 + depth);
-          g.lineTo(px, y + reach * (0.45 + k * 0.75) + (depth === 1 && i % 3 === 0 ? 5 * k : 0));
+          g.lineTo(px, y + reach * (0.45 + k * 0.75) + (i % 3 === 0 ? 2.5 * k : 0));
         }
         g.closePath(); g.fill();
         // a soft shadow where the roots end
@@ -244,19 +250,21 @@ export class WorldRenderer {
     }
     // ore and veins
     if (t === T.CRYSTAL) {
-      for (let k = 0; k < (painted ? 1 : 3); k++) {
+      const sc = mix(base, '#5d6b78', 0.4);   // shards muted toward the rock
+      for (let k = 0; k < (painted ? 1 : 2); k++) {
         const hx = hash2(tx, ty, 10 + k), hy = hash2(tx, ty, 20 + k);
         const cx = x + 6 + hx * 20, cy = y + 6 + hy * 20, r = 4 + hash2(tx, ty, 30 + k) * 5;
-        g.fillStyle = shade(base, -0.25); g.beginPath(); g.moveTo(cx, cy - r * 1.4); g.lineTo(cx + r * 0.7, cy); g.lineTo(cx, cy + r); g.lineTo(cx - r * 0.7, cy); g.closePath(); g.fill();
-        g.fillStyle = mix(base, '#ffffff', 0.15 * k); g.beginPath(); g.moveTo(cx, cy - r * 1.4); g.lineTo(cx + r * 0.7, cy); g.lineTo(cx, cy + r * 0.2); g.closePath(); g.fill();
-        g.fillStyle = rgba('#ffffff', 0.8); g.beginPath(); g.moveTo(cx, cy - r * 1.4); g.lineTo(cx + r * 0.25, cy - r * 0.2); g.lineTo(cx, cy); g.closePath(); g.fill();
+        g.fillStyle = shade(sc, -0.25); g.beginPath(); g.moveTo(cx, cy - r * 1.4); g.lineTo(cx + r * 0.7, cy); g.lineTo(cx, cy + r); g.lineTo(cx - r * 0.7, cy); g.closePath(); g.fill();
+        g.fillStyle = mix(sc, '#ffffff', 0.15 * k); g.beginPath(); g.moveTo(cx, cy - r * 1.4); g.lineTo(cx + r * 0.7, cy); g.lineTo(cx, cy + r * 0.2); g.closePath(); g.fill();
+        g.fillStyle = rgba('#ffffff', 0.5); g.beginPath(); g.moveTo(cx, cy - r * 1.4); g.lineTo(cx + r * 0.25, cy - r * 0.2); g.lineTo(cx, cy); g.closePath(); g.fill();
       }
     } else if (t === T.GOLD) {
-      for (let k = 0; k < 6; k++) {
+      const gc = mix(base, '#6e6252', 0.35);   // nuggets muted toward the rock
+      for (let k = 0; k < 4; k++) {
         const hx = hash2(tx, ty, 40 + k), hy = hash2(tx, ty, 50 + k), r = 1.4 + hash2(tx, ty, 60 + k) * 2.6;
-        g.fillStyle = shade(base, -0.3); g.beginPath(); g.arc(x + 4 + hx * 24, y + 5 + hy * 24, r, 0, TAU); g.fill();
-        g.fillStyle = base; g.beginPath(); g.arc(x + 4 + hx * 24 - 0.4, y + 4 + hy * 24, r * 0.85, 0, TAU); g.fill();
-        g.fillStyle = rgba('#fff6d8', 0.8); g.fillRect(x + 3.4 + hx * 24, y + 3 + hy * 24, 1, 1);
+        g.fillStyle = shade(gc, -0.3); g.beginPath(); g.arc(x + 4 + hx * 24, y + 5 + hy * 24, r, 0, TAU); g.fill();
+        g.fillStyle = gc; g.beginPath(); g.arc(x + 4 + hx * 24 - 0.4, y + 4 + hy * 24, r * 0.85, 0, TAU); g.fill();
+        g.fillStyle = rgba('#fff6d8', 0.5); g.fillRect(x + 3.4 + hx * 24, y + 3 + hy * 24, 1, 1);
       }
     }
     // exposed faces: turf / snow cap on top, lit rim, shade underneath and on the far side
@@ -376,22 +384,27 @@ export class WorldRenderer {
   }
   // painted trees from the materials sheet, planted on their trunk blocks; felled trees (trunk gone) vanish.
   // The crown leans with the wind and away from anyone brushing past.
+  // the painted sprite for the tree standing on column tx (null if none, or its trunk is gone)
+  treeSprite(tx) {
+    const W = this.world, tr = W.treeAt(tx);
+    if (!tr || W.get(tx, tr.base - 1) !== T.LOG) return null;
+    const name = 'trees/' + TREE_SPRITE[tr.kind];
+    if (!IMG[name]) return null;
+    const im = gradedImg(name, biomeOf(biomeIndexAt(tx)));
+    const ax = treeAnchor(name, IMG[name]);
+    const h = (tr.h + (tr.kind === 'shroom' ? 0.6 : 1.6)) * TILE * (tr.kind === 'dead' ? 0.92 : 1);
+    // rooted: the foot of the trunk sinks into the turf (tiles draw over it)
+    return { tr, im, ax, h, w: im.width * h / im.height, bx: tx * TILE + 16, by: tr.base * TILE + 9 };
+  }
   drawTrees(ctx, view, time, actors, wind) {
-    const W = this.world;
     const tx0 = Math.floor(view.x0 / TILE) - 6, tx1 = Math.floor(view.x1 / TILE) + 6;
+    this.treeLean = this.treeLean || new Map();
     for (let tx = tx0; tx <= tx1; tx++) {
-      const tr = W.treeAt(tx);
-      if (!tr || W.get(tx, tr.base - 1) !== T.LOG) continue;
-      const name = 'trees/' + TREE_SPRITE[tr.kind];
-      if (!IMG[name]) continue;
-      const im = gradedImg(name, biomeOf(biomeIndexAt(tx)));
-      const ax = treeAnchor(name, IMG[name]);
-      const h = (tr.h + (tr.kind === 'shroom' ? 0.6 : 1.6)) * TILE * (tr.kind === 'dead' ? 0.92 : 1);
-      const w = im.width * h / im.height;
-      const bx = tx * TILE + 16, by = tr.base * TILE + 3;
+      const S = this.treeSprite(tx);
+      if (!S) continue;
+      const { im, ax, h, w, bx, by } = S;
       let push = 0;
       for (const a of actors) { const dx = bx - a.x; if (Math.abs(dx) < 60 && a.y > by - h && a.y < by + 40) push += Math.sign(dx || 1) * (1 - Math.abs(dx) / 60); }
-      this.treeLean = this.treeLean || new Map();
       const lean0 = this.treeLean.get(tx) || 0, lean = lean0 + (push * 0.05 - lean0) * 0.08;
       this.treeLean.set(tx, lean);
       const sk = (Math.sin(time * 0.9 + tx * 0.7) * 0.6 + Math.sin(time * 2.1 + tx) * 0.25) * 0.018 * (0.5 + wind) + lean;
@@ -401,7 +414,7 @@ export class WorldRenderer {
       ctx.drawImage(im, -ax * w, -h, w, h);
       ctx.restore();
     }
-    if (this.treeLean && this.treeLean.size > 400) this.treeLean.clear();
+    if (this.treeLean.size > 400) this.treeLean.clear();
   }
   drawDecor() {}
 

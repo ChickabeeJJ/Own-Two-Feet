@@ -192,7 +192,7 @@ while ((Date.now() - t0) / 1000 < SECS) {
   if (want && st.interact !== lastInteract) { lastInteract = st.interact; await releaseAll(); await tap('KeyE'); await sleep(300); continue; }
   if (!st.interact) lastInteract = null;
   if (st.target) {
-    const there = await walkTo(st, st.target.x, 20);
+    const there = await walkTo(st, st.target.x, st.target.y - st.y > 96 ? 48 : 20);   // deep targets: dig from the nearest column
     if (there) {
       await releaseAll();
       const dy = st.target.y - (st.y - 50);

@@ -10,6 +10,7 @@ import { Bosses } from './game/bosses.js';
 import { Shrines } from './game/npcs.js';
 import { Story } from './game/story.js';
 import { Throwables } from './game/throwables.js';
+import { Trees } from './game/trees.js';
 import { Sites } from './game/sites.js';
 import { Quests } from './game/quests.js';
 import { Parts } from './game/parts.js';
@@ -27,7 +28,7 @@ async function boot() {
   void pInit;   // the SDK finishes initialising in the background; the game starts on the first frame
   const sv = Save.load();
   const game = new Game(canvas);
-  window.__game = game; window.__input = Input; window.__platform = Platform;
+  window.__game = game; window.__input = Input; window.__platform = Platform; window.__T = T;
   game.save = sv;
   // settings
   const st = Object.assign(game.settings, { shake: 1, flashes: true, post: true, quality: 'high', touchOn: false, muted: false }, sv.settings || {});
@@ -67,9 +68,10 @@ async function boot() {
   game.throwables = new Throwables(game);
   game.parts = new Parts(game);
   game.sites = new Sites(game);
+  game.trees = new Trees(game);
   game.quests = new Quests(game);
   game.quests.navOn = st.questNav !== false;
-  game.systems.push(game.story, game.content, game.shrines, game.enemies, game.bosses, game.throwables, game.parts, game.sites, game.quests);
+  game.systems.push(game.story, game.content, game.shrines, game.enemies, game.bosses, game.throwables, game.parts, game.sites, game.quests, game.trees);
   game.systems.push({ draw: (ctx, a, layer) => { if (layer === 'front') { game.player.drawCursor(ctx); game.player.drawPrompt(ctx); } } });
   game.ui = new UI(game);
   game.touchCtl = new Touch(game);

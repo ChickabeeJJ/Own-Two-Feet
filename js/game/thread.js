@@ -44,8 +44,11 @@ export class Thread {
     this.vx += ((tx - this.x) * k - this.vx) * Math.min(1, dt * 5);
     this.vy += ((ty - this.y) * k - this.vy) * Math.min(1, dt * 5);
     this.x += this.vx * dt; this.y += this.vy * dt;
-    this.trail.push(this.x, this.y);
-    if (this.trail.length > 48) this.trail.splice(0, 2);
+    // the trail is sampled by distance, so it stays long when Thread drifts slowly; hovering, it draws in
+    const tl = this.trail, n = tl.length;
+    if (!n || Math.hypot(this.x - tl[n - 2], this.y - tl[n - 1]) > 3.5) tl.push(this.x, this.y);
+    else if (n > 8 && (g.tick % 2) === 0) tl.splice(0, 2);
+    if (tl.length > 140) tl.splice(0, tl.length - 140);
     // speech queue
     if (this.line) { this.lineT += dt; if (this.lineT > this.line.dur) { this.line = null; } }
     if (!this.line && this.queue.length) { this.line = this.queue.shift(); this.lineT = 0; Audio.play('chime', { vol: 0.25, gap: 0.3 }); }
@@ -77,20 +80,32 @@ export class Thread {
 
 export function drawThreadSprite(ctx, x, y, t, vx = 0, trail = null) {
   ctx.save();
-  // the trailing thread of light
-  if (trail && trail.length > 4) {
+  // the trailing thread of light: a tapered ribbon (soft glow, bright core), a second strand braided round
+  // it, and sparks that twinkle along its length
+  if (trail && trail.length > 6) {
     ctx.globalCompositeOperation = 'lighter';
     ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-    for (const [w, a] of [[5, 0.12], [1.6, 0.7]]) {
-      ctx.strokeStyle = rgba('#9ff3ff', a); ctx.lineWidth = w;
-      ctx.beginPath();
-      for (let i = 0; i < trail.length; i += 2) {
-        const k = i / trail.length;
-        const wob = Math.sin(t * 6 + i * 0.4) * 2 * (1 - k);
-        i ? ctx.lineTo(trail[i], trail[i + 1] + wob) : ctx.moveTo(trail[i], trail[i + 1] + wob);
+    const N = trail.length / 2;
+    const px = (i) => i >= N ? x : trail[i * 2], py = (i) => i >= N ? y : trail[i * 2 + 1];
+    for (const [w, col, al, braid] of [[7, '#7fe6ff', 0.10, 0], [2.6, '#bff6ff', 0.55, 0], [1.1, '#ffffff', 0.8, 0], [1.2, '#d9c9ff', 0.45, 1]]) {
+      for (let i = 1; i <= N; i++) {
+        const k = i / N;                         // 0 at the tail, 1 at Thread
+        const sw = braid ? Math.sin(t * 5 - i * 0.45) * 4.5 * k : Math.sin(t * 6 + i * 0.3) * 1.5 * (1 - k);
+        const x0 = px(i - 1), y0 = py(i - 1), x1 = px(i), y1 = py(i);
+        const dx = x1 - x0, dy = y1 - y0, L = Math.hypot(dx, dy) || 1, nx = -dy / L, ny = dx / L;
+        const sw0 = braid ? Math.sin(t * 5 - (i - 1) * 0.45) * 4.5 * ((i - 1) / N) : Math.sin(t * 6 + (i - 1) * 0.3) * 1.5 * (1 - (i - 1) / N);
+        ctx.strokeStyle = rgba(col, al * k * k);
+        ctx.lineWidth = Math.max(0.3, w * (0.25 + 0.75 * k));
+        ctx.beginPath(); ctx.moveTo(x0 + nx * sw0, y0 + ny * sw0); ctx.lineTo(x1 + nx * sw, y1 + ny * sw); ctx.stroke();
       }
-      ctx.lineTo(x, y);
-      ctx.stroke();
+    }
+    for (let i = 2; i < N; i += 5) {
+      const tw = Math.sin(t * 9 + i * 1.7);
+      if (tw < 0.55) continue;
+      const k = i / N, sx = px(i) + Math.sin(i * 3.1) * 4, sy = py(i) + Math.cos(i * 2.3) * 4, r = (1 + tw) * 1.4 * k;
+      ctx.fillStyle = rgba('#ffffff', 0.8 * k);
+      ctx.beginPath(); ctx.moveTo(sx, sy - r * 2); ctx.lineTo(sx + r * 0.5, sy); ctx.lineTo(sx, sy + r * 2); ctx.lineTo(sx - r * 0.5, sy); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(sx - r * 2, sy); ctx.lineTo(sx, sy + r * 0.5); ctx.lineTo(sx + r * 2, sy); ctx.lineTo(sx, sy - r * 0.5); ctx.closePath(); ctx.fill();
     }
     ctx.globalCompositeOperation = 'source-over';
   }
