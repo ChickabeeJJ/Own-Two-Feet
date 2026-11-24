@@ -444,9 +444,12 @@ export class Story {
       }
       const under = g.player.y / TILE - g.world.surface(Math.floor(g.player.x / TILE));
       if (under > 5 && (!T_ || T_.y < g.player.y - 3 * TILE)) hint = g.touch ? 'underground: dig a stair up, or jump and place a block under you' : 'underground: dig a stair up, or jump and <kbd>Right-click</kbd> below you';
-      ui.objective(typeof G.text === 'function' ? G.text(this) : G.text, hint, dist);
+      this.objText = typeof G.text === 'function' ? G.text(this) : G.text;
+      // the hint line fades once the player knows the ropes (it comes back if they stand around lost)
+      ui.objective(this.objText, g.guide && g.guide.terse ? '' : hint, dist);
     }
   }
+  objectiveText() { return this.objText || null; }
   completed(G) {
     const g = this.game;
     if (this.stage < 5) return;

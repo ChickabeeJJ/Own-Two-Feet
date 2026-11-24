@@ -85,6 +85,7 @@ export class Levels {
     const sv = this.sv;
     if (!(sv.perkPicks > 0) || (sv.perks || []).includes(id)) return false;
     sv.perks = sv.perks || []; sv.perks.push(id); sv.perkPicks--;
+    if (this.game.guide) this.game.guide.ev('perk');
     this.game.player.refreshLook && this.game.player.refreshLook();
     Audio.play('confirm');
     this.game.saveNow && this.game.saveNow();

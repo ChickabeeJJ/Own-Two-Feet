@@ -645,3 +645,13 @@ body.modal #combo, body.modal #streak, body.bag-open #combo { opacity: 0; }
 .rr-btns .btn { min-width: 120px; padding: 12px 18px; border-radius: 12px; font: 700 12px Manrope; letter-spacing: .14em; text-transform: uppercase; cursor: pointer; border: 1px solid var(--line); background: rgba(255,255,255,.07); color: var(--text); }
 .rr-btns .btn.primary { background: linear-gradient(180deg, #ffd0c0, #e07a68); color: #2a0e0a; border: none; }
 .big-btn.rift-btn { border-color: rgba(255,106,90,.35); }
+
+#guidechip { position: absolute; left: 50%; bottom: calc(18vh + 40px); transform: translate(-50%, 8px); display: flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 99px; background: rgba(12,14,20,.78); border: 1px solid rgba(191,246,255,.3); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); opacity: 0; pointer-events: none; transition: opacity .3s, transform .3s var(--ease); z-index: 11; white-space: nowrap; }
+#guidechip.on { opacity: 1; transform: translate(-50%, 0); }
+#guidechip.done { border-color: #9fe0a8; box-shadow: 0 0 20px rgba(159,224,168,.35); }
+#guidechip.compact { padding: 6px 10px; }
+#guidechip kbd { font: 700 11px Manrope; padding: 3px 7px; border-radius: 6px; background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.2); color: #fff; }
+#guidechip .gt { font: 600 12px Manrope; color: var(--text); letter-spacing: .02em; }
+#guidechip .gk.t { font: 700 10px Manrope; letter-spacing: .14em; text-transform: uppercase; color: #bff6ff; }
+body.modal #guidechip, body.bag-open #guidechip { opacity: 0; }
+@media (max-height: 500px) { #guidechip { bottom: 96px; } }

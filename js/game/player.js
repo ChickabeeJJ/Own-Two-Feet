@@ -279,6 +279,7 @@ export class Player {
       a.face(sign(dx) || a.facing);
       a.startAttack('side2', 0.25);
       g.throwables.throw(id === 'i_flare' ? 'flare' : 'charge', ox, oy, Math.cos(ang) * sp, Math.sin(ang) * sp);
+      if (id === 'i_flare' && g.guide) g.guide.ev('flare');
       Audio.play('swing', { pitch: 0.8 });
     }
   }
@@ -424,6 +425,7 @@ export class Player {
     Audio.play('swing', { pitch: rand(0.9, 1.15) * (W === WEAPONS.w_hammer ? 0.6 : W === WEAPONS.w_daggers ? 1.4 : 1) });
   }
   heavy(W) {
+    if (this.game.guide) this.game.guide.ev('charge');
     const a = this.actor, g = this.game, H = W.heavy;
     const k = 0.5 + this.chargeK * 0.5;
     a.startAttack(H.k, H.dur);
@@ -511,7 +513,7 @@ export class Player {
     if (fin) this.finisher(e, hx, hy);
     // recoil and pogo
     if (kind === 'down') { a.c.vy = -680; a.bounced = true; a.c.jumps = 0; a.c.airDash = 1; }
-    else if (kind === 'up' && step.launch) { a.c.vy = Math.min(a.c.vy, -560); }       // follow the launch up
+    else if (kind === 'up' && step.launch) { a.c.vy = Math.min(a.c.vy, -560); if (g.guide) g.guide.ev('launch'); }       // follow the launch up
     else if (!a.c.ground && kind !== 'surge') a.c.vy = Math.min(a.c.vy, -120);       // air combos hang a moment
     else if (kind !== 'surge') a.c.vx -= a.facing * (armored ? 260 : W === WEAPONS.w_hammer ? 60 : 120);
     this.sv.breath = Math.min(100, (this.sv.breath || 0) + (armored ? 6 : 11) * (this.sv.equip && this.sv.equip.charm === 'g_charm_thread' ? 2 : 1) * (this.perk('bloodthread') ? 1.6 : 1));
@@ -567,6 +569,7 @@ export class Player {
   tryParry(e) {
     const a = this.actor, g = this.game, at = a.attack;
     if (!at || at.kind === 'mine' || at.t * at.dur > (this.perk('riposte') ? 0.3 : 0.2) || (at.W && at.W.ranged)) return false;
+    if (g.guide) g.guide.ev('parry');
     if (e && e.poise !== undefined) { e.poise = 0; if (g.enemies && g.enemies.stagger) g.enemies.stagger(e, 1.5); }
     if (e && e.c) { e.c.vx += sign(e.c.x - a.c.x) * 420; }
     this.counterT = 1.4;
@@ -638,7 +641,7 @@ export class Player {
       a.intent.mx = 0;
       if ((this.game.tick % 10) === 0) this.game.fx.spawn({ x: a.c.x + rand(-20, 20), y: a.c.y - rand(0, 70), vy: -60, life: 0.6, size: 2.5, col: '#ffffff', col1: '#9ff3ff', add: true });
       if (this.healT > 0.9 - this.sv.lvl.breath * 0.15) {
-        this.healT = 0; this.sv.breath -= 33; this.hp++;
+        this.healT = 0; this.sv.breath -= 33; this.hp++; if (g.guide) g.guide.ev('mend');
         Audio.play('heal'); this.game.fx.ring(a.c.x, a.c.y - 46, 6, 60, 0.5, '#9ff3ff', 4);
       }
     } else this.healT = 0;

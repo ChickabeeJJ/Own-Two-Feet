@@ -475,6 +475,23 @@ export default ({ page, sleep, key, shot, evalg }) => ({
     console.log('rift', JSON.stringify({ log: log.filter((x, i) => i % 5 === 0), res, again, back }));
     await shot('rift-3-home');
   },
+  // the guide: a ladder lesson shows, climbing completes it; a winding Hollow brings the parry hint; tips
+  async guide() {
+    await sleep(900);
+    await evalg(() => { const g = window.__game, W = g.world, p = g.player, T = window.__T; g.story.skipBirth(); g.story.skipTutorial(); g.enemies.calm = 999; g.surges.next = 999;
+      const x = 70, h = W.surface(x); for (let y = h - 5; y < h; y++) W.set(x, y, T.LADDER); p.respawnAt(x * 32 + 16, h * 32); g.guide.cool = 0; });
+    await sleep(1500);
+    const a = await evalg(() => { const g = window.__game; return { cur: g.guide.cur && g.guide.cur.id, chip: document.querySelector('#guidechip') && document.querySelector('#guidechip').className, text: document.querySelector('#guidechip') && document.querySelector('#guidechip').textContent }; });
+    await shot('guide-0-ladder');
+    await page.keyboard.down('KeyW'); await sleep(700); await page.keyboard.up('KeyW'); await sleep(400);
+    const b = await evalg(() => { const g = window.__game; return { ladderOk: g.save.guide.ladder && g.save.guide.ladder.ok, cur: g.guide.cur && g.guide.cur.id }; });
+    // a husk winding up right next to us
+    await evalg(() => { const g = window.__game, p = g.player; window.__hk = g.enemies.spawn('husk', p.x + 90, p.y, 0, '#ffb36b'); g.guide.cool = 0; g.guide.cur = null; });
+    for (let i = 0; i < 12; i++) { await evalg(() => { const e = window.__hk; e.ai.state = 'windup'; e.ai.t = 0.2; e.face(-1); }); await sleep(100); }
+    const c = await evalg(() => { const g = window.__game; return { cur: g.guide.cur && g.guide.cur.id, line: g.story.thread.line && g.story.thread.line.text }; });
+    await shot('guide-1-parry');
+    console.log('guide', JSON.stringify({ a, b, c }));
+  },
   async looks() {
     await sleep(900);
     await evalg(() => { const g = window.__game, W = g.world, p = g.player; g.story.skipBirth(); g.enemies.calm = 999; g.save.tutDone = 1; g.story.tutI = 9; g.cam.zoomT = 1.3; p.respawnAt(7 * 32, W.surface(7) * 32); });

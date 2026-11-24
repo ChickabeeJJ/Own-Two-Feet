@@ -184,6 +184,15 @@ export class UI {
     el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump');
     clearTimeout(this.comboTO); el.querySelector('em').style.animation = 'none'; void el.offsetWidth; el.querySelector('em').style.animation = '';
   }
+  // the guide's hint chip: keys (or the touch action) and a short line; compact once you've done it before
+  guideChip(L, touch, compact, success) {
+    let el = this.chipEl;
+    if (!el) { el = this.chipEl = document.createElement('div'); el.id = 'guidechip'; document.getElementById('ui').appendChild(el); }
+    if (!L) { if (success) { el.classList.add('done'); setTimeout(() => el.classList.remove('on', 'done'), 600); } else el.classList.remove('on'); return; }
+    const keys = touch ? (L.touch ? `<span class="gk t">${esc(L.touch)}</span>` : '') : L.keys.map(k => `<kbd>${esc(k)}</kbd>`).join('');
+    el.innerHTML = `${keys}${compact ? '' : `<span class="gt">${esc(L.text)}</span>`}`;
+    el.className = 'on' + (compact ? ' compact' : '');
+  }
   // surge banner under the compass: what is happening and how many Hollows are left
   surgeHud(text, left, state) {
     let el = this.surgeEl;

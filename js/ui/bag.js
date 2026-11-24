@@ -438,6 +438,7 @@ export class Bag {
       p.give(r.out, made);
       this.sv.crafted = (this.sv.crafted || 0) + made;
       if (g.quests) g.quests.onCraft(r.out, made);
+      if (g.guide && r.st === 'bench') g.guide.ev('bench');
       if (g.story && g.story.tut) g.story.tut.crafted = 1;
       Audio.play('confirm'); Audio.play('place', { pitch: 1.3 });
       if (rarity(r.out) >= 2) Audio.play('soul', { pitch: 1.3 });
