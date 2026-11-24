@@ -121,6 +121,7 @@ export class Quests {
   complete(id) {
     const g = this.game, sv = this.sv, Q = QUESTS[id], st = sv.quests[id];
     st.done = true;
+    g.levels && g.levels.gain(150, g.player.actor.c.x, g.player.actor.c.y - 110, 'quest');
     const r = Q.reward || {};
     const got = [];
     if (r.glimmer) { sv.glimmer += r.glimmer; got.push(r.glimmer + ' glimmer'); }
@@ -187,6 +188,7 @@ export class Quests {
   claimDaily() {
     const g = this.game, sv = this.sv;
     sv.daily.claimed = true;
+    g.levels && g.levels.gain(200, g.player.actor.c.x, g.player.actor.c.y - 110, 'commissions');
     sv.glimmer += 100;
     const extra = [['i_draught', 2], ['i_flare', 3], ['i_charge', 2]][Math.floor(Math.random() * 3)];
     g.player.give(extra[0], extra[1]);

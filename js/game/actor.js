@@ -8,7 +8,7 @@ import { clamp, lerp, sign } from '../core/util.js';
 const smooth01 = (t) => t * t * (3 - 2 * t);
 
 export const PHYS = {
-  grav: 2600, maxFall: 1500, run: 300, accG: 3400, decG: 4200, accA: 2300, jumpV: 770, djumpV: 700, cut: 0.42,
+  grav: 2600, maxFall: 1500, run: 345, accG: 3900, decG: 4200, accA: 2300, jumpV: 770, djumpV: 700, cut: 0.42,
   coyote: 0.1, buffer: 0.13, dashV: 780, dashT: 0.15, dashCD: 0.4, wallSlide: 150, wallJumpX: 340, wallJumpY: 720,
 };
 
@@ -237,14 +237,14 @@ export class Actor {
     c.coyote = c.ground ? PHYS.coyote : c.coyote - dt;
     c.buffer = I.jump ? PHYS.buffer : c.buffer - dt;
     c.dashCD -= dt;
-    if (c.ground) { c.jumps = 0; c.airDash = 1; }
+    if (c.ground) { c.jumps = 0; c.airDash = this.fleet ? 2 : 1; }
     const crouch = false;
     if (I.crawl && c.ground && !c.climb) this.setCrawl(true);
     else if (this.crawling && (!I.crawl || !c.ground)) this.setCrawl(false);   // stays down under a ceiling
     // dash
     if (I.dash && A.dash && c.dashCD <= 0 && (c.ground || c.airDash > 0)) {
       if (I.mx) this.face(sign(I.mx));
-      c.dashT = PHYS.dashT; c.dashCD = PHYS.dashCD; if (!c.ground) c.airDash--;
+      c.dashT = PHYS.dashT; c.dashCD = PHYS.dashCD * (this.fleet ? 0.6 : 1); if (!c.ground) c.airDash--;
       c.vx = this.facing * PHYS.dashV; c.vy = 0;
       this.inv = Math.max(this.inv, 0.12);
       if (this.onDash) this.onDash();

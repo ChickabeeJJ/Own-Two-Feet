@@ -102,7 +102,7 @@ export function newSave(seed) {
   seed = seed ?? ((Math.random() * 2 ** 31) | 0);
   return {
     v: 1, seed, born: false, name: genName(seed), sigil: seed ^ 0x5bd1e995,
-    pos: null, respawn: null, hp: 5, maxHp: 5, breath: 0, glimmer: 0,
+    pos: null, respawn: null, hp: 5, maxHp: 5, breath: 0, glimmer: 0, level: 1, xp: 0, perks: [], perkPicks: 0, towns: {}, rift: { best: 0 },
     hasBlade: false, inv: {}, hotbar: [], sel: 0,
     abil: { djump: false, wall: false, plunge: false, surge: false },
     lvl: { blade: 0, vessel: 0, breath: 0 },
@@ -129,7 +129,7 @@ export function lookFromSave(sv) {
     thread: true, threadCol: eyes[0] === '#ffffff' ? '#e8f4ff' : eyes[0], bootCol: mat === 'shadow' ? '#1a171f' : '#6b4a32',
     coat: mat === 'shadow' ? '#2b2633' : mat === 'metal' ? '#d8c9a8' : '#ece6dc', hoodCol: '#5f7a4a',
     gearLamp: !!(sv.equip && sv.equip.lamp), gearPick: (sv.equip && sv.equip.pick) || null,
-    weapon: weaponId(sv), weaponLen: WEAPONS[weaponId(sv)].len, infuse: sv.infuse && sv.infuse[weaponId(sv)] ? INFUSE[sv.infuse[weaponId(sv)]].col : null,
+    weapon: weaponId(sv), weaponLen: WEAPONS[weaponId(sv)].len * (sv.perks && sv.perks.includes('long_reach') ? 1.12 : 1), infuse: sv.infuse && sv.infuse[weaponId(sv)] ? INFUSE[sv.infuse[weaponId(sv)]].col : null,
   };
 }
 
@@ -148,6 +148,8 @@ export const Save = {
     for (const k in base.lvl) if (d.lvl[k] === undefined) d.lvl[k] = 0;
     for (const k in base.stats) if (d.stats[k] === undefined) d.stats[k] = 0;
     // the blade from the stone is a weapon you carry and wear
+    if (!d.level) { d.level = 1; d.xp = 0; } if (!d.perks) d.perks = []; if (d.perkPicks === undefined) d.perkPicks = 0;
+    if (!d.towns) d.towns = {}; if (!d.rift) d.rift = { best: 0 };
     if (d.hasBlade && !(d.inv.w_blade > 0)) d.inv.w_blade = 1;
     if (d.hasBlade && !d.equip.weapon) d.equip.weapon = 'w_blade';
     this.data = d;

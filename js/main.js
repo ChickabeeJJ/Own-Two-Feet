@@ -10,6 +10,9 @@ import { Bosses } from './game/bosses.js';
 import { Shrines } from './game/npcs.js';
 import { Story } from './game/story.js';
 import { Throwables } from './game/throwables.js';
+import { Rift } from './game/rift.js';
+import { Surges } from './game/surges.js';
+import { Levels } from './game/levels.js';
 import { Trees } from './game/trees.js';
 import { Sites } from './game/sites.js';
 import { Quests } from './game/quests.js';
@@ -69,9 +72,12 @@ async function boot() {
   game.parts = new Parts(game);
   game.sites = new Sites(game);
   game.trees = new Trees(game);
+  game.levels = new Levels(game);
+  game.surges = new Surges(game);
+  game.rift = new Rift(game);
   game.quests = new Quests(game);
   game.quests.navOn = st.questNav !== false;
-  game.systems.push(game.story, game.content, game.shrines, game.enemies, game.bosses, game.throwables, game.parts, game.sites, game.quests, game.trees);
+  game.systems.push(game.story, game.content, game.shrines, game.enemies, game.bosses, game.throwables, game.parts, game.sites, game.quests, game.trees, game.surges, game.rift);
   game.systems.push({ draw: (ctx, a, layer) => { if (layer === 'front') { game.player.drawCursor(ctx); game.player.drawPrompt(ctx); } } });
   game.ui = new UI(game);
   game.touchCtl = new Touch(game);
@@ -82,7 +88,7 @@ async function boot() {
   game.saveNow = () => {
     const p = game.player;
     if (!p) return;
-    if (game.net && game.net.visiting) { sv.hp = Math.max(1, p.hp); Save.write(null); return; }
+    if ((game.net && game.net.visiting) || (game.rift && game.rift.active)) { sv.hp = Math.max(1, p.hp); Save.write(null); return; }
     if (!p.dead && p.actor.mode === 'ctrl' && p.actor.c.ground) sv.pos = { x: p.x, y: p.y };
     sv.hp = Math.max(1, p.hp);
     Save.write(game.world);

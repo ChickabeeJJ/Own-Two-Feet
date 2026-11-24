@@ -66,6 +66,7 @@ export class Sites {
     const g = this.game, sv = this.sv, p = g.player, c = s.chest;
     if (!c || c.open) return;
     c.open = true; sv.puzzles[s.key + 'c'] = 1;
+    g.levels && g.levels.gain(s.kind === 'camp' ? 140 : 90, g.player.actor.c.x, g.player.actor.c.y - 110, 'solved');
     const gl = 25 + Math.floor(Math.random() * 30) + (s.kind === 'camp' ? 25 : 0);
     sv.glimmer += gl; sv.lights = (sv.lights || 0) + 1;
     const pool = [[T.GOLD, 2], [T.CRYSTAL, 3], ['i_draught', 1], ['i_flare', 2], [T.PLANK, 8], [T.BRICK, 6], ['i_charge', 1]];

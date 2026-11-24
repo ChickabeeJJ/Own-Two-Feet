@@ -413,6 +413,68 @@ export default ({ page, sleep, key, shot, evalg }) => ({
     for (let i = 0; i < 12; i++) { lines.push(await evalg(() => { const th = window.__game.story.thread; return th.line ? th.line.text : '-'; })); await sleep(250); }
     console.log('wake', JSON.stringify(lines.filter((l, i) => l !== lines[i - 1])));
   },
+  // a Hollow surge: the rift opens, waves pour out, clearing them leaves a chest
+  async surge() {
+    await sleep(900);
+    await evalg(() => { const g = window.__game, W = g.world, p = g.player; g.story.skipBirth(); g.story.skipTutorial(); g.story.firstFoeDown = true; g.save.tut.foe = 1; g.enemies.calm = 999;
+      p.respawnAt(80 * 32, W.surface(80) * 32); g.surges.next = 0.2; p.hp = 99; });
+    await sleep(1800); await shot('surge-0-warn');
+    await sleep(2200); await shot('surge-1-wave');
+    const st = [];
+    for (let i = 0; i < 40; i++) {
+      const r = await evalg(() => { const g = window.__game, S = g.surges, p = g.player; p.hp = 99;
+        if (!S.s) return null;
+        for (const e of S.s.alive) if (e.mode !== 'dead' && e.hurt) { p.strike(e, e.c.x, e.c.y - 40, 1, -0.2, 3, 'side', {}); }
+        return [S.s.state, S.s.wave, S.s.waves, S.s.alive.length, S.s.queue.length]; });
+      st.push(r); if (!r) break; await sleep(400);
+    }
+    const end = await evalg(() => { const g = window.__game; return { chests: g.surges.chests.length, level: g.save.level, xp: Math.round(g.save.xp), combo: g.player.combo && g.player.combo.best, kills: g.save.stats.kills }; });
+    console.log('surge', JSON.stringify({ trace: st.filter((x, i) => i % 4 === 0 || !x), end }));
+    await sleep(600); await shot('surge-2-clear');
+  },
+  // levels: XP to a level-up, a perk pick from the Character tab
+  async levels() {
+    await sleep(900);
+    const r = await evalg(async () => { const g = window.__game, L = g.levels, sv = g.save; const wait = ms => new Promise(r => setTimeout(r, ms));
+      g.story.skipBirth(); g.story.skipTutorial(); g.enemies.calm = 999; await wait(300);
+      const before = { level: sv.level, maxHp: sv.maxHp };
+      for (let i = 0; i < 6; i++) { L.gain(L.need(sv.level) + 1, g.player.x, g.player.y - 100); await wait(150); }
+      const mid = { level: sv.level, picks: sv.perkPicks, maxHp: sv.maxHp, dmg: +L.dmgMult().toFixed(2), zone: L.zoneLevel(900 * 32) };
+      return { before, mid }; });
+    console.log('levels', JSON.stringify(r));
+    await sleep(800); await shot('lv-0-card');
+    await evalg(() => window.__game.ui.openMenu('character')); await sleep(900); await shot('lv-1-tab');
+    await page.click('.perk-card'); await sleep(900);
+    const after = await evalg(() => ({ perks: window.__game.save.perks, picks: window.__game.save.perkPicks }));
+    console.log('levels after', JSON.stringify(after)); await shot('lv-2-picked');
+  },
+  // Rift Trials: enter, clear waves, take a boon, fall, results, again, leave; home is untouched
+  async rift() {
+    await sleep(900);
+    const home = await evalg(() => { const g = window.__game, W = g.world, T = window.__T; g.story.skipBirth(); g.story.skipTutorial(); g.enemies.calm = 999;
+      const x = 40, h = W.surface(x); W.set(x, h - 1, T.BRICK); g.saveNow(); return { seed: W.seed, x, h, px: Math.round(g.player.x) }; });
+    await evalg(() => window.__game.rift.enter());
+    await sleep(3500); await shot('rift-0-wave');
+    const log = [];
+    for (let i = 0; i < 60; i++) {
+      const r = await evalg(() => { const g = window.__game, R = g.rift, p = g.player; if (!R.r) return null; p.hp = Math.max(p.hp, 3);
+        for (const e of R.r.alive) if (e.mode !== 'dead') p.strike(e, e.c.x, e.c.y - 40, 1, -0.2, 6, 'side', {});
+        return [R.r.wave, R.r.alive.length, R.r.queue.length, g.ui.modal, Math.round(R.r.breather)]; });
+      log.push(r);
+      if (r && r[3] === 'boon') { await shot('rift-1-boon'); await page.click('#rift-boons .perk-card'); }
+      if (r && r[0] >= 4) break;
+      await sleep(300);
+    }
+    await evalg(() => { const p = window.__game.player; p.hp = 0; p.die(); });
+    await sleep(2600); await shot('rift-2-results');
+    const res = await evalg(() => ({ shown: document.querySelector('#rift-res').classList.contains('on'), best: window.__game.save.rift.best }));
+    await page.click('#rift-res .again'); await sleep(1500);
+    const again = await evalg(() => ({ wave: window.__game.rift.r.wave, alive: !window.__game.player.dead }));
+    await evalg(() => window.__game.rift.leave()); await sleep(1500);
+    const back = await evalg((h) => { const g = window.__game, W = g.world, T = window.__T; return { seed: W.seed === h.seed, brick: W.get(h.x, h.h - 1) === T.BRICK, active: g.rift.active }; }, home);
+    console.log('rift', JSON.stringify({ log: log.filter((x, i) => i % 5 === 0), res, again, back }));
+    await shot('rift-3-home');
+  },
   async looks() {
     await sleep(900);
     await evalg(() => { const g = window.__game, W = g.world, p = g.player; g.story.skipBirth(); g.enemies.calm = 999; g.save.tutDone = 1; g.story.tutI = 9; g.cam.zoomT = 1.3; p.respawnAt(7 * 32, W.surface(7) * 32); });

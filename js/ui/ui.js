@@ -1,5 +1,6 @@
 // DOM UI: HUD, cinematic cards, letterbox, dialog with typewriter, menus (journey, look, craft, together,
 // settings, controls), character editor with a live ragdoll preview and a generated sigil.
+import { PERKS } from '../game/levels.js';
 import { Audio } from '../core/audio.js';
 import { Input } from '../core/input.js';
 import { TILE, T, TILES, biomeOf, gateNear } from '../world/tiles.js';
@@ -171,6 +172,53 @@ export class UI {
     while (box.children.length > 4) box.firstChild.remove();
     setTimeout(() => { d.style.transition = 'opacity .6s'; d.style.opacity = 0; setTimeout(() => d.remove(), 700); }, 2200);
   }
+  // combo counter (right edge): grows and warms with the count, shows the reward multiplier
+  combo(n, mult) {
+    let el = this.comboEl;
+    if (!el) { el = this.comboEl = document.createElement('div'); el.id = 'combo'; el.innerHTML = '<b></b><span>hits</span><i></i><em></em>'; document.getElementById('ui').appendChild(el); }
+    if (n < 2) { el.classList.remove('on'); return; }
+    el.classList.add('on');
+    el.querySelector('b').textContent = n;
+    el.querySelector('i').textContent = 'x' + mult.toFixed(2).replace(/0$/, '') + ' rewards';
+    el.style.setProperty('--heat', Math.min(1, n / 40).toFixed(2));
+    el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump');
+    clearTimeout(this.comboTO); el.querySelector('em').style.animation = 'none'; void el.offsetWidth; el.querySelector('em').style.animation = '';
+  }
+  // surge banner under the compass: what is happening and how many Hollows are left
+  surgeHud(text, left, state) {
+    let el = this.surgeEl;
+    if (!el) { el = this.surgeEl = document.createElement('div'); el.id = 'surge'; el.innerHTML = '<b></b><span></span>'; document.getElementById('ui').appendChild(el); }
+    if (!text) { el.classList.remove('on'); return; }
+    el.classList.add('on'); el.classList.toggle('warn', state === 'warn');
+    const k = text + '|' + left;
+    if (el.dataset.k === k) return; el.dataset.k = k;
+    el.querySelector('b').textContent = text;
+    el.querySelector('span').textContent = left === null || left === undefined ? '' : left + ' left';
+  }
+  // Rift Trials: choose one of three boons between waves
+  riftBoons(list, cb) {
+    let el = this.boonEl;
+    if (!el) { el = this.boonEl = document.createElement('div'); el.id = 'rift-boons'; document.getElementById('ui').appendChild(el); }
+    el.innerHTML = '<em>Choose a boon</em><div class="perk-row"></div>';
+    const row = el.querySelector('.perk-row');
+    this.modal = 'boon'; document.body.classList.add('modal');
+    list.forEach((b, i) => {
+      const c = document.createElement('button'); c.className = 'perk-card'; c.style.setProperty('--i', i);
+      c.innerHTML = `<i class="pk-ico">${b.name[0]}</i><b>${esc(b.name)}</b><span>${esc(b.desc)}</span>`;
+      c.onclick = () => { el.classList.remove('on'); this.modal = null; document.body.classList.remove('modal'); cb(b); };
+      row.appendChild(c);
+    });
+    el.classList.add('on');
+  }
+  // kill streak callout in the middle of the screen
+  streak(text, k) {
+    let el = this.streakEl;
+    if (!el) { el = this.streakEl = document.createElement('div'); el.id = 'streak'; document.getElementById('ui').appendChild(el); }
+    el.innerHTML = `<b>${esc(text)}</b><span>${k} undone</span>`;
+    el.className = 'on' + (k >= 5 ? ' big' : '');
+    void el.offsetWidth;
+    clearTimeout(this.streakTO); this.streakTO = setTimeout(() => el.classList.remove('on'), 1400);
+  }
   glimmerBump() { const g = $('#glimmer'); g.classList.remove('bump'); void g.offsetWidth; g.classList.add('bump'); }
   deathCard(show = true) {
     if (show) { this.letterbox(true); this.card('The body forgets', 'but you remember', 'boss', 2.6); }
@@ -285,7 +333,7 @@ export class UI {
     return g.actors.some(a => a.npcKind === 'tailor' && Math.abs(a.c.x - g.player.x) < 260);
   }
   renderMenu() {
-    const tabs = [['journey', 'Journey'], ['quests', 'Quests'], ['journal', 'Journal'], ['look', 'Look'], ['craft', 'Craft'], ['together', 'Together'], ['settings', 'Settings'], ['controls', 'Controls']];
+    const tabs = [['journey', 'Journey'], ['character', 'Character'], ['quests', 'Quests'], ['journal', 'Journal'], ['look', 'Look'], ['craft', 'Craft'], ['together', 'Together'], ['settings', 'Settings'], ['controls', 'Controls']];
     const th = $('#menu .tabs');
     // tabs are built once; the underline slides between them
     if (!th.querySelector('.tab')) {
@@ -324,6 +372,12 @@ export class UI {
     const tog = el('button', 'big-btn', '<b>Play Together</b><span>Invite a friend or wander the open world</span>');
     tog.onclick = () => { this.menuTab = 'together'; this.renderMenu(); };
     c1.appendChild(tog);
+    if (g.rift && sv.tutDone) {
+      const inR = g.rift.active;
+      const rb = el('button', 'big-btn rift-btn', inR ? '<b>Leave the Rift</b><span>Back to the world, rewards kept</span>' : `<b>Rift Trials</b><span>Endless waves in a sealed arena · best wave ${sv.rift && sv.rift.best || 0}</span>`);
+      rb.onclick = () => { this.closeMenu(); if (inR) g.rift.leave(); else g.rift.enter(); };
+      c1.appendChild(rb);
+    }
     // a way out of any hole: walk back from the last shrine (or home)
     if (g.player && !g.player.dead && !(g.bosses && g.bosses.active) && g.story && g.story.stage >= 5) {
       const back = el('button', 'big-btn', '<b>Return to the shrine</b><span>Trapped or lost? Thread pulls you back</span>');
@@ -342,6 +396,42 @@ export class UI {
   }
   displayName() { return playerName(this.sv, Platform.username); }
   // the quest log: tracked quest, active chains with their steps, the day's commissions, finished quests
+  // level, experience and perks; a pending perk pick shows three cards to choose from
+  tab_character(body) {
+    const g = this.game, sv = this.sv, L = g.levels;
+    const lvl = sv.level || 1, need = L ? L.need(lvl) : 100, frac = Math.min(1, (sv.xp || 0) / need);
+    const wrap = el('div', 'char');
+    const head = el('div', 'char-head');
+    head.innerHTML = `<div class="char-lv"><span>Level</span><b>${lvl}</b></div><div class="char-xp"><div class="bar"><i style="width:${(frac * 100).toFixed(1)}%"></i></div><span>${Math.floor(sv.xp || 0)} / ${need} experience</span></div>`
+      + `<div class="char-stats"><span>Damage <b>+${Math.round(((L ? L.dmgMult() : 1) - 1) * 100)}%</b></span><span>Vessels <b>${sv.maxHp}</b></span><span>Zone here <b>${L ? L.zoneLevel(g.player.x) : 1}</b></span></div>`;
+    wrap.appendChild(head);
+    if (L && sv.perkPicks > 0) {
+      wrap.appendChild(el('div', 'h', `Choose a perk <em>${sv.perkPicks} to choose</em>`));
+      const row = el('div', 'perk-row');
+      L.offer().forEach((pk, i) => {
+        const c = el('button', 'perk-card', `<i class="pk-ico">${pk.name[0]}</i><b>${esc(pk.name)}</b><span>${esc(pk.desc)}</span>`);
+        c.style.setProperty('--i', i);
+        c.onclick = () => { if (L.pick(pk.id)) { c.classList.add('chosen'); setTimeout(() => this.renderMenu(), 420); } };
+        row.appendChild(c);
+      });
+      wrap.appendChild(row);
+    }
+    wrap.appendChild(el('div', 'h', 'Your perks'));
+    const own = el('div', 'perk-own');
+    const mine = (sv.perks || []).map(id => PERKS.find(p => p.id === id)).filter(Boolean);
+    if (!mine.length) own.appendChild(el('div', 'note', 'Every third level you choose a perk. The first comes at level 3.'));
+    for (const pk of mine) own.appendChild(el('div', 'perk-chip', `<b>${esc(pk.name)}</b><span>${esc(pk.desc)}</span>`));
+    wrap.appendChild(own);
+    body.appendChild(wrap);
+  }
+  xpBar(level, frac, bump) {
+    const b = $('#xp'); if (!b) return;
+    $('#lvl').textContent = level; $('#xp-fill').style.width = (Math.max(0, Math.min(1, frac)) * 100).toFixed(1) + '%';
+    if (bump) { b.classList.remove('bump'); void b.offsetWidth; b.classList.add('bump'); }
+  }
+  levelCard(n, vessel, perk) {
+    this.game.story.card(`Level ${n}`, perk ? 'a perk to choose: Menu, Character' : vessel ? 'a new vessel' : 'stronger', 'small', 2.6);
+  }
   tab_quests(body) {
     const g = this.game, Q = g.quests, sv = this.sv;
     if (!Q) return;
@@ -681,6 +771,7 @@ export class UI {
       this.lastHp = p.hp; this.lastMax = sv.maxHp;
     }
     $('#breath-fill').style.width = clamp(sv.breath || 0, 0, 100) + '%';
+    if (g.levels && (this.lastLv !== sv.level || this.lastXp !== sv.xp)) { this.lastLv = sv.level; this.lastXp = sv.xp; this.xpBar(sv.level || 1, (sv.xp || 0) / g.levels.need(sv.level || 1)); $('#xp').classList.toggle('pick', sv.perkPicks > 0); }
     const gl = $('#glimmer-n'); if (gl.textContent != sv.glimmer) gl.textContent = sv.glimmer;
     // hotbar
     if (this.hotbarDirty || this.lastSel !== sv.sel) this.renderHotbar();

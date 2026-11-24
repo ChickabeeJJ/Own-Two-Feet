@@ -65,6 +65,7 @@ export class Player {
   refreshLook() {
     const a = this.actor;
     a.look = lookFromSave(this.sv);
+    a.fleet = this.perk('fleet');
     a.cape = a.look.cape ? new Cape(7, (a.look.cape.len || 7) * a.scale) : null;
     if (a.cape) a.cape.flare = 640;
     a.blade = !!this.sv.hasBlade;
@@ -74,11 +75,12 @@ export class Player {
   update(dt) {
     const g = this.game, a = this.actor, I = a.intent;
     this.hurtCD -= dt;
+    this.tickCombo(dt);
     this.lowHp = this.hp <= 1 && !this.dead;
     if (this.dead) {
       this.deadT += dt;
       I.mx = 0; I.jump = I.dash = I.attack = false;
-      if (this.deadT > 3.2 && this.onRespawn && !this.respawning) { this.respawning = true; this.onRespawn(); }
+      if (this.deadT > 3.2 && this.onRespawn && !this.respawning && !(g.rift && g.rift.active)) { this.respawning = true; this.onRespawn(); }
       a.update(dt);
       return;
     }
@@ -112,7 +114,7 @@ export class Player {
     }
     a.update(dt);
     // surge: dashing through foes cuts them
-    if ((this.sv.abil.surge || (this.sv.equip && this.sv.equip.charm === 'g_charm_ember')) && a.c.dashT > 0) {
+    if ((this.sv.abil.surge || (this.sv.equip && this.sv.equip.charm === 'g_charm_ember') || this.perk('stormstep')) && a.c.dashT > 0) {
       for (const e of g.targets()) {
         if (e.surgeHit === g.tick || Math.abs(e.c.x - a.c.x) > 30 || Math.abs(e.cy - a.cy) > 50) continue;
         e.surgeHit = g.tick;
@@ -407,7 +409,7 @@ export class Player {
     let step;
     if (kind) step = { k: kind, dur: 0.3, launch: kind === 'up' && !air };
     else { step = W.chain[(this.chainI || 0) % W.chain.length]; this.chainI = (this.chainI || 0) + 1; }
-    const dur = step.dur / (W.speed > 1 ? Math.sqrt(W.speed) : 1);
+    const dur = step.dur * 0.87 * (this.perk('swift_strike') ? 0.9 : 1) / (W.speed > 1 ? Math.sqrt(W.speed) : 1);
     a.startAttack(step.k, dur);
     a.attack.step = step; a.attack.W = W;
     a.attackCD = dur * 0.82;
@@ -487,14 +489,14 @@ export class Player {
   }
   strike(e, hx, hy, dirx, diry, mult, kind, o = {}) {
     const g = this.game, a = this.actor, W = o.W || weaponOf(this.sv), step = o.step || {};
-    let dmg = Math.round(W.dmg * (1 + this.sv.lvl.blade * 0.35) * mult);
+    let dmg = Math.round(W.dmg * (1 + this.sv.lvl.blade * 0.35) * mult * (g.levels ? g.levels.dmgMult() : 1) * (this.perk('keen_edge') ? 1.15 : 1) * (this.temp && this.temp.fury ? 1.25 : 1));
     // finishers: a staggered or nearly-undone Hollow, a countered one, or now and then a chain ender
     const low = e.hp !== undefined && e.maxHp && e.hp - dmg <= e.maxHp * 0.2;
     const fin = kind !== 'surge' && kind !== 'plunge' && !e.isBoss && (e.staggered || this.counterT > 0 || (low && Math.random() < 0.55) || (step.ender && Math.random() < 0.3));
     if (this.counterT > 0) dmg = Math.round(dmg * 1.6);
     if (fin) dmg = Math.round(dmg * (e.staggered ? 3 : 2));
     const infuse = this.sv.infuse && this.sv.infuse[weaponId(this.sv)];
-    const res = e.hurt ? e.hurt(dmg, { x: hx, y: hy, dx: dirx, dy: diry, from: this, kind, poise: W.poise * (step.poise || 1) * mult, knock: W.knock * (step.heavy ? 1.6 : 1), launch: step.launch, bleed: W.bleed, element: infuse, finisher: fin, breaksGuard: W === WEAPONS.w_hammer || step.heavy }) : null;
+    const res = e.hurt ? e.hurt(dmg, { x: hx, y: hy, dx: dirx, dy: diry, from: this, kind, poise: W.poise * (step.poise || 1) * mult * (this.perk('heavy_hand') ? 1.4 : 1), knock: W.knock * (step.heavy ? 1.6 : 1), launch: step.launch, bleed: W.bleed, element: infuse, finisher: fin, breaksGuard: W === WEAPONS.w_hammer || step.heavy }) : null;
     const armored = res === 'armor';
     // feedback scaled by weight
     const heavyHit = step.heavy || step.ender || W === WEAPONS.w_hammer;
@@ -512,7 +514,42 @@ export class Player {
     else if (kind === 'up' && step.launch) { a.c.vy = Math.min(a.c.vy, -560); }       // follow the launch up
     else if (!a.c.ground && kind !== 'surge') a.c.vy = Math.min(a.c.vy, -120);       // air combos hang a moment
     else if (kind !== 'surge') a.c.vx -= a.facing * (armored ? 260 : W === WEAPONS.w_hammer ? 60 : 120);
-    this.sv.breath = Math.min(100, (this.sv.breath || 0) + (armored ? 6 : 11) * (this.sv.equip && this.sv.equip.charm === 'g_charm_thread' ? 2 : 1));
+    this.sv.breath = Math.min(100, (this.sv.breath || 0) + (armored ? 6 : 11) * (this.sv.equip && this.sv.equip.charm === 'g_charm_thread' ? 2 : 1) * (this.perk('bloodthread') ? 1.6 : 1));
+    if (!armored) this.comboHit(fin ? 3 : heavyHit ? 2 : 1);
+  }
+  // ---- combo and kill streaks: hits chain a counter that multiplies glimmer and XP; it fades after 2.5 s
+  comboHit(n = 1) {
+    const c = this.combo || (this.combo = { n: 0, t: 0, best: 0, kills: [], streak: 0 });
+    c.n += n; c.t = 2.5; c.best = Math.max(c.best, c.n);
+    if (this.game.ui && this.game.ui.combo) this.game.ui.combo(c.n, this.comboMult());
+  }
+  comboMult() { const n = this.combo ? this.combo.n : 0; return 1 + Math.min(1.5, n * 0.025) * (this.perk ? (this.perk('overdrive') ? 1.6 : 1) : 1); }
+  onKill(e) {
+    const g = this.game, c = this.combo || (this.combo = { n: 0, t: 0, best: 0, kills: [], streak: 0 });
+    const now = g.time;
+    c.kills = c.kills.filter(t => now - t < 3.2); c.kills.push(now);
+    const k = c.kills.length;
+    const call = { 2: 'Double', 3: 'Triple', 5: 'Rampage', 8: 'Unstoppable', 12: 'Undone' }[k];
+    if (call && g.ui && g.ui.streak) { g.ui.streak(call, k); Audio.play('chime', { pitch: 0.8 + Math.min(k, 12) * 0.05 }); if (k >= 5) { g.slowmo(0.45, 0.25); g.shake(0.25); } }
+    if (g.levels) g.levels.gain(g.levels.killXP(e) * this.comboMult(), e.c.x, e.c.y - 90);
+    if (this.perk('ember_soul')) {
+      g.fx.burst(e.c.x, e.c.y - 40, { n: 26, speed: 300, col: '#fff1d0', col1: '#ff7a3a', add: true, life: 0.6, size: 3, kind: 'mote' });
+      g.fx.ring(e.c.x, e.c.y - 40, 8, 100, 0.4, '#ff9b4a', 5); Audio.play('break', { pitch: 1.4, vol: 0.4 });
+      for (const o of g.targets()) if (o !== e && o.hurt && o.mode !== 'dead' && Math.hypot(o.c.x - e.c.x, o.c.y - e.c.y) < 110) o.hurt(10, { x: e.c.x, y: e.c.y - 40, dx: Math.sign(o.c.x - e.c.x) || 1, dy: -0.4, from: this, kind: 'ember', element: 'ember', poise: 6 });
+    }
+    if (g.surges) g.surges.onKill && g.surges.onKill(e);
+    if (g.rift && g.rift.active) g.rift.onKill(e);
+  }
+  perk(id) {
+    const T = this.temp;   // Rift Trials boons count for the run
+    if (T && ((id === 'ember_soul' && T.ember) || (id === 'iron_seam' && T.seam))) return true;
+    return !!(this.sv.perks && this.sv.perks.includes(id));
+  }
+  addBreath(k) { this.sv.breath = Math.min(100, (this.sv.breath || 0) + k * 100); }
+  tickCombo(dt) {
+    const c = this.combo; if (!c || c.n <= 0) return;
+    c.t -= dt;
+    if (c.t <= 0) { c.n = 0; if (this.game.ui && this.game.ui.combo) this.game.ui.combo(0, 1); }
   }
   finisher(e, hx, hy) {
     const g = this.game, a = this.actor;
@@ -529,7 +566,7 @@ export class Player {
   // a parry: striking as a blow lands turns it aside, staggers the attacker and opens a counter
   tryParry(e) {
     const a = this.actor, g = this.game, at = a.attack;
-    if (!at || at.kind === 'mine' || at.t * at.dur > 0.2 || (at.W && at.W.ranged)) return false;
+    if (!at || at.kind === 'mine' || at.t * at.dur > (this.perk('riposte') ? 0.3 : 0.2) || (at.W && at.W.ranged)) return false;
     if (e && e.poise !== undefined) { e.poise = 0; if (g.enemies && g.enemies.stagger) g.enemies.stagger(e, 1.5); }
     if (e && e.c) { e.c.vx += sign(e.c.x - a.c.x) * 420; }
     this.counterT = 1.4;
@@ -624,8 +661,23 @@ export class Player {
   takeHit(n, fromX, fromY, o = {}) {
     const g = this.game, a = this.actor;
     if (this.dead || a.inv > 0 || g.cinematic || (g.ui && g.ui.modal)) return false;
+    // a ward (surges) or Iron Seam turns the blow aside
+    if (this.ward > 0 || (this.perk('iron_seam') && Math.random() < 0.2)) {
+      if (this.ward > 0) this.ward--;
+      a.inv = 0.6; a.flash = 0.5;
+      g.fx.ring(a.c.x, a.c.y - 50, 10, 70, 0.35, '#bff6ff', 4); Audio.play('clang', { pitch: 1.3 });
+      g.fx.text(a.c.x, a.c.y - 110, 'Turned aside', '#bff6ff', 14);
+      return false;
+    }
     this.hp -= n;
+    // Second Thread: a killing blow leaves you on one vessel, once every two minutes
+    if (this.hp <= 0 && this.perk('second_wind') && g.time - (this.lastSecond || -1e9) > 120) {
+      this.lastSecond = g.time; this.hp = 1;
+      g.slowmo(0.2, 0.6); g.flash([0.7, 0.95, 1], 0.4); g.fx.ring(a.c.x, a.c.y - 50, 10, 180, 0.8, '#9ff3ff', 6);
+      g.fx.text(a.c.x, a.c.y - 120, 'Second Thread', '#9ff3ff', 20); Audio.play('chime', { pitch: 0.7 });
+    }
     a.inv = 1.0; a.flash = 1;
+    if (this.combo && this.combo.n) { this.combo.n = Math.floor(this.combo.n / 2); if (g.ui && g.ui.combo) g.ui.combo(this.combo.n, this.comboMult()); }
     const dir = sign(a.c.x - fromX) || -a.facing;
     a.c.vx = dir * (o.knock || 420); a.c.vy = -(o.lift || 380); a.c.dashT = 0;
     a.takeImpulse(fromX, fromY ?? a.cy, dir * 500, -260, 0.75);
@@ -643,7 +695,7 @@ export class Player {
     this.sv.stats.deaths++;
     g.slowmo(0.25, 1.2);
     g.flash([1, 1, 1], 0.4);
-    if (g.ui) g.ui.deathCard();
+    if (g.ui && !(g.rift && g.rift.active)) g.ui.deathCard();
   }
   respawnAt(x, y) {
     const a = this.actor;

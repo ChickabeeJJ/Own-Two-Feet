@@ -110,6 +110,7 @@ export class Bosses {
     else sv.bosses['g' + k] = true;
     if (g.net) g.net.bossDown(B);
     const relic = n < 4 ? RELICS[n] : RELICS[4];
+    g.levels && g.levels.gain(400 + n * 250, g.player.actor.c.x, g.player.actor.c.y - 110, 'Warden');
     if (relic.id === 'vessel') { sv.maxHp++; g.player.hp = sv.maxHp; }
     else { sv.abil[relic.id] = true; if (relic.id === 'djump' || relic.id === 'wall') g.player.actor.abil[relic.id] = true; }
     const got = Save.unlockSrc('boss' + Math.min(n, 3));

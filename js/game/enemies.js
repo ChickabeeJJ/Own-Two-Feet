@@ -4,6 +4,7 @@ import { Audio } from '../core/audio.js';
 import { Actor } from './actor.js';
 import { P } from '../physics/body.js';
 import { TILE, T, TILES, SHRINE_EVERY, gateNear } from '../world/tiles.js';
+const T_STONE = T.STONE;
 import { ARENA_HALF } from '../world/world.js';
 import { clamp, lerp, rand, sign, TAU, rgba, hash2 } from '../core/util.js';
 import { drawGlow } from '../world/light.js';
@@ -54,7 +55,7 @@ export class Proj {
         const b = a.body;
         for (const i of [P.HEAD, P.CHEST, P.BELLY, P.PELVIS, P.KNEE_F, P.KNEE_B]) if ((b.x[i] - this.x) ** 2 + (b.y[i] - this.y) ** 2 < (this.r + b.r[i]) ** 2) { hit = true; break; }
       }
-      if (hit && pl.takeHit(this.dmg, this.x, this.y, { knock: this.kind === 'wave' ? 380 : 300, heavy: this.heavy })) { if (this.kind !== 'wave') this.dead = true; }
+      if (hit && pl.takeHit(this.dmg, this.x, this.y, { knock: this.kind === 'wave' ? 380 : 300, heavy: this.heavy })) { if (this.kind !== 'wave') { this.dead = true; if (this.tile) g.fx.debris(this.x, this.y, this.tile, 5); } }
     }
     // the player's blade can bat orbs away
     if (this.kind === 'orb' && pl && pl.actor.attack && pl.actor.attack.t > 0.16 && pl.actor.attack.t < 0.66) {
@@ -209,13 +210,16 @@ export function drawWispSprite(ctx, x, y, t, col, o = {}) {
 
 // ---------------------------------------------------------------- ragdoll enemies
 export const HUSK_LOOK = (eye) => ({ body: '#2a2630', limb: '#2a2630', coat: '#2a2630', maskCol: '#d8c7a8', hoodCol: '#24202a', head: 'crescent', mat: 'cloth', eyes: eye, eyeStyle: 'slit', cape: { col: '#3b3640', style: 'scarf', len: 5, wide: 3.4 }, cloakLong: '#33303a', blade: null, marks: [], rim: '#ffcf9e', claws: '#e6dfd2', bootCol: '#1e1b22', belt: false, arms: 0.95 });
+// a lancer carries a crude spear and charges; a slinger keeps its distance and lobs stones
+export const LANCER_LOOK = (eye) => ({ ...HUSK_LOOK(eye), head: 'horns', maskCol: '#cbb89a', cape: { col: '#4a3a34', style: 'scarf', len: 6, wide: 3 }, weapon: 'w_spear', weaponLen: 46, blade: { len: 46, w: 2.2, col: '#b8b0a8' } });
+export const SLINGER_LOOK = (eye) => ({ ...HUSK_LOOK(eye), head: 'hood', hoodCol: '#2e2a26', maskCol: '#bfae92', cloakLong: '#3a332c', weapon: 'w_sling', blade: { len: 14, w: 2, col: '#9a96a0' } });
 export const BRUTE_LOOK = (eye) => ({ body: '#3a3238', limb: '#2e2930', coat: '#2e2930', head: 'ears', headK: 1.35, mat: 'cloth', eyes: eye, eyeStyle: 'slit', cape: null, cloakLong: '#2b2730', trim: '#c9a45c', blade: null, marks: [], rim: '#ffcf9e', gaunt: true, gloves: '#3a3238', bulk: 1.25, arms: 1.15, bootCol: '#1e1b22', belt: false });
 
 export class Enemies {
   constructor(game) {
     this.game = game;
-    this.spawnT = 4;
-    this.calm = 50;        // seconds of peace at the very start
+    this.spawnT = 2;
+    this.calm = 22;        // a short breath at the very start, then the Hollows come
   }
   get list() { return this.game.actors.filter(a => a.team === 'enemy' && !a.isBoss && a.kind !== 'nest' && a.kind !== 'dummy'); }
   update(dt) {
@@ -235,7 +239,7 @@ export class Enemies {
     // spawn
     this.spawnT -= dt;
     if (this.spawnT <= 0 && !(g.bosses && g.bosses.active)) {
-      this.spawnT = rand(3, 6);
+      this.spawnT = rand(1.8, 3.2);
       this.trySpawn();
     }
   }
@@ -253,15 +257,17 @@ export class Enemies {
     // no ambushes while learning: nothing spawns until the tutorial is over
     if (g.story && g.story.sv && !g.story.sv.tutDone) return;
     const ptx = Math.floor(P0.x / TILE);
-    if (Math.abs(ptx) < 45 && g.time < 200) return;
+    if (Math.abs(ptx) < 30 && g.time < 90) return;
     const tier = g.world.tierAtX(P0.x);
-    const cap = Math.min(7, 3 + tier);
+    const zl0 = g.levels ? g.levels.zoneLevel(P0.x) : 1;
+    const cap = Math.min(11, 4 + tier * 2 + Math.min(3, Math.floor(zl0 / 3)));
     if (this.list.length >= cap) return;
     const side = Math.random() < 0.5 ? -1 : 1;
     const dist = (g.view.x1 - g.view.x0) / 2 + rand(120, 360);
     const x = P0.x + side * dist, tx = Math.floor(x / TILE);
     // safe zones: near shrines, the spawn plateau, boss arenas
-    if (Math.abs(tx) < 40 && g.time < 200) return;
+    if (Math.abs(tx) < 28 && g.time < 90) return;
+    if (g.towns && g.towns.safeAt && g.towns.safeAt(x)) return;
     const gate = gateNear(tx);
     if (Math.abs(tx - gate.gx) < ARENA_HALF + 6) return;
     if (W.shrineNear(tx) !== null) return;
@@ -278,10 +284,20 @@ export class Enemies {
     if (y === null) return;
     const B = g.biomeAt(x);
     const r = Math.random();
-    const wispK = B.id === 'glass' || B.id === 'hollow' ? 0.35 : 0.2;
+    const wispK = B.id === 'glass' || B.id === 'hollow' ? 0.22 : 0.12;
+    const zl = g.levels ? g.levels.zoneLevel(x) : 1;
     if (r < wispK) this.spawnWisp(x, y * TILE - 140, tier, B.accent);
-    else if (r < wispK + (tier >= 1 || g.time > 160 ? 0.18 : 0.06)) this.spawn('brute', x, y * TILE, tier, B.accent);
-    else this.spawn('husk', x, y * TILE, tier, B.accent);
+    else if (r < wispK + (tier >= 1 || g.time > 120 ? 0.14 : 0.05)) this.spawn('brute', x, y * TILE, tier, B.accent, { lvl: zl });
+    else {
+      // a pack: husks with a lancer or a slinger mixed in, spread out a little
+      const n = Math.min(cap - this.list.length, 1 + Math.floor(Math.random() * (1.6 + Math.min(2, tier) + Math.min(1, zl0 / 4))));
+      for (let i = 0; i < Math.max(1, n); i++) {
+        const k = i === 0 ? 'husk' : Math.random() < 0.3 ? 'lancer' : Math.random() < 0.35 ? 'slinger' : 'husk';
+        const xx = x + side * i * rand(36, 70), tt = Math.floor(xx / TILE);
+        const yy = pty < W.surface(ptx) + 8 ? W.surface(tt) : y;
+        this.spawn(k, xx, yy * TILE, tier, B.accent, { lvl: zl });
+      }
+    }
   }
   spawnWisp(x, y, tier, col) {
     const w = new Wisp(this.game, x, y, tier, col);
@@ -290,14 +306,17 @@ export class Enemies {
   }
   spawn(kind, x, y, tier = 0, eye = '#ffb36b', o = {}) {
     const g = this.game;
-    const brute = kind === 'brute';
+    const brute = kind === 'brute', lancer = kind === 'lancer', slinger = kind === 'slinger';
+    const lvl = o.lvl || 1, lk = 1 + (lvl - 1) * 0.12;
     const e = new Actor(g, {
-      x, y, team: 'enemy', scale: brute ? 1.32 : 0.92, heavy: brute ? 1.6 : 1,
-      look: brute ? BRUTE_LOOK(eye) : HUSK_LOOK(eye), hp: (brute ? 90 : 28) * (1 + tier * 0.55), run: brute ? 120 : 175, facing: -1,
+      x, y, team: 'enemy', scale: brute ? 1.32 : lancer ? 0.98 : 0.92, heavy: brute ? 1.6 : 1,
+      look: brute ? BRUTE_LOOK(eye) : lancer ? LANCER_LOOK(eye) : slinger ? SLINGER_LOOK(eye) : HUSK_LOOK(eye),
+      hp: (brute ? 90 : lancer ? 34 : slinger ? 22 : 28) * (1 + tier * 0.55) * lk, run: brute ? 130 : lancer ? 215 : slinger ? 165 : 200, facing: -1,
     });
-    e.kind = kind; e.tier = tier; e.noCrumple = true;
-    e.maxPoise = e.poise = brute ? 70 : 26;
-    e.ai = { state: 'wander', t: rand(1, 3), dir: Math.random() < 0.5 ? -1 : 1, cd: 0 };
+    e.kind = kind; e.tier = tier; e.noCrumple = true; e.lvl = lvl; e.dmgK = lk;
+    if (lancer || slinger) e.blade = true;
+    e.maxPoise = e.poise = brute ? 70 : lancer ? 34 : 26;
+    e.ai = { state: 'wander', t: rand(0.6, 1.6), dir: Math.random() < 0.5 ? -1 : 1, cd: rand(0, 0.6) };
     e.hurt = (dmg, info) => this.hurt(e, dmg, info);
     e.glowEye = eye;
     Object.assign(e, o);
@@ -317,13 +336,17 @@ export class Enemies {
     if (e.poiseT > 0) { e.poiseT -= dt; if (e.poiseT <= 0) e.poise = e.maxPoise; }
     if (ai.state === 'stagger') { I.mx = 0; e.telegraph = 0; if (ai.t <= 0) { e.staggered = false; e.poise = e.maxPoise; ai.state = 'recover'; ai.t = 0.3; } return; }
     const dx = p ? p.c.x - c.x : 1e9, dy = p ? p.c.y - c.y : 1e9;
-    const sees = p && Math.abs(dx) < 420 && Math.abs(dy) < 210;
+    const seen = p && Math.abs(dx) < 560 && Math.abs(dy) < 240;
+    if (seen) ai.mem = 3; else ai.mem = Math.max(0, (ai.mem || 0) - dt);
+    const sees = seen || (p && ai.mem > 0 && Math.abs(dx) < 900);
     const brute = e.kind === 'brute';
+    if (e.kind === 'lancer' && this.thinkLancer(e, dt, p, dx, dy, sees)) return;
+    if (e.kind === 'slinger' && this.thinkSlinger(e, dt, p, dx, dy, sees)) return;
     e.look_at = sees ? { x: p.c.x, y: p.c.y - 60 } : null;
     switch (ai.state) {
       case 'wander': {
         I.mx = ai.dir * 0.45;
-        if (ai.t <= 0) { ai.dir = -ai.dir; ai.t = rand(1.5, 3.5); if (Math.random() < 0.3) { I.mx = 0; ai.state = 'idle'; ai.t = rand(0.8, 2); } }
+        if (ai.t <= 0) { ai.dir = -ai.dir; ai.t = rand(1.2, 2.6); if (Math.random() < 0.15) { I.mx = 0; ai.state = 'idle'; ai.t = rand(0.4, 1); } }
         if (!this.groundAhead(e, ai.dir) || e.wallAt(ai.dir)) { ai.dir = -ai.dir; ai.t = rand(1.5, 3); }
         if (sees) { ai.state = 'chase'; Audio.play('talk', { pitch: brute ? 0.5 : 0.8, vol: 0.6 }); }
         break;
@@ -341,7 +364,7 @@ export class Enemies {
         else if (c.clawing && ledge >= 1) I.climbWall = dir;   // keep hauling up until over the lip
         else if (ledge > 5 || (brute && ledge > 3)) I.mx = 0;
         if (!this.groundAhead(e, dir) && dy >= -10) I.mx = 0;
-        const range = brute ? 120 : 78;
+        const range = brute ? 120 : 84;
         if (Math.abs(dx) < range && Math.abs(dy) < 70 && ai.cd <= 0) {
           ai.state = 'windup'; ai.t = brute ? 0.75 : 0.42; I.mx = 0; e.face(dir);
           Audio.play('shard', { pitch: brute ? 0.45 : 0.6, vol: 0.6 });
@@ -382,13 +405,66 @@ export class Enemies {
           if (!ai.hit && Math.abs(dx) < 36 && Math.abs(dy) < 50) ai.hit = true;
           if (ai.hit) this.hitTarget(p, 1, c.x, c.y - 50, undefined, e);
         }
-        if (ai.t <= 0) { ai.state = 'recover'; ai.t = brute ? 0.9 : 0.55; ai.slammed = false; ai.cd = brute ? 1.6 : 0.9; }
+        if (ai.t <= 0) { ai.state = 'recover'; ai.t = brute ? 0.75 : 0.38; ai.slammed = false; ai.cd = brute ? 1.3 : 0.55; }
         break;
       }
       case 'recover': I.mx = 0; if (ai.t <= 0) ai.state = sees ? 'chase' : 'wander'; break;
     }
     // telegraph: body leans back, eyes flare
     e.telegraph = ai.state === 'windup' ? 1 - ai.t / (brute ? 0.75 : 0.42) : 0;
+  }
+  // lancer: closes to mid range, crouches with the spear levelled (a red line shows the path), then charges
+  thinkLancer(e, dt, p, dx, dy, sees) {
+    const ai = e.ai, I = e.intent, c = e.c, g = this.game;
+    if (ai.state === 'lwind') {
+      I.mx = 0; e.telegraph = 1 - ai.t / 0.6;
+      if (ai.t <= 0) { ai.state = 'lcharge'; ai.t = 0.34; ai.hit = false; e.startAttack('lunge', 0.4); Audio.play('swing', { pitch: 0.7 }); g.fx.dust(c.x, c.y - 4, 8, '#e8dccb', Math.PI / 2 - e.facing * 1.2, 160); }
+      return true;
+    }
+    if (ai.state === 'lcharge') {
+      I.mx = 0; e.telegraph = 0;
+      c.vx = e.facing * 880; if ((g.tick % 2) === 0) g.fx.spawn({ x: c.x - e.facing * 20, y: c.y - 40, vx: -e.facing * 60, vy: 0, life: 0.3, size: 5, size1: 1, col: '#ffffff', col1: e.glowEye, add: true, kind: 'streak' });
+      if (!ai.hit && p && Math.abs(dx) < 46 && Math.abs(dy) < 60) { ai.hit = true; this.hitTarget(p, Math.round(1 * (e.dmgK || 1)), c.x + e.facing * 30, c.y - 50, { knock: 560, lift: 300 }, e); }
+      if (ai.t <= 0 || e.wallAt(e.facing)) { ai.state = 'recover'; ai.t = 0.8; ai.cd = 1.6; c.vx *= 0.2; }
+      return true;
+    }
+    if (ai.state === 'chase' && sees && ai.cd <= 0 && Math.abs(dx) > 110 && Math.abs(dx) < 300 && Math.abs(dy) < 40 && c.ground) {
+      ai.state = 'lwind'; ai.t = 0.6; I.mx = 0; e.face(sign(dx));
+      Audio.play('shard', { pitch: 0.5, vol: 0.6 });
+      g.fx.ring(c.x + e.facing * 150, c.y - 40, 6, 24, 0.6, '#ff6a5a', 2, true);
+      return true;
+    }
+    return false;
+  }
+  // slinger: stays 200-320 px away, backs off if you close in, and lobs a stone in an arc that lands on you
+  thinkSlinger(e, dt, p, dx, dy, sees) {
+    const ai = e.ai, I = e.intent, c = e.c, g = this.game;
+    if (!sees || !p) return false;
+    const ad = Math.abs(dx), dir = sign(dx);
+    e.face(dir);
+    if (ai.state === 'swind') {
+      I.mx = 0; e.telegraph = 1 - ai.t / 0.55;
+      if (ai.t <= 0) {
+        e.startAttack('sling', 0.4);
+        // aim: a lob that lands where the player is (flight time grows with distance)
+        const T = clamp(ad / 380, 0.55, 1.1), G = 900;
+        const sx = c.x + dir * 14, sy = c.y - 70;
+        const vx = (p.c.x - sx) / T, vy = (p.c.y - 40 - sy - 0.5 * G * T * T) / T;
+        g.projectiles.push(new Proj(g, { kind: 'block', x: sx, y: sy, vx, vy, grav: G, r: 7, dmg: 1, tile: T_STONE, col: '#d8c7a8', life: 3 }));
+        Audio.play('swing', { pitch: 1.3, vol: 0.5 });
+        ai.state = 'chase'; ai.cd = rand(1.6, 2.4);
+      }
+      return true;
+    }
+    I.jumpHeld = true;
+    if (ad < 170) I.mx = -dir * 0.9;                 // too close: back away
+    else if (ad > 330) I.mx = dir * 0.8;             // too far: close in
+    else I.mx = 0;
+    if (I.mx && !this.groundAhead(e, sign(I.mx))) I.mx = 0;
+    if (I.mx && e.wallAt(sign(I.mx)) && c.ground) I.jump = true;
+    if (ai.cd <= 0 && ad < 420 && Math.abs(dy) < 200 && c.ground) { ai.state = 'swind'; ai.t = 0.55; I.mx = 0; Audio.play('talk', { pitch: 1.1, vol: 0.4 }); }
+    e.telegraph = 0;
+    return true;
   }
   // nearest living player, local or remote (the host simulates enemies for everyone)
   target(e) {
@@ -460,9 +536,13 @@ export class Enemies {
     g.hitstop(0.09); g.shake(0.3); g.pulse(1);
     g.fx.ring(info.x, info.y, 6, 60, 0.4, '#ffffff', 4);
     g.fx.burst(info.x, info.y, { n: 18, speed: 420, col: '#ffffff', col1: e.glowEye || e.col || '#ffb36b', add: true, life: 0.5, size: 2.6, kind: 'streak' });
-    const worth = e.kind === 'brute' ? 9 : e.kind === 'wisp' ? 4 : 5;
-    const n = Math.ceil(worth * (1 + (e.tier || 0) * 0.5));
+    const worth = e.kind === 'brute' ? 9 : e.kind === 'wisp' ? 4 : e.kind === 'lancer' ? 6 : 5;
+    const mult = g.player.comboMult ? g.player.comboMult() : 1;
+    const n = Math.ceil(worth * (1 + (e.tier || 0) * 0.5) * mult * (g.player.perk && g.player.perk('magnet') ? 1.2 : 1));
     g.fx.souls(info.x, info.y, Math.min(12, n), g.player.actor.c, '#bff6ff', () => { g.player.sv.glimmer += Math.max(1, Math.round(n / Math.min(12, n))); Audio.play('soul', { pitch: rand(0.9, 1.3), gap: 0.02 }); if (g.ui) g.ui.glimmerBump(); });
+    // now and then a mote of breath: mending comes from fighting
+    if (Math.random() < 0.25 && g.player.addBreath) g.fx.souls(info.x, info.y - 20, 3, g.player.actor.c, '#ffb3c8', () => g.player.addBreath(0.12));
+    if (g.player.onKill) g.player.onKill(e, info);
     g.player.sv.stats.kills++;
     if (g.net) g.net.onKill && g.net.onKill(e);
   }

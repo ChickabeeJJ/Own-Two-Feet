@@ -147,6 +147,7 @@ export class Content {
   wakeDoll(x) {
     const g = this.game, d = this.dolls.get(x);
     if (!d || d.state !== 'lying') return;
+    g.levels && g.levels.gain(45, g.player.actor.c.x, g.player.actor.c.y - 110, 'woken');
     const a = d.actor;
     d.state = 'thanks'; d.t = 5.2; d.dir = sign(a.c.x - g.player.x) || 1;
     a.scriptPose = { mode: 'sit', strength: 1 };
@@ -179,6 +180,7 @@ export class Content {
   openChest(x) {
     const g = this.game, c = this.chests.get(x);
     if (!c || c.open) return;
+    g.levels && g.levels.gain(30, g.player.actor.c.x, g.player.actor.c.y - 110, 'chest');
     c.open = true;
     this.sv.chests[x] = 1;
     const R = () => hash2(x, Math.floor(Math.random() * 1000), 1);
@@ -242,6 +244,7 @@ export class Content {
   breakNest(x) {
     const g = this.game, n = this.nests.get(x);
     if (!n) return;
+    g.levels && g.levels.gain(70, g.player.actor.c.x, g.player.actor.c.y - 110, 'nest');
     const e = n.ent;
     e.mode = 'dead'; e.removed = true;
     this.sv.nests[x] = 1;
