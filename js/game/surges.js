@@ -24,6 +24,9 @@ export class Surges {
     if (g.rift && g.rift.active) return false;
     if (g.towns && g.towns.safeAt && g.towns.safeAt(p.x)) return false;
     if (this.game.world.shrineNear && this.game.world.shrineNear(Math.floor(p.x / TILE)) !== null) return false;
+    // surges happen in the open, not deep in the caves where the rift could open inside the rock
+    const W = this.game.world, tx = Math.floor(p.x / TILE);
+    if (Math.floor(p.y / TILE) > W.surface(tx) + 4) return false;
     return true;
   }
   update(dt) {
@@ -50,11 +53,14 @@ export class Surges {
       if (s.queue.length && s.spawnT <= 0) { s.spawnT = 0.32; this.spawnOne(s.queue.shift()); }
       s.alive = s.alive.filter(e => !e.removed && e.mode !== 'dead');
       const waveT = s.t - s.waveAt;
+      // any that cannot reach you after a while come apart (no wave waits forever on a Hollow stuck in a wall)
+      if (waveT > 30) for (const e of s.alive) if (Math.hypot(e.c.x - p.x, e.c.y - p.y) > 420) { e.removed = true; g.fx.burst(e.c.x, e.c.y - 40, { n: 10, speed: 140, col: '#ffffff', col1: '#ff6a5a', add: true, life: 0.5, size: 2 }); }
       if (!s.queue.length && (s.alive.length === 0 || (s.alive.length <= 1 && waveT > 8) || waveT > 22)) {
         if (s.wave >= s.waves) { if (s.alive.length === 0) this.clear(); }
         else { s.wave++; this.startWave(); }
       }
     }
+    if (this.s !== s) return;   // it just cleared or closed: leave the banner hidden
     if (g.ui && g.ui.surgeHud) g.ui.surgeHud(s.state === 'warn' ? 'A rift is opening' : `Hollow surge · wave ${s.wave}/${s.waves}`, s.state === 'wave' ? s.alive.length + s.queue.length : null, s.state);
   }
   // pick a spot a few blocks to one side with ground under it
@@ -64,7 +70,11 @@ export class Surges {
     for (const side of Math.random() < 0.5 ? [-1, 1] : [1, -1]) {
       for (const d of [260, 200, 330, 160]) {
         const x = p.x + side * d, gy = W.groundBelow(x, p.y - 160, 420);
-        if (gy !== null && Math.abs(gy - p.y) < 220) { spot = { x, y: gy }; break; }
+        // standing room, and a clear line from the rift to you (so the Hollows can reach you)
+        if (gy === null || Math.abs(gy - p.y) > 220) continue;
+        const roomy = !W.solidAt(x, gy - 40) && !W.solidAt(x, gy - 80);
+        const clear = !W.raycast(x, gy - 40, p.x, p.y - 40);
+        if (roomy && clear) { spot = { x, y: gy }; break; }
       }
       if (spot) break;
     }

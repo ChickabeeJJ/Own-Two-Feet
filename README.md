@@ -14,15 +14,15 @@ Before the world, there was a needle and a thread. The Seamstress stitched the l
 
 No loading screen, no menu. The game opens on a short, skippable prologue (any key after a moment, or Esc):
 
-1. **Black.** A heartbeat and the first line: the Seamstress stitched the land awake, and dolls to walk it.
-2. **The seed of light** drifts down through layered clouds, flaring as it falls.
-3. **The five Wardens** stand on a dark horizon, each a silhouette with its own glow and name, while the second line explains how her needles shut every gate.
+1. **Black.** A heartbeat, embers rising, and the first line: before the world had edges, there was a needle and a thread.
+2. **The Loom-Cathedral at dusk.** A painted vista in four parallax layers: a ruin of needle spires with light through their eyes, broken threads strung between them, a cracked rose window, tattered banners, fog in the nave, crows wheeling, and the seed of light falling toward it.
+3. **The five Wardens,** one painted portrait each with a slow push-in and a name card: the Hollow Warden, the Glass Widow, the Unmade Heart, the Pyre Knight, the Still Queen.
 4. **The fall.** A burst of light, and you are plummeting through a dusk sky, steering to catch motes of light (glimmer) while the last lines are told over the wind.
 5. **The impact and getting up.** Slow motion, white-out, a shockwave across the meadow; Thread climbs out of your chest (*"Up. You have to get up."*), the doll pushes onto a knee and stands, a Warden roars far away and the title card lands.
 6. **A short tutorial** (a compact banner with a progress ring, the keys or touch button to use, the matching touch button pulsing; skippable): walk, jump, take the blade from the stone, strike a glowing training doll, dash, break a block, place it, then turn timber into planks in the satchel. Then the first Hollow claws out of the ground.
 7. **A clear chain of goals** (always shown top left, and Thread flies ahead to point the way): reach the shrine, rest, gather Threads of Light, then face the Hollow Warden, make a home, walk on.
 
-The first boss is about 220 tiles away and its gate stays sealed until you carry enough Threads of Light, so the opening is exploration, not a boss rush. A warden's cinematic intro plays only the first time you meet it; later attempts get a short name card and the fight starts at once.
+The tutorial never really ends: it lets go gradually (see The guide). The first boss is about 220 tiles away and its gate stays sealed until you carry enough Threads of Light, so the opening is exploration, not a boss rush. A warden's cinematic intro plays only the first time you meet it; later attempts get a short name card and the fight starts at once.
 
 Returning players drop straight back where they were. Esc skips the opening.
 
@@ -76,9 +76,68 @@ Every doll (you, Hollows, keepers, remote players, wardens' bodies) is an animat
 - **Procedural animation.** The gait is distance-driven so feet never skate, feet land on the real terrain with two-bone IK, landings squash, double jumps flip. Walking down stairs keeps the feet on the ground (no falling pose).
 - **Attacks** are keyframed arcs per weapon (wind-up, strike, follow-through) with the body leaning and stepping into the blow; the blade's real position is what hits.
 - **Hits and falls** are animated states: a flinch, knockback that tumbles you through the air, lying down, getting up.
-- **Ledge mantle:** jump at a wall 2-3 blocks high and the doll grabs the edge, pulls up, swings a knee over and stands, then eases back into control.
-- **Crawl:** hold Ctrl or C to drop onto hands and knees and slip through one-block gaps; you can't stand up under a ceiling.
+- **Ledge mantle:** jump at a wall 2-3 blocks high and both hands catch the lip and hang, the feet scrabble on the wall, the arms haul the chest up past the edge, a knee swings over and the doll stands.
+- **Ladders:** hand over hand on the rungs with the knees coming up under the body; still when you stop.
+- **Crawl:** hold Ctrl or C to drop onto hands and knees and slip through one-block gaps; a one-block step inside a tunnel is climbed on all fours; you can't stand up under a ceiling.
 - Capes are still cloth chains.
+
+## Action: surges, combos, Rift Trials
+
+The game is built to keep you fighting:
+
+- **Hollows come often and in packs,** see further, remember you, and attack more often. Two kinds join the husks and brutes: the **lancer** (a telegraphed dash-thrust; a red line shows its path) and the **slinger** (keeps its distance and lobs stones that land where you stand).
+- **Hollow surges.** Every minute or so in the open, a rift tears open nearby. Waves pour out and the last wave brings a brute. Clear them (fast, for a bonus) and the rift leaves a chest; walk away and it closes. A banner shows the wave and how many are left. Surges never happen in towns, at gates, in menus or in the tutorial.
+- **Combos and streaks.** Every hit adds to a combo that multiplies glimmer and experience. Kills close together call out Double, Triple, Rampage, Unstoppable, Undone. Taking a hit halves the combo.
+- **Rift Trials** (menu, Journey, or the training yard in any town): a sealed arena in a world of its own. Endless waves come from tears at both ends, a champion every fifth wave, a boon to choose every third (Fury, Mend, Quickstep, Cinder, Seamguard, Vigil). When you fall you see wave, kills, best combo and score, then go Again or Leave. The world you left is saved first and untouched.
+
+## Levels and perks
+
+- Experience from everything: kills (scaled by the enemy's level and your combo), surges, quests, commissions, puzzles, camps, chests, woken dolls, nests, new towns, wardens. The inn's Well Rested bonus adds half again.
+- **Level up:** a slow-motion ring and a card. Damage grows every level, a vessel every fourth level (up to ten), and every third level you choose one of three **perks**: Keen Edge, Heavy Hand, Swift Strike, Long Reach, Riposte, Iron Seam, Second Thread, Bloodthread, Overdrive, Fleet, Stormstep, Ember Soul, Lodestone, Scholar, Thread Ward.
+- **Zone levels:** the further from the first fire, the stronger the Hollows. Thread warns you when a zone outclasses you. The Character tab in the menu shows your level, experience, damage, vessels, the zone level here, perks to pick and the ones you have. An XP bar sits under the vessels.
+
+## Towns
+
+One town in every biome, on level ground behind gate arches: the first just left of the start, the next right after the first gate. Each has a cobbled street, seven buildings made of real tiles (walk inside in front of the back walls, run along the solid roofs), and stations to use (forge, workbench, loom).
+
+- **General store:** buy blocks and parts; sell raw materials for glimmer.
+- **Smithy:** temper the weapon you carry up to +5 (12% more damage per step) with glimmer, gilt and crystal.
+- **Tailor:** your looks.
+- **Alchemist:** draughts, flares, charges, infusions.
+- **Inn:** rest, save, and Well Rested.
+- **Notice board:** bounties (undo Hollows, clear a surge, fell brutes); claim them at any board.
+- **Waystone:** travel between towns you have found.
+- **Training yard:** the gate to the Rift Trials.
+
+Townsfolk walk the street and talk, and shopkeepers turn to you. Hollows never come in. All of it is drawn in code as a placeholder until painted art arrives: every building and prop checks for `assets/town/<name>.png` first. `art/sheets/towns.png` is the rough sheet of what to paint, with sizes.
+
+## The guide
+
+The tutorial teaches the basics, then lets go gradually instead of stopping:
+
+- **Lessons wait for the moment they are useful:**
+  - a Hollow winding up: parry;
+  - hurt with breath full: mend;
+  - a brute or a staggered foe: charge;
+  - a ledge: mantle;
+  - a ladder: climb;
+  - a low gap: crawl;
+  - stuck in a pit: dig out;
+  - the dark: flare;
+  - a workbench with something to make;
+  - an untracked quest;
+  - a perk to pick;
+  - a surge;
+  - a growing combo.
+- **How a lesson shows:** a small chip with the keys or touch action, and Thread says it the first times. Each success pushes the next showing further away and shrinks the chip; after a few successes it never comes back.
+- **Live tips from Thread:**
+  - low health with Hollows near;
+  - a crowd;
+  - zones that outclass you, or no longer challenge you;
+  - standing around lost (Thread points the way);
+  - ore enough to forge;
+  - a town ahead.
+- **The objective panel** drops its how-to line from level 8, unless you stand around lost.
 
 ## Combat and weapons
 
@@ -95,6 +154,7 @@ Five weapons, each with its own combo chain, charged heavy attack, numbers and d
 - **Combos** with input buffering; **hold** to charge a heavy; **parry** by striking just as a blow lands (slow-mo flash, the attacker staggers, a counter window opens); **launcher** up-strike and air juggles.
 - **Poise.** Enemies have a stagger bar; heavy weapons break it faster. **Finishers** trigger on staggered or nearly beaten foes (and sometimes on a combo ender): slow motion, a camera punch-in, extra sparks and hit-stop.
 - **Infusions** from the Forge: Ember (hits burn) and Frost (hits slow).
+- **Swings have elbows and wrists:** the weapon is cocked back over the shoulder with the elbow bent, the arm snaps straight through the strike, and the elbow folds again on the follow-through. The wrist lets the blade lead, lag and wrap past the body, the free arm counter-swings, and the body winds back then drives forward.
 - Every hit is weighted: hit-stop and shake by weapon, directional sparks, an impact flash on the enemy, haptic ticks on phones. Floating wisps telegraph longer and shoot slower than before.
 
 ## Quests and side content
@@ -104,11 +164,11 @@ Five weapons, each with its own combo chain, charged heavy attack, numbers and d
 - **World puzzles** (`js/game/sites.js`): brazier rings (light them all before the first goes out), pressure plates (stand on one, put a block on the other), Thread races (fly through the rings before they fade). Each opens a sealed chest.
 - **Hollow camps:** guards around a named elite with a shield or a brute chief, with health and poise nameplates, guarding loot.
 - **Tracking.** The Quests tab lists every quest; track one and a marker shows where to go (an edge-of-screen chevron with distance when it is off screen). Navigation can be turned off.
-- Opened chests linger a moment, then fade away.
+- Chests are the painted chest from the request sheet: the lid swings open on its hinge with light spilling out, then the chest fades away.
 
 ## The world
 
-- **Ground you can read.** Thick, uneven topsoil (the soil line rolls with the land, pockets reach into the rock, thin strata below), one layer of turf with a short ragged edge, and sloped **cave mouths** (with a painted rock arch over each tunnel) and ravines every so often so the caves can be walked into. Crystal and gilt ore are graded into their host rock.
+- **Ground you can read.** Thick, uneven topsoil (the soil line rolls with the land, pockets reach into the rock, thin strata below). Turf hangs down into the soil below it with a ragged edge (the turf-to-soil transition). The top layer is always turf: soil open to the sky becomes turf, soil beside turf turns too (sideways only), and soil you uncover greens a moment later. Wide, gentle **cave mouths** are plain open ground you walk straight into, and there are ravines now and then. Crystal and gilt ore are graded into their host rock.
 - **Endless and seeded** (`js/world/world.js`). Generated per 32x32 chunk, in both directions and downward without end. Caves, floating islands, crystal pillars, ice spikes, ember vents, ore veins, sand pockets, and each biome's painted tree from the materials sheet (round crowns, glass trees, giant mushrooms, dead trees, pines), rooted in the turf, leaning in the wind and away from anyone brushing past. Strike a trunk and chips fly and the crown shakes; a few hits (fewer with the hammer) and it topples, lands with a thump and leaves its timber in your satchel. Only your edits are saved; everything else regenerates identically.
 - **Five biomes** that cycle with distance and darken with each loop: the Pale Meadow, the Glass Wood, the Hollow Below, the Ember Reach and the Frost Spires. Each has its own palette, parallax silhouettes, ambient particles, colour grade and generative score.
 - **Boss gates.** Every boundary between biomes is an arena held by a warden. Three archetypes with stronger variants: the Hollow Warden and the Pyre Knight (giant ragdolls: slam waves, wall-stunning charges, leaps), the Glass Widow and the Still Queen (flying ragdolls: volleys, dives, summons, rings, icefall), and the Unmade Heart (a core wrapped in torn-up blocks: throws, pound, spin). Tier scales health and adds patterns; a second phase starts at half health.
@@ -135,6 +195,8 @@ The painted art comes from hand-made reference sheets, cut up by `tools/extract_
 
 In the world, sheet sprites are colour graded per biome (`gradedImg` in `js/art/images.js`) so they sit in its light. - `assets/req/`: the hand-painted request sheet, cut the same way: cave mouth, Hollow nest, satchel, ladder, platform, door, step, storage chest, workbench, forge, loom, and the item icons (draught, flare, blast charge, lamp, picks, charms). Stations stand in the world as these sprites; the icons appear in the satchel and hotbar (`js/art/itemart.js`). The torch keeps its code-drawn version (its painted halo could not be separated cleanly), and the interface frames on the sheet are matched in CSS.
 
+**Souls-grade detail.** A procedural painting kit (`js/art/brush.js`: bristle strokes, painterly fills, ragged silhouettes, fog banks, rim light, grain) paints the prologue's plates off screen, a few milliseconds per frame (`js/art/prologue.js`). Hollows and wardens are matte and worn (`js/art/grit.js`): a generated grime texture over every limb, bandage wraps, cracked masks running with ichor, torn cloth that sways, riveted scratched plates and chains.
+
 The blade in the stone has its painted light beam removed (`clean_bladestone`) and gets a soft additive shaft with drifting motes drawn in code instead; it stands on a level shelf.
 
 `js/art/images.js` loads them (pattern fills for tiles, sprites for props and icons). Characters are drawn in code to match the character reference (`js/art/doll.js`), matte with blank faces: round heads, scarves, belts and boots, cloaks and hoods, painted with soft shading and no outlines. Anything not on the sheets is still generated in code from the art bible (`js/art/paint.js`): key light from the upper left, rim light from behind.
@@ -148,7 +210,7 @@ The asset sheets in `art/sheets/` are rendered from that same code (so they alwa
 
 - **Sleek, no outlines.** Tiles are soft voxels with rounded exposed corners, a rim light on top faces and a shade underneath; tree canopies merge into one mass. Shape and depth come from coloured flood-fill lighting (sky light, lanterns, crystals, embers, your own soul glow) multiplied over the scene and upsampled smoothly.
 - **Cinematic.** Letterbox bars, serif title cards, biome cards, boss name cards, a warden looming on the horizon as you approach, slow motion and white-out on finishing blows, hit-stop and screen shake scaled by importance, a WebGL post pass with two-level bloom, grade, vignette, grain and a chromatic pulse on impacts.
-- **UI.** Glass panels, a minimal HUD (vessels, breath, glimmer, hotbar, a compass to the next gate; the boss bar only during a fight), typewriter dialogue as subtitles, a menu with a sliding tab line, staggered entrances and a Back button, and an Appearance tab with the doll turning on a lit pedestal. Painted clouds with lit tops and soft bases. Quality defaults to high with post-processing on.
+- **UI.** Glass panels, a minimal HUD (vessels, breath, level and XP, glimmer, hotbar, a compass to the next gate; the boss bar, without shadows, only during a fight; combo counter, surge banner, guide chip), typewriter dialogue as subtitles, a menu with a sliding tab line, staggered entrances and a Back button, and an Appearance tab with the doll turning on a lit pedestal. Painted clouds with lit tops and soft bases. Quality defaults to high with post-processing on.
 - Accessibility: toggles for screen shake, bright flashes, bloom and touch controls, three quality levels, and an automatic quality step-down if frames stay slow.
 
 ## Making the character yours
@@ -169,6 +231,7 @@ CrazyGames provides invites and rooms, not servers, so play is peer to peer over
 SDK v3 loaded async from `sdk.crazygames.com`, initialised with a timeout, and every call is guarded so the game runs the same anywhere. Uses `loadingStart/Stop`, `gameplayStart/Stop` (stopped while the menu is open or the tab is hidden), `happytime` on warden kills, the data module for saves (localStorage fallback), the settings listener for platform mute, the user module for the player's name, and the invite / room APIs above. Loading and gameplay events asked for before the SDK finishes initialising are replayed once it is ready.
 
 Ads (`ad.requestAd`):
+- Starting a new life (Menu, Settings) erases the save and every block you ever placed or broke.
 - **Rewarded, player's choice.** When you fall, Thread offers *Rise here* (a short ad, then you stand back up where you fell, boss fight and all) or *Wake at the shrine*. The reward is only given when the ad finished.
 - **Midgame, at a natural break.** Only while waking at a shrine after a fall (the screen is already dark), never in the first 3 minutes, at most once every 3 minutes, never while other players share your world.
 - While any ad plays the game is paused and silent, `gameplayStop` is sent, and everything is restored afterwards. A lost callback can't hang the game (90 s guard).
@@ -191,7 +254,11 @@ js/game/                game.js (loop, camera, render pipeline), actor.js, playe
                         lore, nests, Threads of Light), story.js (cinematics, tutorial, goals), thread.js,
                         items.js (items, recipes, stations), parts.js (doors, chests, stations), throwables.js,
                         progress.js (save, cosmetics, relics, recipes), fx.js, weapons.js (weapons, infusions),
-                        quests.js (quest chains, commissions, tracking), sites.js (puzzles, camps), trees.js (felling)
+                        quests.js (quest chains, commissions, tracking), sites.js (puzzles, camps), trees.js (felling),
+                        surges.js (rifts and waves), levels.js (XP, perks, zone levels), rift.js (Rift Trials),
+                        guide.js (lessons and tips), towns.js (towns, shops, bounties, waystones)
+js/world/townplan.js    the town layout, shared by the world stamp and the towns system
+js/art/brush.js, prologue.js, grit.js   painting kit, the painted prologue, worn Hollows
 js/art/                 images.js (sheet art loader), doll.js (characters), bg.js, paint.js, tex.js, props.js
 js/ui/                  ui.js (HUD, tutorial, journal, cards, dialog, menus, editor, terms), bag.js (satchel), touch.js
 assets/tex, props, icons, fx, trees, req   art cut from the reference sheets
@@ -222,6 +289,18 @@ node tools/shot.mjs uitour     # tutorial banner, menus, satchel and crafting (a
 node tools/shot.mjs fell       # fell a tree for timber
 node tools/shot.mjs artcheck   # painted stations, item icons, Hollow nest
 node tools/shot.mjs looks      # blade light, cave ore, Thread's trail
+node tools/shot.mjs turf       # no soil open to the sky; uncovered soil greens
+node tools/shot.mjs wipe       # a new life erases placed blocks too
+node tools/shot.mjs wake       # tapping fast through the wake-up keeps Thread in sync
+node tools/shot.mjs cfilm      # filmstrip: crawl (and up a step), ladder
+node tools/shot.mjs mfilm      # the ledge mantle, slowed down
+node tools/shot.mjs surge      # a rift opens, waves clear, a chest
+node tools/shot.mjs levels     # level-ups and a perk pick
+node tools/shot.mjs rift       # Rift Trials: waves, a boon, results, again, leave
+node tools/shot.mjs guide      # a lesson shows and is learned; the parry hint
+node tools/shot.mjs town       # a town: shop, inn, bounty, smith, waystone travel
+node tools/shot.mjs foes       # close look at the Hollows
+node tools/shot.mjs opening    # the painted prologue, shot by shot
 ```
 
 The `tools/` folder drives the real game in headless Chromium (Playwright):

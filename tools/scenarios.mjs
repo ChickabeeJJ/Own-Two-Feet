@@ -152,7 +152,7 @@ export default ({ page, sleep, key, shot, evalg }) => ({
       const r = await evalg(async (hgt) => {
         const g = window.__game, W = g.world, p = g.player; g.story.skipBirth(); g.story.skipTutorial && g.story.skipTutorial(); g.enemies.calm = 999; g.story.firstFoeDown = true; g.save.tut.foe = 1;
         for (const e of g.actors) if (e.team === 'enemy') e.removed = true;
-        const bx = 300 + hgt * 40, gy = 40;
+        const bx = 440 + hgt * 35, gy = 40;   // clear of the town at 278-382
         for (let x = bx - 12; x < bx + 12; x++) { for (let y = gy - 14; y < gy + 4; y++) W.set(x, y, y >= gy ? 3 : 0); }
         for (let x = bx; x < bx + 12; x++) for (let y = gy - hgt; y < gy; y++) W.set(x, y, 3);
         p.respawnAt((bx + 3) * 32 + 16, (gy - hgt) * 32); p.hp = 99; p.actor.inv = 0;

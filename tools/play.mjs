@@ -181,7 +181,9 @@ while ((Date.now() - t0) / 1000 < SECS) {
   // ---------------- goals
   await setPhase('goal: ' + st.goal.replace(/\d+\/\d+/, 'n/m'));
   const foe = st.foes.filter(f => f.kind !== 'dummy').sort((a, b) => Math.abs(a.x - st.x) - Math.abs(b.x - st.x))[0];
-  if (foe && Math.abs(foe.x - st.x) < 260 && Math.abs(foe.y - st.y) < 200) {
+  // fight what is close or in the way; don't chase Hollows back the way you came
+  const ahead = foe && st.target && Math.sign(foe.x - st.x) === Math.sign(st.target.x - st.x);
+  if (foe && (Math.abs(foe.x - st.x) < 200 || (ahead && Math.abs(foe.x - st.x) < 260)) && Math.abs(foe.y - st.y) < 200) {
     // fight: close in, face, strike; dash away when hurt
     // a foe up on a ledge: jump at the wall and mantle up to it, like a person would
     if (foe.y < st.y - 70) { const k = foe.x >= st.x ? 'KeyD' : 'KeyA'; await hold(k, true); await tap('Space', 300); await sleep(500); await releaseAll(); continue; }
