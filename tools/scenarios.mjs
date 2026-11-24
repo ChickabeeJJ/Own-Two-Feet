@@ -271,7 +271,7 @@ export default ({ page, sleep, key, shot, evalg }) => ({
     await sleep(1500);
     await evalg(() => { window.__game.hitstopT = 1e9; });
     let f = 0;
-    for (const wid of ['w_spear', 'w_hammer', 'w_daggers']) {
+    for (const wid of ['w_blade', 'w_spear', 'w_hammer', 'w_daggers']) {
       await evalg((wid) => { const g = window.__game, p = g.player; p.sv.equip.weapon = wid; p.refreshLook(); }, wid);
       for (let i = 0; i < 20; i++) {
         const keys = (i % 5 === 0 && i < 15) ? ['KeyJ'] : [];
@@ -285,6 +285,59 @@ export default ({ page, sleep, key, shot, evalg }) => ({
         }, keys).then(([x, y, sc]) => page.screenshot({ path: `/tmp/otf-shots/film-${String(f++).padStart(3, '0')}.png`, clip: { x: Math.max(0, x - 70 * sc), y: Math.max(0, y - 95 * sc), width: 140 * sc, height: 120 * sc } }));
       }
     }
+  },
+  // filmstrip of the movement animations: crawl (flat, then up a one-block step), ladder, ledge mantle
+  async cfilm() {
+    await page.waitForFunction(() => window.__game && window.__game.story);
+    await evalg(() => { const g = window.__game; g.story.skipBirth(); g.story.skipTutorial && g.story.skipTutorial(); g.enemies.calm = 999; g.story.firstFoeDown = true; g.save.tut.foe = 1; for (const e of g.actors) if (e.team === 'enemy') e.removed = true; });
+    await sleep(1200);
+    await evalg(() => { window.__game.hitstopT = 0; });
+    let f = 0;
+    const setup = (k) => evalg((k) => { const g = window.__game, W = g.world, p = g.player, T = window.__T; const bx = 600, gy = 40;
+      for (let x = bx - 6; x < bx + 30; x++) for (let y = gy - 14; y < gy + 6; y++) W.set(x, y, y >= gy ? T.STONE : T.AIR);
+      if (k === 'crawl') { for (let x = bx + 3; x < bx + 30; x++) W.set(x, gy - 2, T.STONE); for (let x = bx + 9; x < bx + 30; x++) W.set(x, gy - 1, T.STONE), W.set(x, gy - 2, T.AIR), W.set(x, gy - 3, T.STONE); p.respawnAt((bx + 1) * 32, gy * 32); }
+      if (k === 'ladder') { for (let y = gy - 6; y < gy; y++) W.set(bx + 3, y, T.LADDER); for (let x = bx + 4; x < bx + 9; x++) W.set(x, gy - 6, T.STONE); p.respawnAt((bx + 3) * 32 + 16, gy * 32); }
+      if (k === 'mantle') { for (let x = bx + 5; x < bx + 12; x++) for (let y = gy - 4; y < gy; y++) W.set(x, y, T.STONE); p.respawnAt((bx + 2) * 32, gy * 32); }
+      p.actor.face(1); g.cam.x = p.x; g.cam.y = p.y; }, k);
+    const step = async (keys, n) => {
+      const [x, y, sc] = await evalg(([keys, n]) => {
+        const g = window.__game, I = window.__input;
+        I.keys.clear(); for (const k of keys) I.keys.add(k);
+        for (let s = 0; s < n; s++) { I.poll(); g.step(1 / 120); I.endTick(); }
+        g.updateCamera(1 / 30); g.render(0);
+        const c = g.cam, sc = g.baseZoom * c.zoom, p = g.player.actor.c, A = g.player.actor;
+        window.__flog = (window.__flog || []); window.__flog.push([Math.round(p.x - 600 * 32), Math.round(p.y - 40 * 32), A.lastMode, A.mode, p.ground ? 'g' : 'a', Math.round(p.vx)]);
+        return [(p.x - c.rx) * sc + innerWidth / 2, (p.y - c.ry) * sc + innerHeight / 2, sc];
+      }, [keys, n]);
+      await page.screenshot({ path: `/tmp/otf-shots/film-${String(f++).padStart(3, '0')}.png`, clip: { x: Math.max(0, x - 70 * sc), y: Math.max(0, y - 95 * sc), width: 140 * sc, height: 120 * sc } });
+    };
+    await setup('mantle'); await step([], 30);
+    await step(['KeyD', 'Space'], 4);
+    for (let i = 0; i < 30; i++) await step(['KeyD'], 1);
+    await setup('crawl'); await step([], 30);
+    for (let i = 0; i < 20; i++) await step(['KeyC', 'KeyD'], 14);
+    await setup('ladder'); await step([], 30);
+    for (let i = 0; i < 10; i++) await step(['KeyW'], 10);
+    console.log('crawl log', JSON.stringify(await evalg(() => window.__flog.splice(0))));
+  },
+  // the ledge mantle in real time (screenshots as fast as they come)
+  async mfilm() {
+    await page.waitForFunction(() => window.__game && window.__game.story);
+    await sleep(800);
+    await evalg(() => { const g = window.__game, W = g.world, p = g.player, T = window.__T; g.story.skipBirth(); g.story.skipTutorial(); g.enemies.calm = 999; for (const e of g.actors) if (e.team === 'enemy') e.removed = true;
+      const bx = 600, gy = 40; for (let x = bx - 6; x < bx + 30; x++) for (let y = gy - 14; y < gy + 6; y++) W.set(x, y, y >= gy ? T.STONE : T.AIR);
+      for (let x = bx + 5; x < bx + 12; x++) for (let y = gy - 5; y < gy; y++) W.set(x, y, T.STONE); p.respawnAt((bx + 2) * 32, gy * 32); p.actor.face(1); g.cam.zoomT = 1.8; g.slowTarget = 0.2; g.slowT = 1e9; });
+    await sleep(1200);
+    const ok = await evalg(() => { const g = window.__game, p = g.player, a = p.actor, c = a.c; const bx = 600, gy = 40;
+      c.x = (bx + 5) * 32 - c.w / 2 - 1; c.y = (gy - 5) * 32 + 70; c.vy = 0; c.ground = false; return a.tryMantle(1); });
+    console.log('mantle started', ok);
+    let f = 0;
+    for (let i = 0; i < 30; i++) {
+      const box = await evalg(() => { const g = window.__game, c = g.cam, sc = g.baseZoom * c.zoom, p = g.player.actor.c; return [(p.x - c.rx) * sc + innerWidth / 2, (p.y - c.ry) * sc + innerHeight / 2, sc, !!g.player.actor.mantle]; });
+      const [x, y, sc] = box;
+      await page.screenshot({ path: `/tmp/otf-shots/film-${String(f++).padStart(3, '0')}.png`, clip: { x: Math.max(0, x - 80 * sc), y: Math.max(0, y - 150 * sc), width: 160 * sc, height: 170 * sc } });
+    }
+    await page.keyboard.up('KeyD');
   },
   async quests() {
     await page.waitForFunction(() => window.__game && window.__game.story);

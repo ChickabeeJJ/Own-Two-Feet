@@ -104,13 +104,25 @@ export class Actor {
       if (c.ground || c.coyote > 0.05 || c.clawing) {
         for (const up of [TILE * 0.5 + 0.5, TILE + 1]) {
           const ty = c.y - up;
-          if (this.boxFree(nx, ty) && this.boxFree(c.x, ty)) {
+          // crawling in a low tunnel there is no room to rise in place: climb onto the step diagonally
+          if (this.boxFree(nx, ty) && (this.crawling || this.boxFree(c.x, ty))) {
             // settle onto the surface just climbed
             let y = ty; for (let k = 0; k < 8 && this.boxFree(nx, y + 4); k++) y += 4;
+            if (this.crawling && this.anim) this.anim.crawlUp = 1;
             c.y = y; c.x = nx; this.stepped = true; break;
           }
         }
         if (c.x === nx) continue;
+        // crawling: the body spans two columns, so slide fully onto the step in one go
+        if (this.crawling && c.ground) {
+          const dir = Math.sign(sdx), ftx = Math.floor((nx + dir * c.w / 2) / TILE), ty = c.y - TILE - 1;
+          const xs = dir > 0 ? ftx * TILE + c.w / 2 + 0.5 : (ftx + 1) * TILE - c.w / 2 - 0.5;
+          if (Math.abs(xs - c.x) < c.w + 4 && this.boxFree(xs, ty)) {
+            let y = ty; for (let k = 0; k < 8 && this.boxFree(xs, y + 4); k++) y += 4;
+            c.x = xs; c.y = y; this.stepped = true; if (this.anim) this.anim.crawlUp = 1;
+            break;
+          }
+        }
       }
       // snap flush against the wall
       const hit = this.overlaps(nx - c.w / 2, c.y - c.h, nx + c.w / 2, c.y);
@@ -314,7 +326,7 @@ export class Actor {
     if (!c.ground && wasGround) c.fallStart = c.y;
     if (c.climb) { c.fallStart = c.y; if (c.ground && I.down) c.ground = false; }
     // drive the animator
-    const mode = this.crawling ? 'crawl' : c.climb && !c.ground ? 'climb' : this.sitting && c.ground ? 'sit' : c.dashT > 0 ? 'dash' : c.ground ? (this.emote && !I.mx && !this.attack ? 'emote' : 'ground') : (c.wallSlide || c.clawing) ? 'wall' : 'air';
+    const mode = this.lastMode = this.crawling ? 'crawl' : c.climb ? 'climb' : this.sitting && c.ground ? 'sit' : c.dashT > 0 ? 'dash' : c.ground ? (this.emote && !I.mx && !this.attack ? 'emote' : 'ground') : (c.wallSlide || c.clawing) ? 'wall' : 'air';
     this.anim.update(dt, {
       mode, x: c.x, gy: c.y, py: c.y - this.pelvisH, vx: c.vx, vy: c.vy, runMax: this.run, attack: this.attack, blade: !!this.blade,
       look: this.look_at, crouch, emote: this.emote, windup: this.telegraph || 0, accel: clamp((I.mx * this.facing), -1, 1) * (c.ground ? 1 : 0), climbD: this.climbD || 0,
@@ -376,7 +388,7 @@ export class Actor {
       if (!W.solid(tx, ty + 1)) continue;                 // a wall at least two blocks tall
       const x1 = tx * TILE + TILE / 2 + dir * 6;
       if (!this.boxFree(x1, top) || !this.boxFree(c.x, Math.min(c.y, top))) continue;
-      this.mantle = { t: 0, dur: 0.62, x0: c.x, y0: c.y, x1, y1: top, dir };
+      this.mantle = { t: 0, dur: 0.78, x0: c.x, y0: c.y, x1, y1: top, dir, ex: tx * TILE + (dir > 0 ? 0 : TILE) };
       c.vx = c.vy = 0; this.attack = null; this.face(dir);
       if (this.onMantle) this.onMantle();
       return true;
@@ -387,11 +399,14 @@ export class Actor {
     const m = this.mantle, c = this.c;
     m.t += dt / m.dur;
     const u = Math.min(1, m.t);
-    // rise along the wall first, then roll over the lip
-    const up = smooth01(Math.min(1, u / 0.6)), over = smooth01(Math.max(0, (u - 0.5) / 0.5));
-    c.y = m.y0 + (m.y1 - m.y0) * up;
+    // catch the lip and hang (shoulders just under the edge), haul up, then roll over the top
+    const hangY = Math.min(m.y0, m.y1 + 44 * this.scale + this.pelvisH);
+    const grab = smooth01(Math.min(1, u / 0.12));
+    const up = smooth01(Math.min(1, Math.max(0, (u - 0.14) / 0.5))), over = smooth01(Math.min(1, Math.max(0, (u - 0.5) / 0.38)));
+    const yH = m.y0 + (hangY - m.y0) * grab;
+    c.y = yH + (m.y1 - yH) * up;
     c.x = m.x0 + (m.x1 - m.x0) * over;
-    this.anim.update(dt, { mode: 'mantle', mantle: u, x: c.x, gy: c.y, py: c.y - this.pelvisH, vx: 0, vy: 0 }, this.world);
+    this.anim.update(dt, { mode: 'mantle', mantle: u, x: c.x, gy: c.y, py: c.y - this.pelvisH, vx: 0, vy: 0, edge: { x: m.ex, y: m.y1 } }, this.world);
     if (u >= 1) { this.mantle = null; c.ground = true; c.vy = 0; this.anim.slowBlend = 0.32; }
   }
   // crawling: a body one block tall

@@ -397,7 +397,8 @@ function pauldrons(g, cx, cy, tx, ty, nx, ny, s, col) {
 export function bladeGeom(b, look, a) {
   const s = b.s;
   const ex = b.ipx(P.ELB_F, a), ey = b.ipy(P.ELB_F, a), hx = b.ipx(P.HAND_F, a), hy = b.ipy(P.HAND_F, a);
-  const ang = Math.atan2(hy - ey, hx - ex);
+  // the wrist turns the weapon off the forearm line (mirrored with facing)
+  const ang = Math.atan2(hy - ey, hx - ex) + (b.wrist || 0) * (b.facing || 1);
   const L = (look.weaponLen || (look.blade ? look.blade.len : 30)) * s;
   return { x0: hx, y0: hy, x1: hx + Math.cos(ang) * L, y1: hy + Math.sin(ang) * L, ang };
 }
@@ -411,7 +412,7 @@ export function drawBlade(g, b, look, a, o) {
   if (w === 'w_sling') return drawSling(g, b, look, a, o);
   drawSword(g, b, look, a, o);
 }
-function handDir(b, a, e, h) { const ex = b.ipx(e, a), ey = b.ipy(e, a), hx = b.ipx(h, a), hy = b.ipy(h, a); const ang = Math.atan2(hy - ey, hx - ex); return { hx, hy, ang, ux: Math.cos(ang), uy: Math.sin(ang) }; }
+function handDir(b, a, e, h) { const ex = b.ipx(e, a), ey = b.ipy(e, a), hx = b.ipx(h, a), hy = b.ipy(h, a); const ang = Math.atan2(hy - ey, hx - ex) + (h === P.HAND_F ? (b.wrist || 0) * (b.facing || 1) : 0); return { hx, hy, ang, ux: Math.cos(ang), uy: Math.sin(ang) }; }
 function drawSpear(g, b, look, a) {
   const s = b.s, d = handDir(b, a, P.ELB_F, P.HAND_F), L = (look.weaponLen || 54) * s, B = 16 * s;
   capsule(g, d.hx - d.ux * B, d.hy - d.uy * B, d.hx + d.ux * L * 0.86, d.hy + d.uy * L * 0.86, 1.3 * s, 1.3 * s, '#7a5a3e', { dark: 0.35 });

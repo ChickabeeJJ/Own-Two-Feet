@@ -6,31 +6,34 @@ import { wrapAng, clamp, lerp, angLerp, smooth, TAU } from '../core/util.js';
 
 const HALF_PI = Math.PI / 2;
 
-// attack arm keyframes: [t, upperArm, foreArm] absolute angles in the facing-right frame (down = +PI/2)
+// attack arm keyframes: [t, upperArm, foreArm, wrist], absolute angles in the facing-right frame (0 = forward,
+// -PI/2 = up, +PI/2 = down). The elbow only folds one way (foreArm <= upperArm), so a swing reads as a real
+// arm: cocked with a bent elbow, snapping straight through the strike, folding again on the follow-through.
+// wrist turns the weapon off the line of the forearm, so the blade leads, lags and wraps past the body.
 const ATK = {
-  side: [[0, -1.5, -2.3], [0.18, -1.85, -2.75], [0.38, -0.05, 0.0], [0.62, 0.85, 0.9], [1, 1.2, 1.0]],
-  side2: [[0, 0.8, 1.2], [0.18, 1.05, 1.5], [0.38, -0.9, -0.95], [0.62, -1.75, -1.95], [1, -0.6, -0.8]],
-  up: [[0, 0.5, 0.8], [0.18, 0.7, 1.1], [0.38, -1.5, -1.55], [0.62, -2.05, -2.3], [1, -1.0, -1.2]],
-  down: [[0, -1.6, -1.9], [0.18, -1.85, -2.2], [0.38, 1.35, 1.4], [0.62, 1.62, 1.66], [1, 1.3, 1.35]],
-  slam: [[0, -1.6, -1.6], [0.3, -1.75, -1.85], [0.5, 1.2, 1.3], [1, 1.3, 1.35]],
-  // spear: draw back, drive forward
-  thrust: [[0, 1.9, 1.3], [0.22, 2.2, 1.9], [0.42, 0.1, 0.0], [0.7, 0.05, -0.05], [1, 1.1, 0.8]],
-  thrust2: [[0, 1.7, 1.1], [0.22, 2.1, 1.7], [0.42, -0.3, -0.35], [0.7, -0.25, -0.3], [1, 0.9, 0.7]],
-  // a wide finishing sweep
-  sweep: [[0, -2.0, -2.5], [0.25, -2.5, -3.0], [0.5, 0.2, 0.3], [0.68, 1.35, 1.5], [1, 1.1, 1.0]],
-  cleave: [[0, 1.6, 1.9], [0.3, 1.9, 2.3], [0.5, -1.1, -1.2], [0.66, -2.2, -2.5], [1, -1.0, -1.2]],
-  lunge: [[0, 1.8, 1.4], [0.3, 2.3, 2.0], [0.45, 0.05, -0.05], [0.8, 0.0, -0.05], [1, 1.0, 0.7]],
-  // hammer: heavy overhead and a rising swing
-  hsmash: [[0, -2.2, -2.5], [0.38, -2.7, -3.0], [0.58, 0.8, 0.9], [0.75, 1.15, 1.2], [1, 1.0, 1.05]],
-  hsmash2: [[0, 1.3, 1.5], [0.35, 1.8, 2.1], [0.58, -1.1, -1.3], [0.75, -1.6, -1.8], [1, -0.6, -0.7]],
-  // daggers: short jabs, then a whirling flurry
-  dag1: [[0, 1.3, 0.7], [0.3, 0.15, 0.0], [0.6, 0.05, -0.1], [1, 1.0, 0.7]],
-  dag2: [[0, 0.9, 1.5], [0.3, -0.25, -0.45], [0.6, -0.35, -0.55], [1, 0.6, 0.6]],
-  flurry: [[0, -1.5, -2.0], [0.18, 0.6, 0.8], [0.36, -1.4, -1.9], [0.54, 0.7, 0.9], [0.72, -1.2, -1.6], [0.9, 0.8, 1.0], [1, 1.0, 0.9]],
+  // blade: a forehand cut from over the shoulder, a rising backhand, a big overhead finisher
+  side: [[0, 1.2, 0.4, -0.6], [0.16, -1.95, -2.85, -0.9], [0.34, -0.7, -0.75, 0.15], [0.5, 0.45, 0.4, 0.55], [0.72, 1.45, 0.6, 1.25], [1, 1.25, 0.45, 0.3]],
+  side2: [[0, 1.4, 0.6, 1.0], [0.16, 1.95, 1.0, 1.45], [0.36, 0.25, -0.15, -0.35], [0.56, -1.15, -1.55, -0.5], [0.8, -1.55, -2.25, -0.65], [1, 0.6, -0.2, -0.3]],
+  sweep: [[0, 0.8, 0.2, 0], [0.24, -2.15, -2.95, -0.7], [0.46, -0.45, -0.55, 0.25], [0.6, 0.55, 0.5, 0.75], [0.8, 1.4, 0.85, 1.25], [1, 1.3, 0.7, 0.4]],
+  cleave: [[0, 1.6, 1.0, 1.2], [0.3, 2.0, 1.25, 1.55], [0.48, -0.35, -0.8, -0.55], [0.66, -1.6, -2.2, -0.55], [1, -0.8, -1.3, -0.3]],
+  up: [[0, 0.8, 0.2, 0.3], [0.18, 1.35, 0.7, 1.0], [0.38, -1.25, -1.6, -0.25], [0.62, -1.9, -2.35, -0.35], [1, -1.0, -1.45, 0]],
+  down: [[0, -1.4, -2.0, -0.5], [0.18, -1.8, -2.6, -0.8], [0.38, 1.3, 1.28, 0.2], [0.62, 1.55, 1.5, 0.1], [1, 1.3, 1.15, 0]],
+  slam: [[0, -1.6, -1.9, -0.3], [0.3, -2.1, -2.8, -0.6], [0.5, 1.1, 0.98, 0.5], [1, 1.25, 1.05, 0.3]],
+  // spear: pull back with the elbow cocked, drive straight through, a lunging charge
+  thrust: [[0, 0.9, 0.3, -0.3], [0.22, 1.75, 0.85, -0.85], [0.42, 0.15, 0.05, -0.05], [0.7, 0.1, 0.0, 0], [1, 0.9, 0.3, -0.3]],
+  thrust2: [[0, 0.9, 0.3, -0.3], [0.22, 1.5, 0.6, -0.6], [0.42, -0.25, -0.3, 0.05], [0.7, -0.2, -0.25, 0.05], [1, 0.8, 0.25, -0.2]],
+  lunge: [[0, 1.0, 0.35, -0.4], [0.3, 1.95, 1.05, -1.0], [0.45, 0.02, -0.05, 0], [0.8, 0.0, -0.05, 0], [1, 0.9, 0.3, -0.3]],
+  // hammer: hauled over the head, brought down with the whole body; a rising swing
+  hsmash: [[0, 1.0, 0.4, 0], [0.38, -2.1, -2.85, -0.5], [0.58, 0.6, 0.5, 0.6], [0.75, 1.2, 1.1, 0.5], [1, 1.0, 0.8, 0.2]],
+  hsmash2: [[0, 1.2, 0.8, 0.6], [0.35, 1.9, 1.2, 1.2], [0.58, -1.0, -1.4, -0.4], [0.75, -1.5, -2.0, -0.5], [1, -0.4, -0.8, 0]],
+  // daggers: short jabs from a bent elbow, a rising slash, a whirling flurry
+  dag1: [[0, 1.3, 0.4, -0.3], [0.3, 0.1, 0.0, 0], [0.6, 0.05, -0.05, 0], [1, 1.1, 0.35, -0.2]],
+  dag2: [[0, 1.4, 0.55, 0.4], [0.3, -0.3, -0.65, -0.3], [0.6, -0.5, -0.95, -0.3], [1, 0.9, 0.4, 0]],
+  flurry: [[0, -1.5, -2.1, -0.4], [0.18, 0.6, 0.5, 0.5], [0.36, -1.4, -2.0, -0.4], [0.54, 0.7, 0.6, 0.5], [0.72, -1.2, -1.7, -0.4], [0.9, 0.8, 0.7, 0.4], [1, 1.0, 0.6, 0]],
   // sling: windmill and release
-  sling: [[0, 1.0, 1.3], [0.25, -1.6, -2.2], [0.42, -2.6, -2.9], [0.55, -0.5, -0.3], [1, 0.9, 1.0]],
+  sling: [[0, 1.2, 0.6, 0], [0.25, -1.6, -2.2, 0], [0.42, -2.4, -2.85, 0], [0.55, -0.4, -0.5, 0], [1, 0.9, 0.5, 0]],
   // mining: a short overhead chop with the pommel, not a sweeping slash
-  mine: [[0, -1.2, -2.0], [0.3, -1.55, -2.5], [0.55, 0.35, 0.15], [0.72, 0.55, 0.45], [1, 0.1, -0.5]],
+  mine: [[0, -1.2, -2.0, -0.4], [0.3, -1.55, -2.5, -0.6], [0.55, 0.35, 0.15, 0.6], [0.72, 0.55, 0.45, 0.5], [1, 0.1, -0.5, 0]],
 };
 // back-arm keyframes for weapons held in both hands (daggers)
 const ATKB = {
@@ -38,17 +41,30 @@ const ATKB = {
   dag2: [[0, 1.9, 1.5], [0.3, 0.1, -0.1], [0.6, 0.0, -0.2], [1, 1.5, 1.0]],
   flurry: [[0, 0.7, 0.9], [0.18, -1.4, -1.9], [0.36, 0.7, 0.9], [0.54, -1.3, -1.8], [0.72, 0.8, 1.0], [0.9, -1.0, -1.4], [1, 1.5, 1.0]],
 };
+// two-bone arm IK: absolute [upper, fore] angles (facing frame) that put the hand at (hx, hy) from the shoulder
+// (sx, sy). The elbow bends down and back, the only way the joint allows (fore never past upper).
+function armIK(sx, sy, hx, hy, f, s) {
+  const Lu = 15 * s, Lf = 14 * s;
+  const dx = (hx - sx) * f, dy = hy - sy;
+  const D = clamp(Math.hypot(dx, dy), 6 * s, (Lu + Lf) * 0.995);
+  const a = Math.atan2(dy, dx);
+  const c1 = Math.acos(clamp((Lu * Lu + D * D - Lf * Lf) / (2 * Lu * D), -1, 1));
+  const up = a + c1;
+  const ex = Math.cos(up) * Lu, ey = Math.sin(up) * Lu;
+  const tx = Math.cos(a) * D, ty = Math.sin(a) * D;
+  return [up, Math.atan2(ty - ey, tx - ex)];
+}
 function keyArm(kind, t, table = ATK) {
   const K = table[kind] || ATK.side;
   for (let i = 1; i < K.length; i++) {
     if (t <= K[i][0]) {
       const a = K[i - 1], b = K[i];
       const u = smooth((t - a[0]) / (b[0] - a[0]));
-      return [lerp(a[1], b[1], u), lerp(a[2], b[2], u)];
+      return [lerp(a[1], b[1], u), lerp(a[2], b[2], u), lerp(a[3] || 0, b[3] || 0, u)];
     }
   }
   const l = K[K.length - 1];
-  return [l[1], l[2]];
+  return [l[1], l[2], l[3] || 0];
 }
 
 export class Animator {
@@ -86,6 +102,7 @@ export class Animator {
     let fF = null, fB = null;      // foot targets [x, y, toeAngle] in world
     let armF = null, armB = null;  // [upper, fore] absolute, facing frame
     let spine = [0, 0];
+    let wristT = 0;                 // weapon turn off the forearm line (attacks only)
     let rate = 26;
     // squash spring (landing absorption)
     this.squashV += (-this.squash * 260 - this.squashV * 22) * dt;
@@ -246,26 +263,38 @@ export class Animator {
       head = -HALF_PI - 1.2;
       rate = 9;
     } else if (mode === 'mantle') {
-      // grab the edge, haul up, knee onto the ledge, push up to stand
+      // both hands catch the lip and hang, the feet scrabble on the wall, the arms haul the chest up past the
+      // edge and press down, a knee swings onto the ledge, then the doll stands
       rootY = null;
       const u = clamp(st.mantle || 0, 0, 1);
-      const a = smooth(clamp(u / 0.5, 0, 1)), b = smooth(clamp((u - 0.45) / 0.55, 0, 1));
-      torso = -HALF_PI + 0.25 + 0.35 * a - 0.45 * b;
-      armF = [lerp(-1.75, 0.9, b), lerp(-1.55, 1.3, b)];
-      armB = [lerp(-1.6, 1.1, b), lerp(-1.4, 1.5, b)];
-      fF = [rootX + lerp(6, 14, a) * s * f, st.py + lerp(lerp(31, 14, a), 31, b) * s, 0.4 * (1 - b)];
-      fB = [rootX + lerp(-2, 2, a) * s * f, st.py + lerp(32, 31, b) * s, 0.8 * (1 - b)];
-      spine = [0.15 * a, 0.1];
-      rate = 30;
+      const e = st.edge || { x: rootX + 14 * s * f, y: st.py - 24 * s };
+      const pull = smooth(clamp((u - 0.14) / 0.5, 0, 1)), over = smooth(clamp((u - 0.5) / 0.38, 0, 1)), rise = smooth(clamp((u - 0.8) / 0.2, 0, 1));
+      torso = -HALF_PI + 0.08 + 0.62 * pull * (1 - rise);
+      const sx = rootX + Math.cos(torso) * 26 * s * f, sy = st.py + Math.sin(torso) * 26 * s;
+      const ikF = armIK(sx, sy, e.x - f * 2 * s, e.y + 1, f, s), ikB = armIK(sx, sy, e.x - f * 7 * s, e.y + 1, f, s);
+      const rel = smooth(clamp((u - 0.74) / 0.2, 0, 1));    // the hands let go as the doll stands
+      armF = [lerp(ikF[0], 1.35, rel), lerp(ikF[1], 1.15, rel)];
+      armB = [lerp(ikB[0], 1.5, rel), lerp(ikB[1], 1.3, rel)];
+      // feet: against the wall, scrabbling, until a knee comes over the lip
+      const wallX = e.x - f * 4 * s, scr = (1 - over) * Math.max(0, 1 - pull * 1.2);
+      const kick = Math.sin(u * 34) * 5 * s * scr;
+      const top = e.y - footR;
+      fF = [lerp(wallX, e.x + f * 7 * s, over), lerp(st.py + 30 * s - kick - pull * 8 * s, top, over), lerp(-0.3, 0, over)];
+      fB = [lerp(wallX - f * 2 * s, rootX - f * 3 * s, rise), lerp(st.py + 31 * s + kick, top, rise), lerp(-0.2, 0, rise)];
+      spine = [0.18 * pull * (1 - rise), 0.12 * pull];
+      head = -HALF_PI + 0.2 * (1 - pull);
+      rate = 34;
     } else if (mode === 'crawl') {
       // hands and knees, limbs moving in diagonal pairs with the distance crawled
       const ph = this.phase += (Math.abs(st.vx) * dt) / (22 * s);
       const sw = Math.sin(ph * TAU), cw = Math.cos(ph * TAU);
       const moving = clamp(Math.abs(st.vx) / 40, 0, 1);
-      rootY = st.gy - 13 * s + Math.abs(sw) * 1.2 * s * moving;
-      torso = -HALF_PI + 1.32;
-      armF = [HALF_PI - 0.35 - sw * 0.35 * moving, HALF_PI - 0.05 - sw * 0.25 * moving];
-      armB = [HALF_PI - 0.35 + sw * 0.35 * moving, HALF_PI - 0.05 + sw * 0.25 * moving];
+      // a step up: the front hands climb onto it first and the body follows, so it reads as a climb
+      const up = this.crawlUp = Math.max(0, (this.crawlUp || 0) - dt * 3.2);
+      rootY = st.gy - 13 * s + Math.abs(sw) * 1.2 * s * moving + up * 14 * s;
+      torso = -HALF_PI + 1.32 - up * 0.55;
+      armF = [HALF_PI - 0.35 - sw * 0.35 * moving - up * 1.1, HALF_PI - 0.05 - sw * 0.25 * moving - up * 1.0];
+      armB = [HALF_PI - 0.35 + sw * 0.35 * moving - up * 0.7, HALF_PI - 0.05 + sw * 0.25 * moving - up * 0.6];
       // floor right under the knees (searching from above would find the low ceiling you crawl under)
       const fl = (x) => { const gy = world ? world.groundBelow(x, st.gy - 10, 40) : st.gy; return gy === null ? st.gy - footR : gy - footR; };
       const gF = fl(rootX - 16 * s * f), gB = gF;
@@ -276,16 +305,22 @@ export class Animator {
       rate = 20;
     } else if (mode === 'climb') {
       // hand over hand, foot over foot: one limb pair reaches while the other pulls, driven by distance climbed
+      // diagonal pairs: the front hand reaches with the back foot while the other two hold, then they swap.
+      // Hands close on the rungs (8 px apart), knees come up under the body; still on the ladder, nothing moves.
       rootY = null;
-      const ph = (st.climbD || 0) / (34 * s);
-      const u = (Math.sin(ph * Math.PI) + 1) / 2, v = 1 - u;
-      torso = -HALF_PI + 0.1;
-      armF = [lerp(-1.25, -2.0, u), lerp(-1.65, -2.45, u)];
-      armB = [lerp(-1.25, -2.0, v), lerp(-1.65, -2.45, v)];
-      fF = [rootX + 9 * s * f, st.py + lerp(31, 19, u) * s, -0.2];
-      fB = [rootX + 7 * s * f, st.py + lerp(31, 19, v) * s, -0.2];
-      spine = [0.06, 0.04];
-      rate = 22;
+      const ph = (st.climbD || 0) / (16 * s);
+      const u = smooth(clamp(Math.abs(((ph % 2) + 2) % 2 - 1), 0, 1)), v = 1 - u;
+      torso = -HALF_PI + 0.16;
+      const sx = rootX + Math.cos(torso) * 26 * s * f, sy = st.py + Math.sin(torso) * 26 * s;
+      const rung = (y) => Math.round(y / 8) * 8;
+      const hx = rootX + f * 10 * s;
+      armF = armIK(sx, sy, hx, rung(sy - lerp(4, 20, u) * s), f, s);
+      armB = armIK(sx, sy, hx - f * 2 * s, rung(sy - lerp(4, 20, v) * s), f, s);
+      fF = [rootX + 8 * s * f, st.py + lerp(31, 17, v) * s, -0.15];
+      fB = [rootX + 6 * s * f, st.py + lerp(31, 17, u) * s, -0.15];
+      spine = [0.08, 0.05];
+      head = -HALF_PI - 0.15;
+      rate = 26;
     } else if (mode === 'sit') {
       rootY = st.gy - 9 * s;
       torso = -HALF_PI - 0.12 + Math.sin(this.time * 1.7) * 0.02;
@@ -341,23 +376,29 @@ export class Animator {
     // attack overlay on the front (blade) arm, with a lean into the strike
     if (st.attack && st.attack.t < 1) {
       const a = st.attack;
-      const [ua, fa] = keyArm(a.kind, a.t);
+      const [ua, fa, wr] = keyArm(a.kind, a.t);
       const w = a.t > 0.75 ? 1 - smooth((a.t - 0.75) / 0.25) : 1;
       armF = armF ? [lerp(armF[0], ua, w), lerp(armF[1], fa, w)] : [ua, fa];
-      const strike = a.t > 0.18 && a.t < 0.62 ? 1 : 0;
-      torso += (a.kind === 'up' ? -0.1 : a.kind === 'down' ? 0.25 : a.kind === 'mine' ? 0.3 : 0.22) * strike * w;
-      if (ATKB[a.kind]) { const [ub, fb] = keyArm(a.kind, a.t, ATKB); armB = [ub, fb]; }
-      else armB = [lerp(armB ? armB[0] : 1.5, 2.2, 0.6 * w), lerp(armB ? armB[1] : 1.2, 1.8, 0.6 * w)];
-      // the body throws itself into big swings
+      wristT = wr * w;
+      // the body winds back with the arm, then drives forward through the strike (smooth curves, no snap)
+      const wind = smooth(clamp(a.t / 0.18, 0, 1)) * (1 - smooth(clamp((a.t - 0.2) / 0.14, 0, 1)));
+      const drive = smooth(clamp((a.t - 0.22) / 0.16, 0, 1)) * (1 - smooth(clamp((a.t - 0.6) / 0.3, 0, 1)));
+      const base = a.kind === 'up' ? -0.1 : a.kind === 'down' ? 0.25 : a.kind === 'mine' ? 0.3 : 0.24;
       const lean = { sweep: 0.35, cleave: -0.15, lunge: 0.45, hsmash: 0.4, slam: 0.45, thrust: 0.3, thrust2: 0.2, flurry: 0.15 }[a.kind] || 0;
-      torso += lean * strike * w;
+      torso += (-0.16 * wind + (base + lean) * drive) * w;
+      // the free arm counter-swings: reaches forward for balance on the wind-up, flings back through the strike
+      if (ATKB[a.kind]) { const [ub, fb] = keyArm(a.kind, a.t, ATKB); armB = [ub, fb]; }
+      else {
+        const bu = lerp(lerp(1.4, 0.35, wind), 2.1, drive), bf = lerp(lerp(0.9, -0.35, wind), 1.45, drive);
+        armB = [lerp(armB ? armB[0] : 1.5, bu, 0.85 * w), lerp(armB ? armB[1] : 1.2, bf, 0.85 * w)];
+      }
       rate = 60;
       // standing strikes step into the blow: front foot plants forward, back heel lifts, hips drop
       if (mode === 'ground' && fF && fB && speed < 60) {
         const k = Math.sin(clamp(a.t / 0.7, 0, 1) * Math.PI) * w * (a.kind === 'mine' ? 0.5 : 1);
-        fF = [fF[0] + f * 10 * s * k, fF[1], fF[2]];
-        fB = [fB[0] - f * 4 * s * k, fB[1] - 1.5 * s * k, fB[2] - 0.55 * k];
-        if (rootY !== null && rootY !== undefined) rootY += 3 * s * k;
+        fF = [fF[0] + f * 12 * s * k, fF[1], fF[2]];
+        fB = [fB[0] - f * 6 * s * k, fB[1] - 1.5 * s * k, fB[2] - 0.6 * k];
+        if (rootY !== null && rootY !== undefined) rootY += (2 + 4 * drive) * s * k;
       }
     }
     // where the head looks
@@ -433,6 +474,8 @@ export class Animator {
     }
     b.torso = torso;
     b.headAng = head;
+    this.wrist = lerp(this.wrist || 0, wristT, 1 - Math.exp(-(st.attack && st.attack.t < 1 ? 40 : 14) * dt));
+    b.wrist = this.wrist;
     // arm joints stiffen during a swing so the blade really travels
     const atk = st.attack && st.attack.t < 1;
     b.jointK[3] = atk ? 2.4 : 1; b.jointK[4] = atk ? 2.0 : 1;
