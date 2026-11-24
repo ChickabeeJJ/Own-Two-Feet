@@ -222,20 +222,21 @@ export class WorldRenderer {
     if (t === T.ICE) g.globalAlpha = 0.9;
     roundTile(g, x, y, TILE, TILE, rNW, rNE, rSE, rSW);
     g.globalAlpha = 1;
-    // turf edge: the grass layer ends in a short ragged fringe on the soil below it (one layer of turf)
+    // turf into soil: the grass layer hangs down into the soil below it with a ragged, uneven edge (and thins
+    // out over a second tile), so the surface reads as living topsoil instead of a flat stripe
     if (t === T.DIRT && p.id !== 'frost') {
       const up1 = W.get(tx, ty - 1), up2 = W.get(tx, ty - 2);
-      const depth = up1 === T.GRASS ? 1 : 0;   // one layer of turf: only a short ragged fringe below the grass
+      const depth = up1 === T.GRASS ? 1 : up2 === T.GRASS && up1 === T.DIRT ? 2 : 0;
       if (depth) {
         const gp = tp(g, T.GRASS, p.id) || pattern(g, 'soil', p.grass);
-        const reach = 3 + hash2(tx, ty, 91) * 5;
+        const reach = depth === 1 ? 14 + hash2(tx, ty, 91) * 14 : 4 + hash2(tx, ty, 92) * 8;
         g.save(); roundTile(g, x, y, TILE, TILE, rNW, rNE, rSE, rSW, true); g.clip();
         g.fillStyle = gp; g.globalAlpha = depth === 1 ? 0.95 : 0.6;
         g.beginPath(); g.moveTo(x - 1, y - 1); g.lineTo(x + TILE + 1, y - 1);
         for (let i = 8; i >= 0; i--) {
           const px = x + i * (TILE / 8);
           const k = hash2(tx * 8 + i, ty, 93 + depth);
-          g.lineTo(px, y + reach * (0.45 + k * 0.75) + (i % 3 === 0 ? 2.5 * k : 0));
+          g.lineTo(px, y + reach * (0.45 + k * 0.75) + (depth === 1 && i % 3 === 0 ? 5 * k : 0));
         }
         g.closePath(); g.fill();
         // a soft shadow where the roots end

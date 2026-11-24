@@ -193,40 +193,19 @@ export class World {
       }
       const dir = hash2(kk, 55, s) < 0.5 ? -1 : 1, len = 18 + Math.floor(hash2(kk, 56, s) * 14);
       const u = (tx - mx) * dir;
-      if (u < 0 || u > len) continue;
-      // the floor starts level with the ground and drops at most a block per column, so you can always
-      // walk back up and out
+      if (u < -2 || u > len) continue;
+      // a wide, gentle opening: the floor starts level with the ground and drops half a block per column,
+      // so you can always walk straight in and back out. Tall enough to jump inside.
       const top = this.col(mx).h;
-      const half = 1.6;
-      const cy = top - half + u * 0.62 + Math.sin(u * 0.35 + kk) * 0.25;
-      // an open sloped cut until the roof would be thick enough, then a tunnel (no thin slivers of turf)
+      const half = 1.9;
+      const uu = Math.max(0, u);
+      const cy = top - half + uu * 0.5 + Math.sin(uu * 0.35 + kk) * 0.2;
+      // a flared lip before the cut, then an open sloped cut until the roof is thick, then a tunnel
+      if (u < 0) { if (u === -1 && ty === this.col(tx).h) return true; continue; }
       const roof = (cy - half) - this.col(tx).h;
-      if (roof < 2.8 ? (ty >= this.col(tx).h - 1 && ty <= cy + half) : (ty >= cy - half && ty <= cy + half)) return true;
+      if (roof < 3.5 ? (ty >= this.col(tx).h - 1 && ty <= cy + half) : (ty >= cy - half && ty <= cy + half)) return true;
     }
     return false;
-  }
-  // where each sloping tunnel stops being an open cut and gets a roof: the spot for a cave-mouth arch
-  mouthEntrances(a, b) {
-    const s = this.seed, STEP = 67, out = [];
-    this.mouthCache = this.mouthCache || new Map();
-    for (let kk = Math.floor(a / STEP) - 1; kk <= Math.ceil(b / STEP) + 1; kk++) {
-      if (this.mouthCache.has(kk)) { const m = this.mouthCache.get(kk); if (m) out.push(m); continue; }
-      let m = null;
-      const r = hash2(kk, 51, s);
-      const mx = kk * STEP + Math.floor(hash2(kk, 52, s) * 22) - 11;
-      const g = gateNear(mx);
-      if (r >= 0.2 && r <= 0.86 && !(mx > SPAWN_L - 16 && mx < SPAWN_R + 16) && !(Math.abs(mx - g.gx) < ARENA_HALF + 10 || this.shrineNear(mx) !== null)) {
-        const dir = hash2(kk, 55, s) < 0.5 ? -1 : 1, len = 18 + Math.floor(hash2(kk, 56, s) * 14);
-        const top = this.col(mx).h, half = 1.6;
-        for (let u = 1; u <= len; u++) {
-          const tx = mx + u * dir, cy = top - half + u * 0.62 + Math.sin(u * 0.35 + kk) * 0.25;
-          if ((cy - half) - this.col(tx).h >= 2.8) { m = { x: (tx - dir) * TILE + 16, y: (Math.floor(cy + half) + 1) * TILE, dir }; break; }
-        }
-      }
-      this.mouthCache.set(kk, m);
-      if (m) out.push(m);
-    }
-    return out;
   }
   stampTrees(cx, cy, fg) {
     const x0 = cx * CH, y0 = cy * CH;
@@ -280,6 +259,58 @@ export class World {
       for (const ox of [-3, 3]) { put(sx + ox, sy - 1, T.RUIN, wall); put(sx + ox, sy - 2, T.RUIN, wall); put(sx + ox, sy - 3, T.LANTERN); }
     }
   }
+  // the top layer is always turf: soil open to the sky becomes grass, and soil right beside grass (left or
+  // right, never above or below) becomes grass too. One step only, from a snapshot, so it never creeps along
+  // a whole row underground.
+  turfPass(fg, wall, x0, y0) {
+    const sky = (x, y) => {            // open air with no back wall: above ground
+      const lx = x - x0, ly = y - y0;
+      if (lx >= 0 && ly >= 0 && lx < CH && ly < CH) { const i = ly * CH + lx; return fg[i] === T.AIR && !wall[i]; }
+      const r = this.gen(x, y); return r[0] === T.AIR && !r[1];
+    };
+    const grassAt = (x, y) => {        // grass after the exposure rule, for columns beyond this chunk
+      const lx = x - x0, ly = y - y0;
+      if (lx >= 0 && ly >= 0 && lx < CH && ly < CH) return fg[ly * CH + lx] === T.GRASS;
+      const t = this.gen(x, y)[0];
+      return t === T.GRASS || (t === T.DIRT && sky(x, y - 1));
+    };
+    const turned = [];
+    for (let ly = 0; ly < CH; ly++) for (let lx = 0; lx < CH; lx++) {
+      const i = ly * CH + lx;
+      if (fg[i] !== T.DIRT) continue;
+      const x = x0 + lx, y = y0 + ly;
+      if (y > this.col(x).h + 8) continue;
+      if (biomeOf(biomeIndexAt(x)).id === 'frost') continue;
+      if (sky(x, y - 1) || sky(x - 1, y) || sky(x + 1, y)) fg[i] = T.GRASS;
+    }
+    for (let ly = 0; ly < CH; ly++) for (let lx = 0; lx < CH; lx++) {
+      const i = ly * CH + lx;
+      if (fg[i] !== T.DIRT) continue;
+      const x = x0 + lx, y = y0 + ly;
+      if (y > this.col(x).h + 8) continue;
+      if (grassAt(x - 1, y) || grassAt(x + 1, y)) turned.push(i);
+    }
+    for (const i of turned) fg[i] = T.GRASS;
+  }
+  // after an edit: soil left open to the sky, or right beside turf, grows turf a moment later
+  queueTurf(tx, ty) {
+    this.turfQ = this.turfQ || [];
+    if (this.turfQ.length < 400) this.turfQ.push([tx, ty, 0.8 + Math.random() * 0.6]);
+  }
+  tickTurf(dt) {
+    const q = this.turfQ;
+    if (!q || !q.length) return;
+    for (const e of q) e[2] -= dt;
+    const due = q.filter(e => e[2] <= 0);
+    this.turfQ = q.filter(e => e[2] > 0);
+    for (const [x, y] of due) {
+      if (this.get(x, y) !== T.DIRT || biomeOf(biomeIndexAt(x)).id === 'frost') continue;
+      const open = (a, b) => this.get(a, b) === T.AIR && !this.wall(a, b);
+      if (open(x, y - 1) || open(x - 1, y) || open(x + 1, y) || this.get(x - 1, y) === T.GRASS || this.get(x + 1, y) === T.GRASS) {
+        this.set(x, y, T.GRASS, 0, true);
+      }
+    }
+  }
   generateChunk(cx, cy) {
     const fg = new Uint8Array(CH * CH), wall = new Uint8Array(CH * CH);
     const x0 = cx * CH, y0 = cy * CH;
@@ -289,6 +320,7 @@ export class World {
     }
     this.stampTrees(cx, cy, fg);
     this.stampStructures(cx, cy, fg, wall);
+    this.turfPass(fg, wall, x0, y0);
     const ed = this.edits.get(cx + ',' + cy);
     if (ed) for (const [i, t] of ed) { if (i >= 1024) wall[i - 1024] = t; else fg[i] = t; }
     return { fg, wall, cx, cy, used: 0 };
@@ -325,6 +357,7 @@ export class World {
     if (!ed) { ed = new Map(); this.edits.set(k, ed); }
     ed.set(i + (layer ? 1024 : 0), t);
     this.version++;
+    if (!layer && !silent) { this.queueTurf(tx, ty); this.queueTurf(tx, ty + 1); this.queueTurf(tx - 1, ty); this.queueTurf(tx + 1, ty); }
     for (const fn of this.listeners) fn(tx, ty, t, layer, silent);
     return true;
   }

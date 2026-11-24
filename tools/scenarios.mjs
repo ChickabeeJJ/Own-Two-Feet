@@ -324,6 +324,42 @@ export default ({ page, sleep, key, shot, evalg }) => ({
     await evalg(() => window.__game.ui.closeMenu()); await sleep(300); await shot('quests-hud');
     if (!r.benchStarted || !r.benchDone || !r.smithStarted || !r.brazierSolved || !r.chestOpened || !r.campCleared) throw new Error('quests broken');
   },
+  // the top layer is always turf: no soil open to the sky near the surface; uncovered soil turns
+  async turf() {
+    await sleep(900);
+    const r = await evalg(() => { const g = window.__game, W = g.world, T = window.__T; g.story.skipBirth(); g.story.skipTutorial(); g.enemies.calm = 999;
+      let exposed = 0, checked = 0;
+      for (let tx = -150; tx < 400; tx++) { const h = W.surface(tx); for (let ty = h - 6; ty < h + 6; ty++) { if (W.get(tx, ty) !== T.DIRT) continue; checked++;
+        const open = (a, b) => W.get(a, b) === T.AIR && !W.wall(a, b);
+        if (open(tx, ty - 1) || open(tx - 1, ty) || open(tx + 1, ty)) exposed++; } }
+      // dig the turf off a column: the soil under it greens a moment later
+      const x = 60, h = W.surface(x); W.set(x, h, T.AIR); W.set(x - 1, h, T.AIR); W.set(x + 1, h, T.AIR);
+      return { exposed, checked, x, h, below: W.get(x, h + 1) }; });
+    await sleep(2200);
+    const after = await evalg((r) => { const W = window.__game.world; return W.get(r.x, r.h + 1); }, r);
+    console.log('turf', JSON.stringify({ ...r, belowAfter: after }));
+    await evalg(() => { const g = window.__game; g.player.respawnAt(60 * 32, g.world.surface(58) * 32); g.cam.zoomT = 1.4; });
+    await sleep(1200); await shot('turf-0');
+  },
+  // starting a new life wipes every block ever placed or broken
+  async wipe() {
+    await sleep(900);
+    const a = await evalg(() => { const g = window.__game, W = g.world, T = window.__T; g.story.skipBirth(); g.story.skipTutorial();
+      const x = 30, h = W.surface(x); W.set(x, h - 1, T.BRICK); W.set(x, h - 2, T.BRICK); W.set(x + 3, h, T.AIR); g.saveNow(); return { x, h, edits: W.edits.size }; });
+    await evalg(() => { const S = window.__game.ui; const g = window.__game; import('./js/game/progress.js').then(m => { m.Save.wipe(g.world); location.reload(); }); });
+    await page.waitForFunction(() => window.__game && window.__game.world && window.__game.story, { timeout: 15000 }).catch(() => {});
+    await sleep(2500);
+    const b = await evalg((a) => { const W = window.__game.world, T = window.__T; return { brick: W.get(a.x, a.h - 1) === T.BRICK, hole: W.get(a.x + 3, a.h) === T.AIR, edits: W.edits.size, born: !!window.__game.save.born }; }, a);
+    console.log('wipe', JSON.stringify({ before: a, after: b }));
+  },
+  // spam-tapping through the wake-up: Thread's line matches the moment (no lag)
+  async wake() {
+    await page.waitForFunction(() => window.__game && window.__game.story && window.__game.story.stage === 2, { timeout: 40000 });
+    const lines = [];
+    for (let i = 0; i < 6; i++) { await key('Space', 40); await sleep(120); }
+    for (let i = 0; i < 12; i++) { lines.push(await evalg(() => { const th = window.__game.story.thread; return th.line ? th.line.text : '-'; })); await sleep(250); }
+    console.log('wake', JSON.stringify(lines.filter((l, i) => l !== lines[i - 1])));
+  },
   async looks() {
     await sleep(900);
     await evalg(() => { const g = window.__game, W = g.world, p = g.player; g.story.skipBirth(); g.enemies.calm = 999; g.save.tutDone = 1; g.story.tutI = 9; g.cam.zoomT = 1.3; p.respawnAt(7 * 32, W.surface(7) * 32); });

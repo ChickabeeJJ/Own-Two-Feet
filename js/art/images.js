@@ -8,7 +8,7 @@ const PROPS = ['shrine', 'campfire', 'bladestone', 'hearth', 'lantern', 'banner'
 const ICONS = ['stone', 'deepstone', 'shadowstone', 'sandstone', 'snow', 'earth', 'wood', 'planks', 'brick', 'ice', 'marble', 'obsidian', 'rootcrystal', 'sunstone', 'emberrock', 'rime', 'lantern', 'brazier'].map(n => 'icons/b_' + n)
   .concat(['vessel', 'vessel_empty', 'glimmer', 'r_djump', 'r_wall', 'r_plunge', 'r_surge', 'r_vessel'].map(n => 'icons/' + n));
 const TREES = ['meadow', 'glass', 'hollow', 'ember', 'frost'].map(n => 'trees/' + n);
-const REQ = ['cave_mouth', 'nest', 'satchel', 'ladder', 'platform', 'door', 'step', 'chest', 'bench', 'forge', 'loom', 'draught', 'flare', 'charge', 'lamp', 'pick_gilt', 'pick_crystal', 'charm_thread', 'charm_ember'].map(n => 'req/' + n);
+const REQ = ['nest', 'satchel', 'ladder', 'platform', 'door', 'step', 'chest', 'bench', 'forge', 'loom', 'draught', 'flare', 'charge', 'lamp', 'pick_gilt', 'pick_crystal', 'charm_thread', 'charm_ember'].map(n => 'req/' + n);
 const FX = ['slash', 'spark', 'wave', 'souls', 'dust', 'thread'].map(n => 'fx/' + n);
 
 export const IMG = {};

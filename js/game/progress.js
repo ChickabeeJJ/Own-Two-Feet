@@ -154,11 +154,19 @@ export const Save = {
     return d;
   },
   write(world) {
-    if (!this.data) return;
+    if (!this.data || this.wiping) return;
     if (world) this.data.edits = world.serializeEdits();
     try { Platform.setItem(SAVE_KEY, JSON.stringify(this.data)); } catch (e) { /* storage full or blocked */ }
   },
-  wipe() { try { Platform.removeItem(SAVE_KEY); } catch (e) { /* ignore */ } this.data = newSave(); return this.data; },
+  // a new life: the save, every block placed or broken, everything. Nothing may write the old state back
+  // afterwards (the reload's pagehide would otherwise save the world edits again).
+  wipe(world) {
+    this.wiping = true;
+    if (world) { world.edits.clear(); world.chunks.clear(); world._lc = null; }
+    try { Platform.removeItem(SAVE_KEY); } catch (e) { /* ignore */ }
+    this.data = newSave();
+    return this.data;
+  },
   unlock(id) { if (!this.data.unlocked.includes(id)) { this.data.unlocked.push(id); return true; } return false; },
   unlockSrc(src) { const got = []; for (const c of COSMETICS) if (c.src === src && this.unlock(c.id)) got.push(c); return got; },
 };

@@ -599,7 +599,7 @@ export class UI {
     const wipe = el('button', 'mini-btn', 'Start a new life');
     wipe.style.marginTop = '20px';
     wipe.onclick = () => {
-      if (wipe.dataset.sure) { Save.wipe(); location.reload(); }
+      if (wipe.dataset.sure) { Save.wipe(this.game.world); location.reload(); }
       else { wipe.dataset.sure = 1; wipe.textContent = 'Erase everything? Tap again'; }
     };
     c2.appendChild(wipe);

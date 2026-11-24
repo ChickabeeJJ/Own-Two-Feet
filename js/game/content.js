@@ -294,20 +294,9 @@ export class Content {
     for (const n of this.nests.values()) arr.push({ x: n.ent.c.x, y: n.ent.c.y, c: [0.55, 0.4, 0.9], s: 0.7 });
     for (const c of this.chests.values()) if (!c.open) arr.push({ x: c.x, y: c.y - 16, c: [1, 0.85, 0.5], s: 0.45 });
   }
-  // the painted cave mouth sits over each tunnel opening (world.mouthEntrances finds them)
-  drawMouths(ctx) {
-    const g = this.game, W = g.world, im = IMG['req/cave_mouth'];
-    if (!im || !W.mouthEntrances) return;
-    const v = g.view, tx0 = Math.floor((v.x0 - 200) / TILE), tx1 = Math.ceil((v.x1 + 200) / TILE);
-    for (const m of W.mouthEntrances(tx0, tx1)) {
-      const w = 6.2 * TILE, h = w * im.height / im.width;
-      ctx.drawImage(im, m.x - w / 2, m.y - h + 10, w, h);
-    }
-  }
   draw(ctx, a, layer) {
     const g = this.game, t = g.time;
     if (layer === 'back') {
-      this.drawMouths(ctx, a);
       for (const n of this.nests.values()) drawNest(ctx, n.ent.c.x, n.ent.c.y + 26, t, n.ent.flash);
       // an opened chest lingers a moment, then fades away
       for (const c of this.chests.values()) {
@@ -349,6 +338,30 @@ export function drawMossBed(g, x, y, k) {
   g.restore();
 }
 export function drawChest(g, x, y, open, t) {
+  const im = IMG['req/chest'];
+  if (im) {
+    // the painted chest, split at the lid seam: the lid swings back on its hinge and light spills out
+    const w = 42, h = w * im.height / im.width, cut = 0.42, lidH = h * cut, bodyH = h - lidH;
+    const sy = im.height * cut;
+    g.save();
+    softDisc(g, x, y, 32, '#000000', 0.35);
+    if (open > 0) {
+      g.fillStyle = '#1a120c'; g.beginPath(); g.roundRect(x - w / 2 + 3, y - bodyH - 3, w - 6, 6, 2); g.fill();
+      g.save(); g.globalCompositeOperation = 'lighter';
+      softDisc(g, x, y - bodyH, 46, '#ffd98a', 0.55 * (1 - open * 0.5));
+      const gr = g.createLinearGradient(0, y - bodyH - 60, 0, y - bodyH);
+      gr.addColorStop(0, rgba('#ffe7b0', 0)); gr.addColorStop(1, rgba('#ffe7b0', 0.35 * (1 - open * 0.4)));
+      g.fillStyle = gr; g.beginPath(); g.moveTo(x - 10, y - bodyH - 60); g.lineTo(x + 10, y - bodyH - 60); g.lineTo(x + w / 2 - 4, y - bodyH); g.lineTo(x - w / 2 + 4, y - bodyH); g.closePath(); g.fill();
+      g.restore();
+    }
+    g.drawImage(im, 0, sy, im.width, im.height - sy, x - w / 2, y - bodyH, w, bodyH);
+    g.save(); g.translate(x - w / 2, y - bodyH); g.rotate(-open * 1.75);
+    g.drawImage(im, 0, 0, im.width, sy, 0, -lidH, w, lidH);
+    g.restore();
+    if (!open) { g.globalCompositeOperation = 'lighter'; softDisc(g, x, y - bodyH, 24, '#ffd98a', 0.12 + Math.sin(t * 2.5) * 0.07); }
+    g.restore();
+    return;
+  }
   g.save();
   softDisc(g, x, y, 30, '#000000', 0.35);
   const w = 30, h = 20;

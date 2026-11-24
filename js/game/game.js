@@ -128,6 +128,7 @@ export class Game {
     this.wind = Math.sin(this.time * 0.23) * 0.6 + Math.sin(this.time * 0.71) * 0.3;
     for (const h of this.onTickHooks) h(dt);
     for (const s of this.systems) if (s.update) s.update(dt);
+    if (this.world.tickTurf) this.world.tickTurf(dt);
     if (this.player) this.player.update(dt);
     for (const a of this.actors) a.update(dt);
     this.actors = this.actors.filter(a => !a.removed);

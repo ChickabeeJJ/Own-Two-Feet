@@ -217,9 +217,11 @@ export class Story {
       th.override = { x: b.x[P.HEAD] + 30, y: b.y[P.HEAD] - 40 };
       g.fx.burst(th.x, th.y, { n: 16, speed: 200, col: '#ffffff', col1: '#9ff3ff', add: true, life: 0.6, size: 2.2 });
       Audio.play('chime', { vol: 0.7 });
-      setTimeoutGame(g, 0.6, () => this.say('...hey.', 1.6));
-      setTimeoutGame(g, 2.0, () => this.say('Up. You have to get up.', 2.6));
-      setTimeoutGame(g, 2.6, () => { ui.press(g.touch ? 'tap to get up' : 'press any key to get up'); this.stage = 2; this.presses = 0; a.scriptFromLimp({ mode: 'getup', getup: 0, strength: 0.32 }); });
+      // each beat interrupts the one before, and only while the doll is still down: tapping early never
+      // leaves Thread talking about a moment that has already passed
+      setTimeoutGame(g, 0.6, () => { if (!this.presses) this.say('...hey.', 1.4, true); });
+      setTimeoutGame(g, 1.6, () => { if (!this.presses) this.say('Up. You have to get up.', 2.4, true); });
+      setTimeoutGame(g, 1.6, () => { ui.press(g.touch ? 'tap to get up' : 'press any key to get up'); this.stage = 2; this.presses = 0; a.scriptFromLimp({ mode: 'getup', getup: 0, strength: 0.32 }); });
     }
   }
   updateWake(dt) {
@@ -238,11 +240,12 @@ export class Story {
         a.takeImpulse(a.body.x[P.CHEST], a.body.y[P.CHEST], 0, -300, 0);
         Audio.play('land', { vol: 0.6 }); g.shake(0.1);
         ui.press(g.touch ? 'again' : 'again');
-        this.say('That’s it. One more.', 2);
+        this.say('That’s it. One more.', 1.6, true);
       } else {
         this.stage = 3; this.t = 0;
         ui.press(null);
         sp.strength = 0.95;
+        this.thread.hush();   // standing now: drop anything still queued about getting up
       }
     }
     if (this.presses >= 1 && this.stage === 2) sp.getup = Math.min(0.45, sp.getup + dt / 0.5);
@@ -253,7 +256,7 @@ export class Story {
         this.stood = true;
         a.mode = 'ctrl'; a.scriptPose = null;
         this.thread.override = null;
-        this.say('You stood. Nobody stands anymore.', 3);
+        this.say('You stood. Nobody stands anymore.', 3, true);
         // far away, a warden hears it
         setTimeoutGame(g, 1.4, () => { Audio.play('roar', { vol: 0.55, pitch: 0.65 }); g.shake(0.35); this.roared = g.time; });
         setTimeoutGame(g, 1.8, () => { this.card('On Two Feet', 'the last doll walks', '', 4.4); Audio.play('chime'); g.cam.override = null; g.cam.zoomT = 0.85; });

@@ -16,11 +16,16 @@ export class Thread {
     this.target = null;
     this.placed = false;
   }
-  say(text, dur = 3.2, prio = false) {
+  // prio: interrupt whatever is being said. ttl: a queued line older than this is stale and is skipped, so
+  // speech never lags behind what the player is doing
+  say(text, dur = 3.2, prio = false, ttl = 5) {
     if (prio) { this.queue = []; this.line = null; }
     if (this.line && this.line.text === text) return;
-    this.queue.push({ text, dur });
+    if (this.queue.some(q => q.text === text)) return;
+    this.queue.push({ text, dur, at: this.t, ttl });
   }
+  // cut a line short (for example once the thing it asks for is done)
+  hush(match) { if (this.line && (!match || this.line.text === match)) this.line = null; this.queue = match ? this.queue.filter(q => q.text !== match) : []; }
   update(dt) {
     const g = this.game, p = g.player;
     if (!p) return;
@@ -51,7 +56,11 @@ export class Thread {
     if (tl.length > 140) tl.splice(0, tl.length - 140);
     // speech queue
     if (this.line) { this.lineT += dt; if (this.lineT > this.line.dur) { this.line = null; } }
-    if (!this.line && this.queue.length) { this.line = this.queue.shift(); this.lineT = 0; Audio.play('chime', { vol: 0.25, gap: 0.3 }); }
+    while (!this.line && this.queue.length) {
+      const q = this.queue.shift();
+      if (this.t - (q.at ?? this.t) > (q.ttl ?? 5)) continue;   // stale: the moment has passed
+      this.line = q; this.lineT = 0; Audio.play('chime', { vol: 0.25, gap: 0.3 });
+    }
     if ((g.tick % 8) === 0) g.fx.spawn({ x: this.x + (Math.random() - 0.5) * 6, y: this.y + (Math.random() - 0.5) * 6, vx: -this.vx * 0.1, vy: -this.vy * 0.1 + 10, life: 0.7, size: 1.6, size1: 0.3, col: '#ffffff', col1: '#9ff3ff', add: true });
   }
   lights(arr) { if (this.visible) arr.push({ x: this.x, y: this.y, c: [0.62, 0.95, 1], s: 0.65 }); }

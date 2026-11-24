@@ -206,7 +206,7 @@ def tree_sprites(p3, outdir, meta):
 # ---------------------------------------------------------------- the painted request sheet (art requests board)
 # boxes are in a 1000-wide frame of the sheet and scaled to the real size; each box holds only the art, not the label
 REQ_BOXES = {
-    'cave_mouth': (424, 96, 584, 184), 'nest': (640, 104, 742, 180), 'satchel': (830, 100, 944, 182),
+    'nest': (640, 104, 742, 180), 'satchel': (830, 100, 944, 182),
     'ladder': (30, 262, 112, 344), 'platform': (136, 262, 224, 344), 'torch': (246, 262, 328, 344),
     'door': (352, 262, 434, 344), 'step': (458, 262, 542, 344), 'chest': (566, 262, 650, 344),
     'bench': (674, 262, 758, 344), 'forge': (782, 262, 866, 344), 'loom': (890, 262, 974, 344),
