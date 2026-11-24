@@ -522,6 +522,15 @@ export default ({ page, sleep, key, shot, evalg }) => ({
     console.log('travelled to', where);
     await evalg(() => { const g = window.__game, p = g.player; g.cam.zoomT = 1.2; }); await sleep(1500); await shot('town-3-street');
   },
+  // close look at the Hollows (grit, wraps, plates, chains, tatters)
+  async foes() {
+    await sleep(900);
+    await evalg(() => { const g = window.__game, W = g.world, p = g.player; g.story.skipBirth(); g.story.skipTutorial(); g.enemies.calm = 999; g.surges.next = 999;
+      p.respawnAt(80 * 32, W.surface(80) * 32); const y = W.surface(84) * 32;
+      for (const [k, dx] of [['husk', 120], ['brute', 210], ['lancer', 300], ['slinger', 380]]) { const e = g.enemies.spawn(k, p.x + dx, W.surface(Math.floor((p.x + dx) / 32)) * 32, 0, '#ffb36b'); e.ai.state = 'idle'; e.ai.t = 99; e.face(-1); }
+      g.cam.zoomT = 2.1; g.cam.x = p.x + 230; });
+    await sleep(2500); await shot('foes-0');
+  },
   async looks() {
     await sleep(900);
     await evalg(() => { const g = window.__game, W = g.world, p = g.player; g.story.skipBirth(); g.enemies.calm = 999; g.save.tutDone = 1; g.story.tutI = 9; g.cam.zoomT = 1.3; p.respawnAt(7 * 32, W.surface(7) * 32); });
@@ -575,11 +584,18 @@ export default ({ page, sleep, key, shot, evalg }) => ({
     await sleep(640); await shot('ui-bag-made');
   },
   async opening() {
-    await sleep(700); await shot('op-1-black');
-    await sleep(3200); await shot('op-2-seed');
-    await sleep(3200); await shot('op-3-wardens');
-    await sleep(2400); await shot('op-4-burst');
-    await sleep(1500); await shot('op-5-fall');
+    const t0 = Date.now();
+    await sleep(1200); await shot('op-0-black');
+    await page.waitForFunction(() => window.__game.story.shot === 1, { timeout: 30000 });
+    console.log('vista ready after ms', Date.now() - t0);
+    await sleep(2200); await shot('op-1-vista');
+    for (let i = 0; i < 5; i++) {
+      await page.waitForFunction((i) => window.__game.story.shot === 2 && window.__game.story.wi === i, i, { timeout: 30000 });
+      await sleep(700); await shot('op-2-warden' + i);
+    }
+    await page.waitForFunction(() => window.__game.story.stage >= 0, { timeout: 30000 });
+    console.log('prologue ms', Date.now() - t0);
+    await sleep(900); await shot('op-3-fall');
   },
   async doll() {
     await page.waitForFunction(() => window.__game && window.__game.story);

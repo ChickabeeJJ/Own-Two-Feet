@@ -16,6 +16,7 @@ import { drawGlow } from '../world/light.js';
 import { Save, COSMETICS } from './progress.js';
 import { setTimeoutGame } from './bosses.js';
 import { Platform } from '../platform.js';
+import { PrologueArt } from '../art/prologue.js';
 import { Thread } from './thread.js';
 import { drawBladeStone, drawSeed } from '../art/props.js';
 import { softDisc } from '../art/paint.js';
@@ -122,9 +123,15 @@ export class Story {
     const t = this.pt += dt;
     if (!this.pBeat) { this.pBeat = 1; ui.lore(PROLOGUE[0]); }
     for (const bt of [0.25, 1.05, 1.85]) if (t >= bt && (this.beats || 0) < [0.25, 1.05, 1.85].indexOf(bt) + 1) { this.beats = (this.beats || 0) + 1; Audio.play('beat'); }
-    if (t > 2.9 && this.shot === 0) { this.shot = 1; ui.fade(0, 1.4); ui.lore(PROLOGUE[1]); g.cam.zoomT = 1.0; }
-    if (t > 6.2 && this.shot === 1) { this.shot = 2; ui.lore(PROLOGUE[2]); Audio.play('roar', { vol: 0.25, pitch: 0.5 }); }
-    if (t > 9.6 && this.shot === 2) this.endPrologue();
+    // the painted plates are made a slice at a time; a shot starts only once its plates are ready
+    const P = this.pArt || (this.pArt = new PrologueArt());
+    P.step(this.shot === 0 ? 14 : 8);
+    if (this.shot === 0 && t > 2.6 && ['sky', 'far', 'cath', 'near'].every(n => P.ready(n))) { this.shot = 1; this.s1 = t; ui.fade(0, 0.8); ui.lore(PROLOGUE[1]); }
+    if (this.shot === 1 && t - this.s1 > 4.2 && P.ready('w0')) { this.shot = 2; this.wi = 0; this.wt = t; ui.lore(PROLOGUE[2]); Audio.play('roar', { vol: 0.25, pitch: 0.5 }); }
+    if (this.shot === 2 && t - this.wt > 1.35) {
+      if (this.wi >= 4) this.endPrologue();
+      else if (P.ready('w' + (this.wi + 1))) { this.wi++; this.wt = t; Audio.play('slam', { vol: 0.25, pitch: 0.5 + this.wi * 0.1 }); }
+    }
     // the seed drifts down; the camera rides above it
     sp.vy = 150 + t * 18;
     g.cam.override.x = a.c.x; g.cam.override.y = a.c.y + 40;
@@ -590,7 +597,23 @@ export class Story {
     }
   }
   drawPrologue(ctx, W, H, px, t) {
-    // shot 1: black. shot 3: the five wardens on the horizon
+    // painted: black with embers, the Loom-Cathedral at dusk, then each Warden in turn
+    const P = this.pArt;
+    if (P) {
+      ctx.save();
+      if (this.shot === 0) { ctx.fillStyle = '#040308'; ctx.fillRect(0, 0, W, H); P.embersDraw(ctx, W, H, t, '255,170,120', clamp(t / 1.5, 0, 1)); }
+      else if (this.shot === 1) { ctx.fillStyle = '#040308'; ctx.fillRect(0, 0, W, H); P.vista(ctx, W, H, clamp((t - this.s1) / 4.2, 0, 1), t); const f = clamp(1 - (t - this.s1) / 0.8, 0, 1); if (f > 0) { ctx.fillStyle = `rgba(4,3,8,${f})`; ctx.fillRect(0, 0, W, H); } }
+      else if (this.shot === 2) {
+        ctx.fillStyle = '#040308'; ctx.fillRect(0, 0, W, H);
+        const u = clamp((t - this.wt) / 1.35, 0, 1);
+        P.warden(ctx, W, H, this.wi, u, t);
+        const cut = clamp(1 - (t - this.wt) / 0.14, 0, 1);
+        if (cut > 0) { ctx.fillStyle = `rgba(255,240,225,${cut * 0.35})`; ctx.fillRect(0, 0, W, H); }
+      }
+      ctx.restore();
+      return;
+    }
+    // (fallback before the painter exists) shot 1: black. shot 3: the five wardens on the horizon
     if (t < 3.4) { ctx.fillStyle = `rgba(4,3,8,${clamp(1 - (t - 2.9) / 0.5, 0, 1)})`; ctx.fillRect(0, 0, W, H); }
     const k = clamp((t - 6.0) / 0.5, 0, 1) * clamp((9.6 - t) / 0.45, 0, 1);
     if (k > 0) {

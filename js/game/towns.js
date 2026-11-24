@@ -47,7 +47,7 @@ export class Towns {
     if (p.wellRested > 0) p.wellRested -= dt;
     const tx = Math.floor(p.x / TILE);
     // townsfolk live while you are near
-    const tn = townNear(tx, 120);
+    const tn = townNear(tx, 30);   // townsfolk only exist while the town is close
     for (const [bi, list] of this.folk) if (!tn || tn.bi !== bi) { for (const a of list) a.removed = true; this.folk.delete(bi); }
     if (tn && !this.folk.has(tn.bi)) this.populate(tn);
     if (tn) for (const a of this.folk.get(tn.bi) || []) this.walk(a, dt);

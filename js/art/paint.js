@@ -18,6 +18,7 @@
      cyan #9ff3ff; hazard = ember #ff7a3a; reward = glimmer cyan-white + gilt #f2c86a.
    Light: key light from the upper left in every asset; rim light from behind (biome sun).
    ============================================================================ */
+import { gritFill } from './grit.js';
 import { mix, shade, rgba, clamp, hexToRgb, TAU } from '../core/util.js';
 
 export const LIGHT = { x: -0.55, y: -0.83 };
@@ -78,6 +79,7 @@ export function capsule(g, ax, ay, bx, by, ra, rb, base, o = {}) {
   gr.addColorStop(1, shade(base, hi));
   g.fillStyle = gr;
   g.fill();
+  gritFill(g);
   if (o.rim) {
     // thin back-light on the shadow side
     g.strokeStyle = rgba(o.rim, o.rimA ?? 0.45); g.lineWidth = Math.max(0.8, r * 0.16);
@@ -120,6 +122,7 @@ export function hull(g, nodes, base, o = {}) {
   gr.addColorStop(1, shade(base, hi));
   g.fillStyle = o.fill || gr;
   g.fill();
+  gritFill(g);
   return { nx, ny };
 }
 export function softDisc(g, x, y, r, col, a = 1) {

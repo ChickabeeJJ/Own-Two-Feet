@@ -209,11 +209,11 @@ export function drawWispSprite(ctx, x, y, t, col, o = {}) {
 }
 
 // ---------------------------------------------------------------- ragdoll enemies
-export const HUSK_LOOK = (eye) => ({ body: '#2a2630', limb: '#2a2630', coat: '#2a2630', maskCol: '#d8c7a8', hoodCol: '#24202a', head: 'crescent', mat: 'cloth', eyes: eye, eyeStyle: 'slit', cape: { col: '#3b3640', style: 'scarf', len: 5, wide: 3.4 }, cloakLong: '#33303a', blade: null, marks: [], rim: '#ffcf9e', claws: '#e6dfd2', bootCol: '#1e1b22', belt: false, arms: 0.95 });
+export const HUSK_LOOK = (eye) => ({ grit: 'husk', body: '#2a2630', limb: '#2b2729', coat: '#2a2630', maskCol: '#bcae96', hoodCol: '#221e22', head: 'crescent', mat: 'cloth', eyes: eye, eyeStyle: 'slit', cape: { col: '#34302e', style: 'scarf', len: 6, wide: 3.4 }, cloakLong: '#302b2c', blade: null, marks: [], rim: '#8a7462', claws: '#e6dfd2', bootCol: '#1e1b22', belt: false, arms: 0.95 });
 // a lancer carries a crude spear and charges; a slinger keeps its distance and lobs stones
 export const LANCER_LOOK = (eye) => ({ ...HUSK_LOOK(eye), head: 'horns', maskCol: '#cbb89a', cape: { col: '#4a3a34', style: 'scarf', len: 6, wide: 3 }, weapon: 'w_spear', weaponLen: 46, blade: { len: 46, w: 2.2, col: '#b8b0a8' } });
 export const SLINGER_LOOK = (eye) => ({ ...HUSK_LOOK(eye), head: 'hood', hoodCol: '#2e2a26', maskCol: '#bfae92', cloakLong: '#3a332c', weapon: 'w_sling', blade: { len: 14, w: 2, col: '#9a96a0' } });
-export const BRUTE_LOOK = (eye) => ({ body: '#3a3238', limb: '#2e2930', coat: '#2e2930', head: 'ears', headK: 1.35, mat: 'cloth', eyes: eye, eyeStyle: 'slit', cape: null, cloakLong: '#2b2730', trim: '#c9a45c', blade: null, marks: [], rim: '#ffcf9e', gaunt: true, gloves: '#3a3238', bulk: 1.25, arms: 1.15, bootCol: '#1e1b22', belt: false });
+export const BRUTE_LOOK = (eye) => ({ grit: 'brute', plateCol: '#4e484c', body: '#33302f', limb: '#2b2829', coat: '#2b2829', head: 'horns', hornCol: '#1e1a1c', headK: 1.35, mat: 'cloth', eyes: eye, eyeStyle: 'slit', cape: null, cloakLong: '#2a2526', trim: '#8a7448', blade: null, marks: [], rim: '#8a7462', gaunt: true, gloves: '#3a3238', bulk: 1.25, arms: 1.15, bootCol: '#1e1b22', belt: false });
 
 export class Enemies {
   constructor(game) {

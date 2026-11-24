@@ -2,6 +2,7 @@
 // two glowing oval eyes, a cream coat with a stand collar, a brown belt with a gold buckle, slim limbs,
 // brown boots and a long flowing scarf. Keepers wear long cloaks, Hollows wear hoods and masks, Wardens
 // trail huge tattered capes. Same physics rig for everyone. No outlines: shaded forms + rim light.
+import { setGrit, drawGrit } from './grit.js';
 import { P } from '../physics/body.js';
 import { capsule, hull, ballShade, softDisc, stitches, shade, mix, rgba, LIGHT, TAU } from './paint.js';
 
@@ -13,6 +14,11 @@ function matK(mat) {
 }
 
 export function drawDoll(ctx, b, look, a, o = {}) {
+  if (look.grit) setGrit(true, look.gritA || 0.62);
+  try { drawDollInner(ctx, b, look, a, o); } finally { setGrit(false); }
+  if (look.grit) { ctx.save(); drawGrit(ctx, b, look, a, o.time || 0); ctx.restore(); }
+}
+function drawDollInner(ctx, b, look, a, o) {
   const s = b.s, f = b.facing;
   const X = i => b.ipx(i, a), Y = i => b.ipy(i, a);
   const fl = o.flash > 0 ? o.flash : 0;

@@ -226,7 +226,7 @@ class Warden extends BossBase {
     this.maxHp = this.hp = Math.round(280 * (1 + tier * 0.65));
     const a = this.a = new Actor(g, {
       x, y: gy, team: 'enemy', scale: 2.25, heavy: 2.4, hp: this.hp, run: 150 + tier * 12, facing: -1, blade: true,
-      look: { body: spec.head2 || spec.body, limb: spec.body, coat: spec.body, mat: 'cloth', eyes: spec.col, eyeStyle: 'slit', head: spec.head, hornCol: '#2a2430', accent: '#d9a441', belt: false,
+      look: { grit: 'warden', gritA: 0.7, plateCol: '#4a444a', body: spec.head2 || spec.body, limb: spec.body, coat: spec.body, mat: 'cloth', eyes: spec.col, eyeStyle: 'slit', head: spec.head, hornCol: '#2a2430', accent: '#d9a441', belt: false,
         cloakLong: spec.cape, cloakToGround: true, trim: '#c9a45c', gaunt: true, gloves: spec.body, bulk: 1.05,
         cape: { col: shade(spec.cape, -0.15), style: 'cape', len: 12, wide: 13, trim: '#c9a45c' }, blade: { col: '#dcd6cc', glow: spec.col, len: 42, w: 3.8 }, marks: [], rim: spec.col },
     });
@@ -374,7 +374,7 @@ class Wraith extends BossBase {
     this.maxHp = this.hp = Math.round(240 * (1 + tier * 0.65));
     const a = this.a = new Actor(g, {
       x, y: gy - 60, team: 'enemy', scale: 1.9, heavy: 1.2, hp: this.hp, facing: -1, blade: false,
-      look: { body: spec.head2 || spec.body, limb: spec.body, coat: spec.cape, mat: 'glow', eyes: spec.col, eyeStyle: 'dots', head: spec.head, accent: spec.name.includes('Still') ? '#e8eef5' : '#bff6ff', belt: false,
+      look: { grit: 'husk', gritA: 0.45, body: spec.head2 || spec.body, limb: spec.body, coat: spec.cape, mat: 'glow', eyes: spec.col, eyeStyle: 'dots', head: spec.head, accent: spec.name.includes('Still') ? '#e8eef5' : '#bff6ff', belt: false,
         robe: spec.cape, trim: shade(spec.cape, 0.35), claws: spec.col, arms: 1.05,
         cape: { col: shade(spec.cape, -0.1), style: 'cape', len: 13, wide: 14 }, blade: null, marks: [], rim: spec.col },
     });
