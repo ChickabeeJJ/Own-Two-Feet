@@ -16,6 +16,8 @@ import { texture, grassLip, snowLip } from '../js/art/tex.js';
 import { BIOMES, T, TILES } from '../js/world/tiles.js';
 import { loadImages, setBase, IMG, drawSprite, TILE_ICON } from '../js/art/images.js';
 import { drawPart, drawItemIcon } from '../js/art/itemart.js';
+import { Towns } from '../js/game/towns.js';
+import { BUILDINGS } from '../js/world/townplan.js';
 
 const fakeWorld = {
   get(tx, ty) { return ty >= 0 ? 3 : 0; },
@@ -269,6 +271,56 @@ function requests() {
   slot(1680, 1400, 660, 270, 'Touch buttons', '160 x 160 each', 'Strike, Jump, Dash, Mend, Build, Bag, Talk', (cx, cy) => { for (let i = 0; i < 5; i++) { g.strokeStyle = 'rgba(255,240,220,.4)'; g.lineWidth = 2; g.beginPath(); g.arc(cx - 240 + i * 120, cy, 46, 0, TAU); g.stroke(); } });
 }
 
+// ---------------------------------------------------------------- towns: rough sheet of what to paint
+function towns() {
+  const W = 2400, H = 1980;
+  const g = board('towns', W, H, 'Town requests', 'rough placeholders: paint over these at the sizes shown (front view, transparent PNG, warm and lived-in)');
+  const slot = (x, y, w, h, name, size, note, draw) => {
+    g.save();
+    g.fillStyle = 'rgba(255,255,255,.03)'; g.beginPath(); g.roundRect(x, y, w, h, 16); g.fill();
+    g.setLineDash([6, 6]); g.strokeStyle = 'rgba(255,240,220,.25)'; g.lineWidth = 1.5; g.beginPath(); g.roundRect(x, y, w, h, 16); g.stroke(); g.setLineDash([]);
+    g.restore();
+    g.save(); g.beginPath(); g.rect(x, y, w, h - 54); g.clip(); draw(x + w / 2, y + h - 64); g.restore();
+    label(g, x + w / 2, y + h - 30, name, size + (note ? ' · ' + note : ''));
+  };
+  // a rough facade: plaster or brick wall, timber frame, windows, a gabled roof, the shop sign
+  const facade = (B) => (cx, gy) => {
+    const k = 0.9, w = B.w * 32 * k, h = B.h * 32 * k, x0 = cx - w / 2;
+    const wall = B.wall === T.BRICK ? '#7d6f6a' : B.wall === T.PLANK ? '#8a6a4c' : '#d9d0c2';
+    g.fillStyle = wall; g.fillRect(x0, gy - h, w, h);
+    g.fillStyle = '#5e4330';
+    for (let i = 0; i <= B.w; i += (B.w > 8 ? 4 : B.w - 1)) g.fillRect(x0 + Math.min(i, B.w - 1) * 32 * k, gy - h, 32 * k * 0.3, h);
+    g.fillRect(x0, gy - h, w, 6);
+    for (let i = 1; i < B.w - 1; i += 3) { g.fillStyle = '#ffd08a'; g.fillRect(x0 + i * 32 * k + 6, gy - h * 0.6, 32 * k - 12, 32 * k * 1.4); g.strokeStyle = '#5e4330'; g.lineWidth = 2; g.strokeRect(x0 + i * 32 * k + 6, gy - h * 0.6, 32 * k - 12, 32 * k * 1.4); }
+    g.fillStyle = '#3a2c2a'; g.fillRect(cx - 14, gy - 54, 28, 54);
+    g.fillStyle = '#8a4a3c'; g.beginPath(); g.moveTo(x0 - 22, gy - h); g.lineTo(cx, gy - h - Math.min(130, w * 0.45)); g.lineTo(x0 + w + 22, gy - h); g.closePath(); g.fill();
+    g.strokeStyle = 'rgba(0,0,0,.25)'; g.lineWidth = 1; for (let i = 1; i < 6; i++) { const yy = gy - h - i * Math.min(130, w * 0.45) / 6; g.beginPath(); g.moveTo(x0 - 22 + i * 10, yy); g.lineTo(x0 + w + 22 - i * 10, yy); g.stroke(); }
+    if (B.kind !== 'house') { g.fillStyle = '#6b4a32'; g.beginPath(); g.roundRect(cx - 34, gy - h - 6, 68, 22, 4); g.fill(); g.fillStyle = '#e9d9b8'; g.font = '600 11px Manrope'; g.textAlign = 'center'; g.fillText(B.name.toUpperCase(), cx, gy - h + 9); }
+  };
+  section(g, 60, 196, 'Buildings: painted fronts (they cover the tile building; doors stay open)');
+  const kinds = []; for (const B of BUILDINGS) if (!kinds.some(k => k.kind === B.kind && B.kind === 'house')) kinds.push(B);
+  const bw = [330, 380, 380, 470, 330, 330];
+  let x = 60;
+  kinds.slice(0, 6).forEach((B, i) => { const w = bw[i] || 330; slot(x, 220, w, 470, B.name, `${(B.w + 2) * 32 * 2} x ${(B.h + 4) * 32 * 2}`, B.kind === 'inn' ? 'two floors' : '', facade(B)); x += w + 20; });
+  section(g, 60, 756, 'Props');
+  const fake = { player: { sv: {} }, world: { col: () => ({ h: 0 }) }, time: 1 };
+  const T0 = new Towns(fake);
+  const props = [['waystone', 'Waystone', '128 x 256', 'glows when you travel'], ['well', 'Well', '160 x 192', ''], ['board', 'Notice board', '160 x 160', 'bounty papers'], ['stall', 'Market stall', '192 x 192', 'awning, crates'], ['lamp', 'Lamp post', '96 x 256', 'lit at night'], ['gate', 'Town gate banner', '96 x 160', 'per biome colour'], ['yard', 'Training yard', '192 x 192', 'target, rift sign']];
+  props.forEach(([k, n, sz, note], i) => slot(60 + i * 326, 780, 306, 340, n, sz, note, (cx, gy) => { g.save(); g.translate(cx, gy); g.scale(1.7, 1.7); T0.drawProp(g, k, 0, k === 'gate' ? 150 : 0, 1, { bi: 0 }); g.restore(); }));
+  section(g, 60, 1186, 'Tiles (seamless 64 x 64)');
+  const tile = (col, lines) => (cx, gy) => { const s = 150; g.fillStyle = col; g.fillRect(cx - s / 2, gy - s, s, s); g.strokeStyle = 'rgba(0,0,0,.25)'; g.lineWidth = 2; lines(cx - s / 2, gy - s, s); };
+  slot(60, 1210, 360, 290, 'Roof tiles', '64 x 64', 'clay shingles', tile('#8a4a3c', (x0, y0, s) => { for (let r = 0; r < 5; r++) for (let c = 0; c < 5; c++) { g.beginPath(); g.arc(x0 + c * 30 + (r % 2) * 15 + 15, y0 + r * 30 + 30, 15, Math.PI, 0); g.stroke(); } }));
+  slot(440, 1210, 360, 290, 'Cobbled street', '64 x 64', 'worn stones', tile('#8d857b', (x0, y0, s) => { for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++) { g.beginPath(); g.roundRect(x0 + c * 37 + (r % 2) * 18 + 3, y0 + r * 37 + 3, 31, 31, 8); g.stroke(); } }));
+  slot(820, 1210, 360, 290, 'Timber beam', '64 x 64', 'dark frame wood', tile('#5e4330', (x0, y0, s) => { for (let i = 0; i < 6; i++) { g.beginPath(); g.moveTo(x0, y0 + i * 25 + 12); g.lineTo(x0 + s, y0 + i * 25 + 8); g.stroke(); } }));
+  slot(1200, 1210, 360, 290, 'Plaster wall', '64 x 64', 'back wall inside houses', tile('#d9d0c2', () => {}));
+  slot(1580, 1210, 360, 290, 'Lit window', '64 x 64', 'warm glass, two variants', tile('#ffd08a', (x0, y0, s) => { g.strokeStyle = '#5e4330'; g.lineWidth = 8; g.strokeRect(x0 + 4, y0 + 4, s - 8, s - 8); g.beginPath(); g.moveTo(x0 + s / 2, y0); g.lineTo(x0 + s / 2, y0 + s); g.moveTo(x0, y0 + s / 2); g.lineTo(x0 + s, y0 + s / 2); g.stroke(); }));
+  slot(1960, 1210, 380, 290, 'Shop signs', '128 x 64 each', 'anvil, bag, needle, flask, bed', (cx, gy) => { ['ANVIL', 'BAG', 'NEEDLE', 'FLASK', 'BED'].forEach((t, i) => { g.fillStyle = '#6b4a32'; g.beginPath(); g.roundRect(cx - 170 + i * 70, gy - 120 + (i % 2) * 40, 60, 30, 4); g.fill(); g.fillStyle = '#e9d9b8'; g.font = '600 10px Manrope'; g.textAlign = 'center'; g.fillText(t, cx - 140 + i * 70, gy - 100 + (i % 2) * 40); }); });
+  section(g, 60, 1566, 'Townsfolk (front view, 3/4 is fine) and shop icons');
+  const folk = [['Merchant', 'wanderer'], ['Smith', 'smith'], ['Tailor', 'tailor'], ['Alchemist', 'sage'], ['Innkeeper', 'wanderer'], ['Child', 'tailor']];
+  folk.forEach(([n, k], i) => slot(60 + i * 250, 1590, 230, 340, n, '256 x 384', '', (cx, gy) => drawFigure(g, cx, gy - 10, Object.assign({}, LOOKS[k]), i === 5 ? 1.5 : 2.1, { st: { mode: 'ground' }, ticks: 30 }, { blade: false })));
+  slot(1580, 1590, 760, 340, 'Shop UI icons', '96 x 96 each', 'buy, sell, temper, rest, travel, bounty', (cx, gy) => { ['BUY', 'SELL', 'TEMPER', 'REST', 'TRAVEL', 'BOUNTY'].forEach((t, i) => { const x = cx - 300 + i * 120, y = gy - 120; g.strokeStyle = 'rgba(255,240,220,.45)'; g.lineWidth = 2; g.beginPath(); g.arc(x, y, 42, 0, TAU); g.stroke(); g.fillStyle = 'rgba(243,236,224,.6)'; g.font = '600 11px Manrope'; g.textAlign = 'center'; g.fillText(t, x, y + 4); }); });
+}
+
 setBase('../assets/');
 const loadImg = (src) => new Promise(r => { const i = new Image(); i.onload = () => r(i); i.onerror = () => r(null); i.src = src; });
 Promise.all(['meadow', 'glass', 'hollow', 'ember', 'frost', 'shrine'].map(id => loadImg('../art/sheets/scenes/' + id + '.png').then(i => [id, i])))
@@ -277,5 +329,6 @@ Promise.all(['meadow', 'glass', 'hollow', 'ember', 'frost', 'shrine'].map(id => 
   try { maps(); } catch (e) { console.error('maps', e.stack); }
   try { assets(); } catch (e) { console.error('assets', e.stack); }
   try { requests(); } catch (e) { console.error('requests', e.stack); }
+  try { towns(); } catch (e) { console.error('towns', e.stack); }
   window.__sheetsDone = true;
 });

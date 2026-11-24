@@ -491,7 +491,7 @@ export class Player {
   }
   strike(e, hx, hy, dirx, diry, mult, kind, o = {}) {
     const g = this.game, a = this.actor, W = o.W || weaponOf(this.sv), step = o.step || {};
-    let dmg = Math.round(W.dmg * (1 + this.sv.lvl.blade * 0.35) * mult * (g.levels ? g.levels.dmgMult() : 1) * (this.perk('keen_edge') ? 1.15 : 1) * (this.temp && this.temp.fury ? 1.25 : 1));
+    let dmg = Math.round(W.dmg * (1 + this.sv.lvl.blade * 0.35) * mult * (g.levels ? g.levels.dmgMult() : 1) * (this.perk('keen_edge') ? 1.15 : 1) * (this.temp && this.temp.fury ? 1.25 : 1) * (1 + 0.12 * ((this.sv.wlvl && this.sv.wlvl[weaponId(this.sv)]) || 0)));
     // finishers: a staggered or nearly-undone Hollow, a countered one, or now and then a chain ender
     const low = e.hp !== undefined && e.maxHp && e.hp - dmg <= e.maxHp * 0.2;
     const fin = kind !== 'surge' && kind !== 'plunge' && !e.isBoss && (e.staggered || this.counterT > 0 || (low && Math.random() < 0.55) || (step.ender && Math.random() < 0.3));
@@ -541,6 +541,7 @@ export class Player {
     }
     if (g.surges) g.surges.onKill && g.surges.onKill(e);
     if (g.rift && g.rift.active) g.rift.onKill(e);
+    if (g.towns) g.towns.onKill(e);
   }
   perk(id) {
     const T = this.temp;   // Rift Trials boons count for the run

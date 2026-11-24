@@ -45,6 +45,7 @@ function texName(t, id) {
     case T.BRICK: return 'build_brick';
     case T.RUIN: case T.GATE: return 'build_stone';
     case T.MARBLE: return 'build_plaster';
+    case T.ROAD: return 'build_stone';
     case T.OBSIDIAN: return 'build_obsidian';
     case T.LOG: return id + '_bark';
     case T.LEAVES: return id + '_foliage';
@@ -90,6 +91,9 @@ function matOf(t, p) {
     case T.BRICK: return ['brick', '#8f8a96'];
     case T.RUIN: case T.GATE: return ['ruin', t === T.GATE ? '#4a4652' : '#a39d93'];
     case T.MARBLE: return ['marble', '#e9e4dc'];
+    case T.ROAD: return ['ruin', '#8d857b'];
+    case T.ROOF: return ['brick', '#8a4a3c'];
+    case T.TIMBER: return ['plank', '#5e4330'];
     case T.OBSIDIAN: return ['obsidian', '#2a2440'];
     case T.EMBER: return ['ember', '#ff7a3a'];
     case T.CRYSTAL: return ['deep', mix(p.stone, '#000000', 0.15)];

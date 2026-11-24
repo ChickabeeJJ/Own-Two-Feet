@@ -9,6 +9,8 @@ export const T = {
   GOLD: 17, HEARTH: 18, RUIN: 19, GATE: 20, SHROOM: 21, CAP: 22, MARBLE: 23, OBSIDIAN: 24,
   // crafted building parts and stations
   LADDER: 25, PLATFORM: 26, TORCH: 27, DOOR: 28, DOOR_OPEN: 29, STEP: 30, STORE: 31, BENCH: 32, FORGE: 33, LOOM: 34,
+  // towns
+  ROAD: 35, ROOF: 36, TIMBER: 37,
 };
 
 // k: key colour role resolved per biome ('dirt','stone','deep','grass','leaf') or a fixed hex
@@ -51,6 +53,9 @@ TILES[T.STORE] = D({ name: 'Storage Chest', k: '#8a6440', solid: false, opaque: 
 TILES[T.BENCH] = D({ name: 'Workbench', k: '#9b7653', solid: false, opaque: false, hard: 0.5, natural: false, station: 'bench' });
 TILES[T.FORGE] = D({ name: 'Forge', k: '#6e6670', solid: false, opaque: false, hard: 0.8, natural: false, station: 'forge', light: [1.0, 0.5, 0.22] });
 TILES[T.LOOM] = D({ name: 'Loom', k: '#b08a62', solid: false, opaque: false, hard: 0.5, natural: false, station: 'loom' });
+TILES[T.ROAD] = D({ name: 'Cobbles', k: '#8d857b', hard: 1.0, natural: false });
+TILES[T.ROOF] = D({ name: 'Roof Tiles', k: '#8a4a3c', hard: 0.7, natural: false });
+TILES[T.TIMBER] = D({ name: 'Timber Beam', k: '#5e4330', hard: 0.8, natural: false });
 
 export const isSolid = t => TILES[t].solid;
 export const isOpaque = t => TILES[t].opaque;
@@ -111,4 +116,12 @@ export function gateNear(tx) {
 }
 export function biomeOf(bi) { return BIOMES[((bi % 5) + 5) % 5]; }
 // how far (in biomes) from the start: 0 for the first biome either side
+// one town per biome, 110 tiles in from the side you arrive from (the first one just left of the start)
+export const TOWN_HALF = 52;
+export function townCenter(bi) { return bi >= 0 ? bi * BIOME_W - 110 : bi * BIOME_W + 110; }
+export function townNear(tx, pad = 18) {
+  const bi = biomeIndexAt(tx);
+  for (const b of [bi - 1, bi, bi + 1]) { const cx = townCenter(b); if (Math.abs(tx - cx) <= TOWN_HALF + pad) return { bi: b, cx }; }
+  return null;
+}
 export function tierOf(bi) { return bi >= 0 ? bi : -bi - 1; }

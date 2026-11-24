@@ -49,7 +49,7 @@ page.on('console', m => { if (m.type() === 'error') errs.push(m.text()); });
 await page.goto(`http://localhost:${port}/tools/sheets.html`);
 await page.waitForFunction(() => window.__sheetsDone, null, { timeout: 60000 });
 const only = process.argv[2];
-for (const id of ['characters', 'maps', 'assets', 'requests']) {
+for (const id of ['characters', 'maps', 'assets', 'requests', 'towns']) {
   if (only && only !== id) continue;
   const el = await page.$('#' + id);
   await el.screenshot({ path: path.join(outDir, id + '.png') });

@@ -1,6 +1,7 @@
 // Endless seeded tile world: generation, chunk storage, edits, queries.
-import { TILE, CH, T, TILES, BIOME_W, SHRINE_EVERY, biomeIndexAt, biomeLocal, biomeOf, tierOf, gateNear } from './tiles.js';
+import { TILE, CH, T, TILES, BIOME_W, SHRINE_EVERY, biomeIndexAt, biomeLocal, biomeOf, tierOf, gateNear, townNear, TOWN_HALF } from './tiles.js';
 import { fbm1, fbm2, noise2, hash2, clamp, lerp, smooth } from '../core/util.js';
+import { stampTownTiles } from './townplan.js';
 export { gateNear };
 
 const SPAWN_L = -14, SPAWN_R = 26;
@@ -55,6 +56,12 @@ export class World {
       const db = Math.abs(tx - 12);
       if (db <= 4) h = lerp(h, base + Math.sin(12 * 0.21) * 0.8, db <= 2 ? 1 : 0.5);
     }
+    // towns stand on level ground (blended in over 18 tiles at both ends)
+    const tn = townNear(tx);
+    if (tn) {
+      const base = Math.round(this.rawHeight(tn.cx)), d = Math.abs(tx - tn.cx);
+      h = lerp(h, base, d <= TOWN_HALF ? 1 : smooth(1 - (d - TOWN_HALF) / 18));
+    }
     const bi = biomeIndexAt(tx);
     // boss arena on the biome boundary
     const gx = gateNear(tx).gx;
@@ -86,6 +93,7 @@ export class World {
     if (Math.abs(tx - sx) > 14) return null;
     if (Math.abs(sx - gateNear(sx).gx) < 50) return null;
     if (sx > SPAWN_L - 30 && sx < SPAWN_R + 30) return null;
+    if (townNear(sx, 12)) return null;     // a town has an inn instead
     return sx;
   }
   shrinesBetween(a, b) {
@@ -102,6 +110,7 @@ export class World {
     const c = this.col(tx);
     if (c.arena || c.shrine !== null) return null;
     if (tx > -4 && tx < 12) return null;
+    if (townNear(tx, 6)) return null;
     if (this.mouthAt(tx, c.h, c.h) || this.mouthAt(tx, c.h + 1, c.h)) return null;
     const B = biomeOf(c.bi);
     if (hash2(tx, 7, this.seed) > B.trees) return null;
@@ -175,6 +184,7 @@ export class World {
   // a sloping tunnel from the surface every ~45-90 tiles, and now and then a narrow ravine
   mouthAt(tx, ty, h) {
     if (tx > SPAWN_L - 16 && tx < SPAWN_R + 16) return false;
+    if (townNear(tx, 24)) return false;
     const s = this.seed, STEP = 67;
     const k = Math.round(tx / STEP);
     for (const kk of [k - 1, k, k + 1]) {
@@ -234,7 +244,7 @@ export class World {
     // boss gate arches on both arena edges
     {
       const gx = gateNear(x0 + CH / 2).gx;
-      if (gx < x0 - 50 || gx > x0 + CH + 50) return this.stampShrines(x0, y0, put, wall);
+      if (gx < x0 - 50 || gx > x0 + CH + 50) { this.stampShrines(x0, y0, put, wall); this.stampTown(x0, y0, put, wall); return; }
       const gy = this.col(gx).h;
       for (const side of [-1, 1]) {
         const px = gx + side * (ARENA_HALF + 2);
@@ -250,6 +260,15 @@ export class World {
       }
     }
     this.stampShrines(x0, y0, put, wall);
+    this.stampTown(x0, y0, put, wall);
+  }
+  // a town's buildings, street and gates (see js/world/townplan.js)
+  stampTown(x0, y0, put, wall) {
+    const tn = townNear(x0 + CH / 2, 60);
+    if (!tn) return;
+    const base = this.col(tn.cx).h;
+    if (y0 > base + 2 || y0 + CH < base - 14) return;
+    stampTownTiles(tn.cx, base, put, wall);
   }
   stampShrines(x0, y0, put, wall) {
     // shrines: a little stone dais with a lantern post

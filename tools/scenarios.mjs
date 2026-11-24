@@ -492,6 +492,36 @@ export default ({ page, sleep, key, shot, evalg }) => ({
     await shot('guide-1-parry');
     console.log('guide', JSON.stringify({ a, b, c }));
   },
+  // a town: arrive, look around, trade, rest, take a bounty, temper the blade, travel by waystone
+  async town() {
+    await sleep(900);
+    await evalg(() => { const g = window.__game, W = g.world, p = g.player; g.story.skipBirth(); g.story.skipTutorial(); g.enemies.calm = 999; g.surges.next = 999;
+      p.respawnAt(-110 * 32, W.surface(-110) * 32); g.save.glimmer = 500; p.give(17, 10); p.give(8, 10); });
+    await sleep(2500); await shot('town-0-first');
+    await evalg(() => { const g = window.__game, W = g.world, p = g.player; p.respawnAt(326 * 32, W.surface(326) * 32); g.cam.zoomT = 0.8; });
+    await sleep(2800); await shot('town-1-wide');
+    const r = await evalg(async () => { const g = window.__game, T = g.towns, sv = g.save, wait = ms => new Promise(r => setTimeout(r, ms));
+      const tn = T.townAt(g.player.x);
+      const its = T.interactables().map(i => i.verb);
+      T.store(tn); await wait(300); const shopOpen = !!g.ui.modal; g.ui.closeDialog && g.ui.closeDialog(); g.ui.modal = null; document.querySelector('#shop') && document.querySelector('#shop').classList.add('hidden');
+      T.inn(tn); const rested = g.player.wellRested > 0;
+      T.board(tn); await wait(1600); const opts = [...document.querySelectorAll('#dialog .opts button')].map(b => b.textContent);
+      document.querySelector('#dialog .opts button') && document.querySelector('#dialog .opts button').click(); await wait(300);
+      const bounty = sv.bounty && sv.bounty.kind;
+      g.ui.closeDialog && g.ui.closeDialog();
+      T.smith(tn); await wait(1600); const sOpts = [...document.querySelectorAll('#dialog .opts button')].map(b => b.textContent);
+      document.querySelector('#dialog .opts button') && document.querySelector('#dialog .opts button').click(); await wait(300);
+      const wl = sv.wlvl; g.ui.closeDialog && g.ui.closeDialog();
+      const visited = Object.keys(sv.towns || {});
+      return { name: tn && T.name(tn.bi), its, shopOpen, rested, opts, bounty, sOpts, wl, visited, folk: [...T.folk.values()].map(l => l.length) };
+    });
+    console.log('town', JSON.stringify(r));
+    await evalg(() => { const g = window.__game; g.towns.waystone(g.towns.townAt(g.player.x)); }); await sleep(500); await shot('town-2-waystone');
+    await evalg(() => { const b = [...document.querySelectorAll('#dialog .opts button')].find(b => /Travel/.test(b.textContent)); b && b.click(); }); await sleep(1500);
+    const where = await evalg(() => Math.round(window.__game.player.x / 32));
+    console.log('travelled to', where);
+    await evalg(() => { const g = window.__game, p = g.player; g.cam.zoomT = 1.2; }); await sleep(1500); await shot('town-3-street');
+  },
   async looks() {
     await sleep(900);
     await evalg(() => { const g = window.__game, W = g.world, p = g.player; g.story.skipBirth(); g.enemies.calm = 999; g.save.tutDone = 1; g.story.tutI = 9; g.cam.zoomT = 1.3; p.respawnAt(7 * 32, W.surface(7) * 32); });

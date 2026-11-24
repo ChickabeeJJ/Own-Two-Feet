@@ -119,6 +119,7 @@ export class Surges {
     this.chests.push({ x: s.x, y: s.y, open: false, t: 0, fade: 1, tier: s.tier, swift, lvl: s.lvl });
     this.sv.stats.surges = (this.sv.stats.surges || 0) + 1;
     if (g.guide) g.guide.ev('surge');
+    if (g.towns) g.towns.onSurge();
     if (g.quests && g.quests.counters) g.quests.counters.surges = (g.quests.counters.surges || 0) + 1;
     this.s = null;
     if (g.ui && g.ui.surgeHud) g.ui.surgeHud(null);

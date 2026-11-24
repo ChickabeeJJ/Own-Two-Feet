@@ -7,7 +7,7 @@
 import { Audio } from '../core/audio.js';
 import { Actor } from './actor.js';
 import { P } from '../physics/body.js';
-import { TILE, T, TILES, gateNear, BIOME_W } from '../world/tiles.js';
+import { TILE, T, TILES, gateNear, BIOME_W, townNear } from '../world/tiles.js';
 import { ARENA_HALF } from '../world/world.js';
 import { hash2, rand, clamp, lerp, sign, TAU, rgba } from '../core/util.js';
 import { drawGlow } from '../world/light.js';
@@ -50,6 +50,7 @@ export class Content {
     const g = gateNear(x);
     if (Math.abs(x - g.gx) < ARENA_HALF + 12) return false;
     if (W.shrineNear(x) !== null) return false;
+    if (townNear(x, 14)) return false;
     if (W.mouthAt && (W.mouthAt(x, W.surface(x), W.surface(x)) || W.mouthAt(x, W.surface(x) + 1, W.surface(x)))) return false;
     return true;
   }
