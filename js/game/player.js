@@ -401,6 +401,8 @@ export class Player {
       if (a.attack && a.attack.kind !== 'mine') { if (a.attack.t > 0.35) this.queued = true; }
       else if (a.attackCD <= 0) this.lightAttack(W, wp);
     }
+    // a queued swing flows out of the recovery once it reaches its cancel point
+    if (a.attack && this.queued && a.attack.step && a.attack.step.cancelAt && a.attack.t >= a.attack.step.cancelAt) { a.attack = null; a.attackCD = 0; }
     if (!a.attack && this.queued && a.attackCD <= 0) { this.queued = false; this.lightAttack(W, wp); }
     this.activeHits(dt);
   }
@@ -417,11 +419,14 @@ export class Player {
     if (kind === 'down' && this.sv.abil.plunge && Input.axis.y > 0.5) { this.plunge(); return; }
     let step;
     if (kind) step = { k: kind, dur: 0.3, launch: kind === 'up' && !air };
+    // the blade on the run: a lunging slash; in the air: a downward cut
+    else if (W === WEAPONS.w_blade && !air && Math.abs(a.c.vx) > 220) { step = { k: 'ssRun', dur: 0.42, hitT: [0.24, 0.58], mult: 1.3, run: true }; this.chainI = 1; }
+    else if (W === WEAPONS.w_blade && air) step = { k: 'ssAir', dur: 0.38, hitT: [0.26, 0.6], mult: 1.2 };
     else { step = W.chain[(this.chainI || 0) % W.chain.length]; this.chainI = (this.chainI || 0) + 1; }
     // now and then a blade or the daggers lunge and stab instead: often when a foe stands just out of reach,
     // sometimes as the second blow of a chain
     let lunge = false;
-    if (!kind && !air && (W === WEAPONS.w_blade || W === WEAPONS.w_daggers) && !step.ender) {
+    if (!kind && !air && W === WEAPONS.w_daggers && !step.ender) {
       let gap = false;
       for (const e of this.game.targets()) { if (e.team !== 'enemy' || e.mode === 'dead') continue; const dx = (e.cx ?? e.c.x) - a.c.x; if (Math.sign(dx) === a.facing && Math.abs(dx) > 70 && Math.abs(dx) < 150 && Math.abs((e.cy ?? e.c.y) - a.c.y) < 80) { gap = true; break; } }
       lunge = gap ? Math.random() < 0.55 : (this.chainI === 2 && Math.random() < 0.25);
@@ -479,7 +484,8 @@ export class Player {
     const seg = a.bladeSeg(1);
     const prev = a.prevBlade || seg;
     a.prevBlade = seg;
-    const active = at.t > 0.16 && at.t < 0.7;
+    const [h0, h1] = step.hitT || [0.16, 0.7];
+    const active = at.t > h0 && at.t < h1;
     if (!active) return;
     // multi-hit moves open fresh hit windows
     if (step.multi) { const win = Math.floor(at.t * step.multi); if (win !== at.win) { at.win = win; at.hits.clear(); } }

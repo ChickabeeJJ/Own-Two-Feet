@@ -779,7 +779,7 @@ export default ({ page, sleep, key, shot, evalg }) => ({
   },
   async lunge() {
     await sleep(1200);
-    await evalg(() => { const g = window.__game; g.story.skipBirth(); if (g.story.skipTutorial) g.story.skipTutorial(); g.save.hasBlade = true; g.player.actor.blade = true; g.enemies.calm = 999; });
+    await evalg(() => { const g = window.__game; g.story.skipBirth(); if (g.story.skipTutorial) g.story.skipTutorial(); g.save.hasBlade = true; g.player.actor.blade = true; g.enemies.calm = 999; g.player.give('w_daggers', 1); g.player.sv.equip.weapon = 'w_daggers'; g.player.refreshLook(); });
     await sleep(2500);
     const r = await evalg(() => { const g = window.__game, p = g.player, a = p.actor; for (const e of g.actors) if (e.team === 'enemy') e.removed = true;
       a.face(1); const e = g.enemies.spawn('husk', a.c.x + 120, a.c.y, 0); e.ai.cd = 99; e.hp = e.maxHp = 400; window.__lx = a.c.x;

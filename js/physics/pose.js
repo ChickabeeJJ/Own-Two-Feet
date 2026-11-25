@@ -26,6 +26,17 @@ const ATK = {
   // blade and daggers, now and then: the lunge-stab. Elbow cocked hard back at the hip, then the whole arm
   // drives out straight and level as the body drops into the lunge, held a beat, then recovers
   lungestab: [[0, 1.0, 0.4, -0.4], [0.24, 2.05, 1.25, -1.1], [0.4, -0.06, -0.1, 0], [0.72, -0.04, -0.08, 0], [1, 0.9, 0.3, -0.3]],
+  // the blade, souls style: each swing has a clear wind-up (the blade cocked back and held), a fast committed
+  // arc through the target, follow-through past it and a readable recovery. Light chain: a downward diagonal
+  // from over the shoulder, a rising backhand, a straight thrust from the hip, a big committed finisher.
+  ss1: [[0, 1.2, 0.5, 0.2], [0.18, -1.7, -2.4, -0.9], [0.3, -2.0, -2.65, -1.05], [0.42, -0.6, -0.5, 0.3], [0.55, 0.6, 0.5, 0.7], [0.7, 1.35, 0.9, 1.1], [0.86, 1.3, 0.8, 0.8], [1, 1.2, 0.5, 0.25]],
+  ss2: [[0, 1.25, 0.6, 0.6], [0.18, 1.6, 1.15, 1.3], [0.28, 1.75, 1.3, 1.45], [0.42, 0.3, -0.1, -0.2], [0.52, -0.5, -0.8, -0.45], [0.66, -1.25, -1.65, -0.6], [0.84, -0.95, -1.35, -0.4], [1, 0.9, 0.3, -0.2]],
+  ss3: [[0, 1.0, 0.4, -0.3], [0.2, 1.75, 0.9, -0.85], [0.3, 1.9, 1.0, -0.95], [0.44, 0.06, 0.0, 0], [0.7, 0.03, -0.02, 0], [0.86, 0.5, 0.15, -0.1], [1, 0.95, 0.35, -0.3]],
+  ss4: [[0, 1.0, 0.4, 0.1], [0.24, -1.95, -2.7, -1.0], [0.36, -2.25, -2.95, -1.12], [0.48, -0.35, -0.45, 0.35], [0.58, 0.9, 0.8, 0.9], [0.74, 1.6, 1.1, 1.2], [0.92, 1.5, 1.0, 1.0], [1, 1.25, 0.5, 0.3]],
+  // the heavy: a two-handed overhead brought straight down; a running slash; a jumping downward cut
+  ssHeavy: [[0, 1.0, 0.5, 0.2], [0.3, -2.1, -2.45, -0.35], [0.42, -2.3, -2.6, -0.4], [0.56, 0.1, 0.2, 0.35], [0.7, 1.15, 1.1, 0.5], [0.88, 1.1, 0.9, 0.35], [1, 1.0, 0.6, 0.2]],
+  ssRun: [[0, 1.4, 0.9, 1.0], [0.2, 1.65, 1.05, 1.25], [0.38, -0.1, -0.25, -0.25], [0.52, -0.9, -1.2, -0.45], [0.8, -0.5, -0.8, -0.3], [1, 0.9, 0.3, -0.2]],
+  ssAir: [[0, -1.2, -1.8, -0.6], [0.24, -2.0, -2.7, -0.85], [0.44, 0.6, 0.7, 0.6], [0.6, 1.4, 1.2, 0.6], [1, 1.2, 0.8, 0.3]],
   // hammer: hauled over the head, brought down with the whole body; a rising swing
   hsmash: [[0, 1.0, 0.4, 0], [0.38, -2.1, -2.85, -0.5], [0.58, 0.6, 0.5, 0.6], [0.75, 1.2, 1.1, 0.5], [1, 1.0, 0.8, 0.2]],
   hsmash2: [[0, 1.2, 0.8, 0.6], [0.35, 1.9, 1.2, 1.2], [0.58, -1.0, -1.4, -0.4], [0.75, -1.5, -2.0, -0.5], [1, -0.4, -0.8, 0]],
@@ -40,6 +51,8 @@ const ATK = {
 };
 // back-arm keyframes for weapons held in both hands (daggers)
 const ATKB = {
+  // both hands on the hilt for the heavy overhead
+  ssHeavy: [[0, 1.4, 1.0], [0.3, -1.95, -2.2], [0.42, -2.15, -2.4], [0.56, 0.2, 0.3], [0.7, 1.05, 1.0], [0.88, 1.0, 0.85], [1, 1.4, 1.0]],
   dag1: [[0, 1.6, 1.0], [0.3, 1.9, 1.5], [1, 1.6, 1.0]],
   dag2: [[0, 1.9, 1.5], [0.3, 0.1, -0.1], [0.6, 0.0, -0.2], [1, 1.5, 1.0]],
   flurry: [[0, 0.7, 0.9], [0.18, -1.4, -1.9], [0.36, 0.7, 0.9], [0.54, -1.3, -1.8], [0.72, 0.8, 1.0], [0.9, -1.0, -1.4], [1, 1.5, 1.0]],
@@ -384,10 +397,12 @@ export class Animator {
       armF = armF ? [lerp(armF[0], ua, w), lerp(armF[1], fa, w)] : [ua, fa];
       wristT = wr * w;
       // the body winds back with the arm, then drives forward through the strike (smooth curves, no snap)
-      const wind = smooth(clamp(a.t / 0.18, 0, 1)) * (1 - smooth(clamp((a.t - 0.2) / 0.14, 0, 1)));
-      const drive = smooth(clamp((a.t - 0.22) / 0.16, 0, 1)) * (1 - smooth(clamp((a.t - 0.6) / 0.3, 0, 1)));
+      // souls swings hold their wind-up longer (to about a third of the swing) before the drive
+      const we = a.kind.startsWith('ss') ? (a.kind === 'ssHeavy' ? 0.42 : 0.3) : 0.18;
+      const wind = smooth(clamp(a.t / we, 0, 1)) * (1 - smooth(clamp((a.t - we - 0.02) / 0.14, 0, 1)));
+      const drive = smooth(clamp((a.t - we - 0.04) / 0.16, 0, 1)) * (1 - smooth(clamp((a.t - 0.66) / 0.3, 0, 1)));
       const base = a.kind === 'up' ? -0.1 : a.kind === 'down' ? 0.25 : a.kind === 'mine' ? 0.3 : 0.24;
-      const lean = { sweep: 0.35, cleave: -0.15, lunge: 0.45, lungestab: 0.6, hsmash: 0.4, slam: 0.45, thrust: 0.3, thrust2: 0.2, flurry: 0.15 }[a.kind] || 0;
+      const lean = { ss1: 0.32, ss2: 0.18, ss3: 0.38, ss4: 0.5, ssHeavy: 0.5, ssRun: 0.42, ssAir: 0.2, sweep: 0.35, cleave: -0.15, lunge: 0.45, lungestab: 0.6, hsmash: 0.4, slam: 0.45, thrust: 0.3, thrust2: 0.2, flurry: 0.15 }[a.kind] || 0;
       torso += (-0.16 * wind + (base + lean) * drive) * w;
       // the free arm counter-swings: reaches forward for balance on the wind-up, flings back through the strike
       if (ATKB[a.kind]) { const [ub, fb] = keyArm(a.kind, a.t, ATKB); armB = [ub, fb]; }

@@ -5,10 +5,12 @@ import { T } from '../world/tiles.js';
 
 export const WEAPONS = {
   w_blade: {
-    name: 'Blade', desc: 'Balanced cuts. Three-step chain, a rising cleave when charged.',
+    name: 'Blade', desc: 'Committed cuts: a falling diagonal, a rising backhand, a thrust and a heavy finisher; a two-handed overhead when charged.',
     len: 30, dmg: 10, poise: 10, knock: 1, speed: 1, mine: 1,
-    chain: [{ k: 'side', dur: 0.28 }, { k: 'side2', dur: 0.28 }, { k: 'sweep', dur: 0.42, mult: 1.5, ender: true }],
-    heavy: { k: 'cleave', dur: 0.5, mult: 2.4, poise: 3 },
+    // hitT: the window the edge is live; cancelAt: from here the recovery can flow into the next swing
+    chain: [{ k: 'ss1', dur: 0.4, hitT: [0.34, 0.66], cancelAt: 0.78 }, { k: 'ss2', dur: 0.38, hitT: [0.32, 0.64], cancelAt: 0.78 },
+      { k: 'ss3', dur: 0.36, hitT: [0.34, 0.62], cancelAt: 0.76, mult: 1.15 }, { k: 'ss4', dur: 0.52, hitT: [0.38, 0.7], mult: 1.6, ender: true }],
+    heavy: { k: 'ssHeavy', dur: 0.66, hitT: [0.46, 0.74], mult: 2.4, poise: 3 },
   },
   w_spear: {
     name: 'Spear', desc: 'Long reach. Quick thrusts, a wide sweep, a lunging charge.',
