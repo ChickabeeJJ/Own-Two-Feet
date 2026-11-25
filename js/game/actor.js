@@ -113,8 +113,9 @@ export class Actor {
           }
         }
         if (c.x === nx) continue;
-        // crawling: the body spans two columns, so slide fully onto the step in one go
-        if (this.crawling && c.ground) {
+        // no room to rise in place (a ceiling over where you stand, or crawling: the body spans two columns):
+        // slide fully onto the step in one go when there is room standing on it
+        if (c.ground) {
           const dir = Math.sign(sdx), ftx = Math.floor((nx + dir * c.w / 2) / TILE), ty = c.y - TILE - 1;
           const xs = dir > 0 ? ftx * TILE + c.w / 2 + 0.5 : (ftx + 1) * TILE - c.w / 2 - 0.5;
           if (Math.abs(xs - c.x) < c.w + 4 && this.boxFree(xs, ty)) {
@@ -239,8 +240,16 @@ export class Actor {
     c.dashCD -= dt;
     if (c.ground) { c.jumps = 0; c.airDash = this.fleet ? 2 : 1; }
     const crouch = false;
-    if (I.crawl && c.ground && !c.climb) this.setCrawl(true);
-    else if (this.crawling && (!I.crawl || !c.ground)) this.setCrawl(false);   // stays down under a ceiling
+    // walking into a gap too low to stand in (an overhang at head height, room below) ducks into a crawl by
+    // itself, and stands again once clear, instead of stopping dead with the legs still going
+    const sc = this.scale, lowAt = (nx, y, w) => this.overlaps(nx - w / 2, y - 82 * sc, nx + w / 2, y - 2) && !this.overlaps(nx - w / 2, y - 28 * sc, nx + w / 2, y - 2);
+    const lowAhead = (d) => { if (!d) return false; const w = c.w, nx = c.x + d * (w / 2 + 8);
+      if (lowAt(nx, c.y, w)) return true;
+      // a one-block step with too little room above it to stand: crawl up onto it
+      return !!this.overlaps(nx - w / 2, c.y - TILE + 2, nx + w / 2, c.y - 2) && lowAt(nx, c.y - TILE, w); };
+    if (I.crawl && c.ground && !c.climb) { this.setCrawl(true); this.autoCrawl = false; }
+    else if (c.ground && !c.climb && !this.crawling && I.mx && lowAhead(sign(I.mx))) { this.setCrawl(true); this.autoCrawl = true; }
+    else if (this.crawling && (!c.ground || (!I.crawl && !(this.autoCrawl && lowAhead(sign(I.mx || this.facing)))))) { if (this.setCrawl(false)) this.autoCrawl = false; }   // stays down under a ceiling
     // dash
     if (I.dash && A.dash && c.dashCD <= 0 && (c.ground || c.airDash > 0)) {
       if (I.mx) this.face(sign(I.mx));

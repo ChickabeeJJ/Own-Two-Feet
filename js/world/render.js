@@ -199,7 +199,8 @@ export class WorldRenderer {
   drawTile(g, tx, ty, t, x, y) {
     const W = this.world, p = paletteAt(tx);
     const d = TILES[t];
-    if (t >= T.LADDER) { drawPart(g, t, x, y, (dx, dy) => W.get(tx + dx, ty + dy)); return; }
+    // building parts (ladder to loom) have their own art; the town tiles and timber blocks after them are blocks
+    if (t >= T.LADDER && t <= T.LOOM) { drawPart(g, t, x, y, (dx, dy) => W.get(tx + dx, ty + dy)); return; }
     const base = tileColor(t, p);
     const h = hash2(tx, ty, 1);
     const sol = (a, b) => { const q = W.get(a, b); return TILES[q].solid && TILES[q].opaque; };
@@ -559,8 +560,8 @@ export function biomeBlendAt(x) {
   const tx = x / TILE;
   const bi = biomeIndexAt(tx), local = biomeLocal(tx);
   const A = biomeOf(bi);
-  // a long, gentle crossfade (90 tiles each side of the border) with an S-curve that has no kinks
-  const edge = 90, ss = (u) => { u = Math.min(1, Math.max(0, u)); return u * u * u * (u * (u * 6 - 15) + 10); };
+  // a long, gentle crossfade (140 tiles each side of the border) with an S-curve that has no kinks
+  const edge = 140, ss = (u) => { u = Math.min(1, Math.max(0, u)); return u * u * u * (u * (u * 6 - 15) + 10); };
   if (local < edge) return { A: biomeOf(bi - 1), B: A, k: ss(0.5 + local / edge / 2), bi };
   if (local > BIOME_W - edge) return { A, B: biomeOf(bi + 1), k: ss((local - (BIOME_W - edge)) / edge / 2), bi };
   return { A, B: A, k: 0, bi };

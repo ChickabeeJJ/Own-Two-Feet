@@ -180,9 +180,11 @@ export class World {
     else if (fg === T.STONE || fg === T.DEEP) {
       const o = hash2(tx, ty, s + 77);
       const vein = noise2(tx * 0.12, ty * 0.12, s + 13);
-      if (vein > 0.5 + Math.max(0, 0.15 - d * 0.004) && o < 0.45) fg = T.CRYSTAL;
-      else if (d > 26 && vein < -0.5 && o < 0.4) fg = T.GOLD;
-      else if (B.id === 'ember' && o < 0.035) fg = T.EMBER;
+      // the rarer the ore, the deeper it lies: soul crystal from 30 down (richer as you go), gilt from 60 down
+      // in thin veins, ember rock from 40 down; shallow stone holds only moss and ice
+      if (d > 30 && vein > 0.62 - Math.min(0.14, (d - 30) * 0.003) && o < 0.45) fg = T.CRYSTAL;
+      else if (d > 60 && vein < -0.58 && o < 0.3) fg = T.GOLD;
+      else if (B.id === 'ember' && d > 40 && o < 0.035) fg = T.EMBER;
       else if (B.id === 'frost' && d < 20 && o < 0.05) fg = T.ICE;
       else if ((B.id === 'meadow' || B.id === 'glass') && noise2(tx * 0.08, ty * 0.08, s + 17) > 0.45) fg = T.MOSS;
     }

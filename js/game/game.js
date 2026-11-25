@@ -136,7 +136,7 @@ export class Game {
     this.projectiles = this.projectiles.filter(p => !p.dead);
     this.fx.update(dt);
     if (this.player) {
-      const bl = biomeBlendAt(this.player.x);
+      const bl = this.easeBlend(biomeBlendAt(this.cam ? this.cam.x : this.player.x), dt);
       this.fx.ambient(dt, this.view, bl.k > 0.5 ? bl.B : bl.A, this.depthK || 0);
       if ((this.tick % 240) === 0) this.world.trim(this.player.x, this.player.y);
     }
@@ -173,6 +173,20 @@ export class Game {
   }
 
   // ------------------------------------------------------------ render
+  // the background never switches: each biome's share eases toward where the camera is over about two
+  // seconds, so crossing a border, travelling or falling into a cave always fades from one sky to the next
+  easeBlend(tgt, dt) {
+    const w = this.blW || (this.blW = new Map()), want = new Map([[tgt.A, 1 - tgt.k]]);
+    want.set(tgt.B, (want.get(tgt.B) || 0) + tgt.k);
+    if (!w.size) for (const [b, v] of want) w.set(b, v);
+    const r = 1 - Math.exp(-dt * 1.5);
+    for (const b of new Set([...w.keys(), ...want.keys()])) w.set(b, (w.get(b) || 0) + ((want.get(b) || 0) - (w.get(b) || 0)) * r);
+    for (const [b, v] of w) if (v < 0.002 && !want.has(b)) w.delete(b);
+    const top = [...w.entries()].sort((a, b) => b[1] - a[1]);
+    const [A, wa] = top[0], [B, wb] = top[1] || [A, 0];
+    this.blShown = { A, B, k: wb / Math.max(1e-6, wa + wb), bi: tgt.bi };
+    return this.blShown;
+  }
   render(a) {
     const PR = window.__prof;
     let pt = PR ? performance.now() : 0;
@@ -184,7 +198,7 @@ export class Game {
     v.scale = scale; v.frame = this.frame;
     v.x0 = c.rx - W / 2 / scale; v.x1 = c.rx + W / 2 / scale;
     v.y0 = c.ry - H / 2 / scale; v.y1 = c.ry + H / 2 / scale;
-    const bl = biomeBlendAt(c.x);
+    const bl = this.blShown || biomeBlendAt(c.x);
     const A = bl.A, B = bl.B, k = bl.k;
     const surf = this.world.surface(Math.floor(c.x / TILE)) * TILE;
     const depth = clamp((c.y - surf - 6 * TILE) / (16 * TILE), 0, 1);

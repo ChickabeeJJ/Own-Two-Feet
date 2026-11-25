@@ -841,6 +841,66 @@ export default ({ page, sleep, key, shot, evalg }) => ({
     console.log('after', JSON.stringify(after));
     if ((before.lit && !(after.lit && after.lit[0])) || !after.surge || after.timber !== 38 || after.off.length) console.log('PROBLEMS: saveall', JSON.stringify(after));
   },
+  // feet: walk and run across real terrain, striking now and then; the doll must keep moving and its feet
+  // stay on the floor (logs any stall where the key is held, nothing blocks the way, and x does not advance)
+  async feet() {
+    await sleep(1200);
+    await evalg(() => { const g = window.__game; g.story.skipBirth(); if (g.story.skipTutorial) g.story.skipTutorial(); g.save.hasBlade = true; g.player.actor.blade = true; g.enemies.calm = 999; });
+    await sleep(2500);
+    const res = await evalg(async () => {
+      const g = window.__game, p = g.player, a = p.actor, b = a.body, W = g.world, I = window.__input; const wait = ms => new Promise(r => setTimeout(r, ms));
+      const P = { FOOT_F: 10, FOOT_B: 13 };
+      const log = [], stalls = []; let lastX = a.c.x, stillT = 0;
+      const plan = [['KeyD', 4000], ['KeyD+J', 3000], ['KeyA', 4000], ['KeyD+Shift', 3000], ['KeyA+J', 3000], ['KeyD', 6000], ['KeyD+Space', 3000], ['KeyA', 6000]];
+      for (const [k, ms] of plan) {
+        I.keys.clear(); const keys = k.split('+').map(x => x === 'J' ? 'KeyJ' : x === 'Shift' ? 'ShiftLeft' : x); for (const kk of keys) I.keys.add(kk);
+        const t0 = performance.now();
+        while (performance.now() - t0 < ms) {
+          await wait(50);
+          if (k.includes('J') && Math.random() < 0.3) { I.keys.delete('KeyJ'); await wait(20); I.keys.add('KeyJ'); }
+          for (const e of g.actors) if (e.team === 'enemy') e.removed = true;
+          const dir = keys.includes('KeyD') ? 1 : -1;
+          const fy = Math.max(b.y[P.FOOT_F], b.y[P.FOOT_B]), gy = W.groundBelow(a.c.x, a.c.y - 40, 200);
+          const wall = W.solidAt(a.c.x + dir * 20, a.c.y - 50) || W.solidAt(a.c.x + dir * 20, a.c.y - 90);
+          if (Math.abs(a.c.x - lastX) < 0.5 && !a.attack && !a.mantle) stillT += 50; else stillT = 0;
+          if (stillT === 400) {
+            const tx = Math.floor(a.c.x / 32), ty = Math.floor((a.c.y - 1) / 32), grid = [];
+            for (let y = ty - 3; y <= ty + 1; y++) { let row = ''; for (let x = tx - 2; x <= tx + 2; x++) row += (x === tx && y === ty) ? '@' : W.get(x, y) ? (W.solid(x, y) ? '#' : '+') : '.'; grid.push(row); }
+            stalls.push({ x: Math.round(a.c.x), y: Math.round(a.c.y), fx: Math.round(a.c.x - tx * 32), k, vx: Math.round(a.c.vx), ground: a.c.ground, wall, mode: a.mode, crawl: a.crawling, grid: grid.join('|') });
+          }
+          if (a.c.ground && gy !== null) log.push(Math.round(fy - gy));
+          lastX = a.c.x;
+        }
+      }
+      I.keys.clear();
+      const off = log.filter(d => d < -16 || d > 14).length;   // the foot point is the ankle (about 4 px up); a run's flight lifts both
+      return { stalls, samples: log.length, offFloor: off, worst: Math.max(...log.map(Math.abs)) };
+    });
+    console.log('feet', JSON.stringify(res));
+    if (res.stalls.filter(st => !st.wall && st.mode === 'ctrl').length || res.offFloor > res.samples * 0.35) console.log('PROBLEMS: feet', JSON.stringify(res));
+  },
+  // filmstrip of walking with strikes, to see the feet
+  async feetfilm() {
+    await sleep(1200);
+    await evalg(() => { const g = window.__game; g.story.skipBirth(); if (g.story.skipTutorial) g.story.skipTutorial(); g.save.hasBlade = true; g.player.actor.blade = true; g.enemies.calm = 999; for (const e of g.actors) if (e.team === 'enemy') e.removed = true; g.cam.zoomT = 1.8; });
+    await sleep(1500);
+    await page.keyboard.down('KeyD');
+    for (let i = 0; i < 30; i++) { if (i % 6 === 2) { await page.keyboard.down('KeyJ'); } if (i % 6 === 3) await page.keyboard.up('KeyJ'); await sleep(70); await shot('film-' + String(i).padStart(2, '0')); }
+    await page.keyboard.up('KeyD');
+  },
+  // every town: stand in front of the inn and look at the street
+  async towns5() {
+    await sleep(1200);
+    await evalg(() => { const g = window.__game; g.story.skipBirth(); if (g.story.skipTutorial) g.story.skipTutorial(); g.save.hasBlade = true; g.player.actor.blade = true; g.enemies.calm = 999; });
+    await sleep(2000);
+    for (const bi of [0, 1, 2, -1, -2]) {
+      const r = await evalg((bi) => { const g = window.__game, p = g.player, W = g.world; const BW = 440; const cx = bi >= 0 ? bi * BW - 110 : bi * BW + 110;
+        p.respawnAt((cx + 6) * 32 + 16, W.floorTy(cx + 6) * 32); g.cam.snap && g.cam.snap(); return cx; }, bi);
+      await sleep(1800);
+      await shot('town5-' + (bi + 2));
+      console.log('town', bi, r);
+    }
+  },
   async persist() {
     await sleep(1200);
     const before = await evalg(() => { const g = window.__game; g.story.skipBirth(); g.save.hasBlade = true; g.player.actor.blade = true; g.enemies.calm = 999;
