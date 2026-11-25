@@ -215,7 +215,8 @@ export class Player {
     if (target && !this.fightNear && !this.buildMode && !g.touchBuild && this.sv.hasBlade !== false) {
       const sel = this.sv.hotbar[this.sv.sel];
       if (ctxMode && target.canMine) strikeAs = 'mine';
-      else if (target.canPlace && placeable(sel) && target.tile === T.AIR) strikeAs = 'place';
+      // placing by Strike only while standing still, so swinging on the run never walls you in
+      else if (target.canPlace && placeable(sel) && target.tile === T.AIR && (this.mouseAim || (Math.abs(a.c.vx) < 40 && !a.intent.mx))) strikeAs = 'place';
     }
     if (strikeAs !== this.strikeAs) { this.strikeAs = strikeAs; g.ui && g.ui.strikeMode && g.ui.strikeMode(strikeAs); }
     // mine: hold left mouse (or Strike in build mode, or Strike facing a block)

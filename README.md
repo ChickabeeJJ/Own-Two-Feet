@@ -31,10 +31,10 @@ Returning players drop straight back where they were. Esc skips the opening.
 | Input | Action |
 | --- | --- |
 | A / D, arrows | Walk |
-| Space, W | Jump. Again in the air once you earn *Second Wind* |
+| Space, W | Jump. Tap again in the air for a double jump |
 | Shift, K | Dash |
 | Hold Ctrl or C | Crawl through one-block gaps |
-| J, left click | Strike: a combo chain per weapon. Hold to charge a heavy attack; strike just as a foe's blow lands to parry. Hold up to launch, down in the air to bounce |
+| J, left click | Strike, and it does what the moment asks: with a foe close it swings; facing a block it mines it (hold); facing open space with a block in hand, standing still, it places it. The touch button reads Strike, Mine or Place. A combo chain per weapon; blade and daggers sometimes lunge and stab. Hold to charge a heavy attack; strike just as a foe's blow lands to parry. Hold up to launch, down in the air to bounce |
 | Hold left click on a block | Break it (only blocks you can see; with an enemy close, a click strikes instead). Strike a trunk a few times and the tree topples for timber |
 | Right click | Place the chosen block: a ghost shows where it goes, red when it can't (with the reason on click). Click a block's face to build onto it, hold and drag to lay a line. Shift places a back wall |
 | 1-9, mouse wheel | Choose what's in hand (blocks, parts, flares, draughts) |
@@ -94,7 +94,7 @@ The game is built to keep you fighting:
 
 - Experience from everything: kills (scaled by the enemy's level and your combo), surges, quests, commissions, puzzles, camps, chests, woken dolls, nests, new towns, wardens. The inn's Well Rested bonus adds half again.
 - **Level up:** a slow-motion ring and a card. Damage grows every level, a vessel every fourth level (up to ten), and every third level you choose one of three **perks**: Keen Edge, Heavy Hand, Swift Strike, Long Reach, Riposte, Iron Seam, Second Thread, Bloodthread, Overdrive, Fleet, Stormstep, Ember Soul, Lodestone, Scholar, Thread Ward.
-- **Zone levels:** the further from the first fire, the stronger the Hollows. Thread warns you when a zone outclasses you. The Character tab in the menu shows your level, experience, damage, vessels, the zone level here, perks to pick and the ones you have. An XP bar sits under the vessels.
+- **Zone levels:** the further from the first fire, the stronger the Hollows. Thread warns you when a zone outclasses you. The Character tab in the menu shows your level, experience, damage, vessels, the zone level here, perks to pick and the ones you have. A thin experience line sits just above the hotbar, the level in a round badge at its left.
 
 ## Towns
 
@@ -112,6 +112,13 @@ One town in every biome, on level ground behind gate arches: the first just left
 Townsfolk walk the street and talk, and shopkeepers turn to you. Hollows never come in. All of it is drawn in code as a placeholder until painted art arrives: every building and prop checks for `assets/town/<name>.png` first. `art/sheets/towns.png` is the rough sheet of what to paint, with sizes.
 
 ## The guide
+
+Modelled on how big open-world games keep players oriented (first-time tutorial cards kept in an archive, a companion who explains, a tracked goal with an on-screen marker, clear gating messages):
+
+- **Teaching cards** (`js/ui/teach.js`): the first time Threads of Light, sealed gates, the way-marker, surges, towns, perks and crafting matter, a card with a drawn picture, a title and two lines pauses the game. The menu's **Guide** tab keeps every card you've seen.
+- **Threads made obvious:** the goal reads "Threads of Light 3/10 · they open the gate" and names the nearest source and its distance; a sealed gate says exactly what it needs and what you carry.
+- **Compass strip:** a thin strip across the top shows the gate, the nearest Thread of Light, the tracked quest, the nearest shrine and town, each with its distance.
+- **Always a next step:** the diamond marker (and its screen-edge arrow) always has a target: the tracked quest, else the story goal, else the nearest Thread of Light.
 
 The tutorial teaches the basics, then lets go gradually instead of stopping:
 
@@ -195,7 +202,11 @@ The painted art comes from hand-made reference sheets, cut up by `tools/extract_
 
 In the world, sheet sprites are colour graded per biome (`gradedImg` in `js/art/images.js`) so they sit in its light. - `assets/req/`: the hand-painted request sheet, cut the same way: cave mouth, Hollow nest, satchel, ladder, platform, door, step, storage chest, workbench, forge, loom, and the item icons (draught, flare, blast charge, lamp, picks, charms). Stations stand in the world as these sprites; the icons appear in the satchel and hotbar (`js/art/itemart.js`). The torch keeps its code-drawn version (its painted halo could not be separated cleanly), and the interface frames on the sheet are matched in CSS.
 
-**Souls-grade detail.** A procedural painting kit (`js/art/brush.js`: bristle strokes, painterly fills, ragged silhouettes, fog banks, rim light, grain) paints the prologue's plates off screen, a few milliseconds per frame (`js/art/prologue.js`). Hollows and wardens are matte and worn (`js/art/grit.js`): a generated grime texture over every limb, bandage wraps, cracked masks running with ichor, torn cloth that sways, riveted scratched plates and chains.
+**Clean geometry.** Hollows, wardens and the prologue plates are built structure first, then shaded: closed paths with integer corners, proportions from a few shared variables, symmetric figures mirrored about their centre line, one stroke width per layer with round joins, soft gradient shading, one rim light, glow last. No grain, no jitter, no sketch marks. Enemy gear is in `js/art/grit.js` (tabard, face plate with one crack, breastplate, pauldron, even chain links); the vista and the five Warden portraits are in `js/art/prologue.js`, painted off screen a slice at a time. A painted plate in `assets/cine/<name>.png` (listed in `CINE` in `js/art/images.js`) replaces the built one.
+
+**Town art.** `town_sprites` in `tools/extract_assets.py` cuts the painted town sheet into `assets/town/` (buildings, props, signs, townsfolk), `assets/ui/` (shop icons, slot frames, crafting ring, panel, touch ring) and seamless town tiles in `assets/tex/town_*`. Buildings stand on the street at their own proportions, townsfolk walk as their sprites, and the hotbar, touch buttons, crafting ring, menu panel and teaching cards wear the painted frames.
+
+**Requests II.** `art/sheets/requests2.png` lists what to paint next: the four vista layers and five Warden portraits (1600 x 900), rig parts for each Hollow, weapons, infusion glows, the double-jump ring, the rift tear, the level bar and the card frame.
 
 The blade in the stone has its painted light beam removed (`clean_bladestone`) and gets a soft additive shaft with drifting motes drawn in code instead; it stands on a level shelf.
 
