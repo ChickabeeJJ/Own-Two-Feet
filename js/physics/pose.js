@@ -23,6 +23,9 @@ const ATK = {
   thrust: [[0, 0.9, 0.3, -0.3], [0.22, 1.75, 0.85, -0.85], [0.42, 0.15, 0.05, -0.05], [0.7, 0.1, 0.0, 0], [1, 0.9, 0.3, -0.3]],
   thrust2: [[0, 0.9, 0.3, -0.3], [0.22, 1.5, 0.6, -0.6], [0.42, -0.25, -0.3, 0.05], [0.7, -0.2, -0.25, 0.05], [1, 0.8, 0.25, -0.2]],
   lunge: [[0, 1.0, 0.35, -0.4], [0.3, 1.95, 1.05, -1.0], [0.45, 0.02, -0.05, 0], [0.8, 0.0, -0.05, 0], [1, 0.9, 0.3, -0.3]],
+  // blade and daggers, now and then: the lunge-stab. Elbow cocked hard back at the hip, then the whole arm
+  // drives out straight and level as the body drops into the lunge, held a beat, then recovers
+  lungestab: [[0, 1.0, 0.4, -0.4], [0.24, 2.05, 1.25, -1.1], [0.4, -0.06, -0.1, 0], [0.72, -0.04, -0.08, 0], [1, 0.9, 0.3, -0.3]],
   // hammer: hauled over the head, brought down with the whole body; a rising swing
   hsmash: [[0, 1.0, 0.4, 0], [0.38, -2.1, -2.85, -0.5], [0.58, 0.6, 0.5, 0.6], [0.75, 1.2, 1.1, 0.5], [1, 1.0, 0.8, 0.2]],
   hsmash2: [[0, 1.2, 0.8, 0.6], [0.35, 1.9, 1.2, 1.2], [0.58, -1.0, -1.4, -0.4], [0.75, -1.5, -2.0, -0.5], [1, -0.4, -0.8, 0]],
@@ -384,7 +387,7 @@ export class Animator {
       const wind = smooth(clamp(a.t / 0.18, 0, 1)) * (1 - smooth(clamp((a.t - 0.2) / 0.14, 0, 1)));
       const drive = smooth(clamp((a.t - 0.22) / 0.16, 0, 1)) * (1 - smooth(clamp((a.t - 0.6) / 0.3, 0, 1)));
       const base = a.kind === 'up' ? -0.1 : a.kind === 'down' ? 0.25 : a.kind === 'mine' ? 0.3 : 0.24;
-      const lean = { sweep: 0.35, cleave: -0.15, lunge: 0.45, hsmash: 0.4, slam: 0.45, thrust: 0.3, thrust2: 0.2, flurry: 0.15 }[a.kind] || 0;
+      const lean = { sweep: 0.35, cleave: -0.15, lunge: 0.45, lungestab: 0.6, hsmash: 0.4, slam: 0.45, thrust: 0.3, thrust2: 0.2, flurry: 0.15 }[a.kind] || 0;
       torso += (-0.16 * wind + (base + lean) * drive) * w;
       // the free arm counter-swings: reaches forward for balance on the wind-up, flings back through the strike
       if (ATKB[a.kind]) { const [ub, fb] = keyArm(a.kind, a.t, ATKB); armB = [ub, fb]; }
@@ -394,8 +397,8 @@ export class Animator {
       }
       rate = 60;
       // standing strikes step into the blow: front foot plants forward, back heel lifts, hips drop
-      if (mode === 'ground' && fF && fB && speed < 60) {
-        const k = Math.sin(clamp(a.t / 0.7, 0, 1) * Math.PI) * w * (a.kind === 'mine' ? 0.5 : 1);
+      if (mode === 'ground' && fF && fB && (speed < 60 || a.kind === 'lungestab')) {
+        const k = Math.sin(clamp(a.t / 0.7, 0, 1) * Math.PI) * w * (a.kind === 'mine' ? 0.5 : a.kind === 'lungestab' ? 1.9 : 1);
         fF = [fF[0] + f * 12 * s * k, fF[1], fF[2]];
         fB = [fB[0] - f * 6 * s * k, fB[1] - 1.5 * s * k, fB[2] - 0.6 * k];
         if (rootY !== null && rootY !== undefined) rootY += (2 + 4 * drive) * s * k;

@@ -753,6 +753,50 @@ export default ({ page, sleep, key, shot, evalg }) => ({
     console.log('after place', JSON.stringify(r2));
     await sleep(1500); await shot('u1-home');
   },
+  // one Strike, three jobs: mine the block you face, place the block in hand into open space, strike a foe
+  async contextual() {
+    await sleep(1200);
+    await evalg(() => { const g = window.__game; g.story.skipBirth(); if (g.story.skipTutorial) g.story.skipTutorial(); g.save.hasBlade = true; g.player.actor.blade = true; g.enemies.calm = 999; });
+    await sleep(2500);
+    const w = await evalg(() => { const g = window.__game, a = g.player.actor; a.face(1); for (const e of g.actors) if (e.team === 'enemy') e.removed = true;
+      const tx = Math.floor((a.c.x + 30) / 32), ty = Math.floor((a.c.y - 20) / 32), id = g.world.get(tx, ty + 1) || 3;
+      g.world.set(tx, ty, id); g.world.set(tx, ty - 1, id); return { tx, ty, id }; });
+    await sleep(300);
+    const m0 = await evalg(() => window.__game.player.strikeAs);
+    await page.keyboard.down('KeyJ'); await sleep(2600); await shot('ctx-0-mine'); await page.keyboard.up('KeyJ'); await sleep(200);
+    const m1 = await evalg((w) => window.__game.world.get(w.tx, w.ty), w);
+    console.log('mine', JSON.stringify({ mode: m0, before: w.id, after: m1 }));
+    await evalg((w) => { const g = window.__game; g.world.set(w.tx, w.ty, 0); g.world.set(w.tx, w.ty - 1, 0); for (const e of g.actors) if (e.team === 'enemy') e.removed = true; g.player.give(18, 3); g.save.sel = g.save.hotbar.indexOf(18); }, w);
+    await sleep(300);
+    const p0 = await evalg(() => { const p = window.__game.player; return { mode: p.strikeAs, placed: window.__game.save.stats.placed, cur: p.cursor, sel: p.save ? 0 : p.sv.sel, hb: p.sv.hotbar, fight: p.fightNear, foe: p.foeNear }; });
+    await key('KeyJ'); await sleep(400); await shot('ctx-1-place');
+    const p1 = await evalg((w) => ({ placed: window.__game.save.stats.placed, tile: window.__game.world.get(w.tx, w.ty) }), w);
+    console.log('place', JSON.stringify({ p0, p1 }));
+    const f0 = await evalg(() => { const g = window.__game, p = g.player; g.enemies.calm = 0; const e = g.enemies.spawn('husk', p.x - 60, p.actor.c.y, 0); e.ai.cd = 99; p.actor.face(-1); return true; });
+    await sleep(300);
+    const f1 = await evalg(() => window.__game.player.strikeAs);
+    await key('KeyJ'); await sleep(120);
+    const f2 = await evalg(() => { const a = window.__game.player.actor; return a.attack ? a.attack.kind : null; });
+    console.log('fight', JSON.stringify({ mode: f1, attack: f2 }));
+    if (m0 !== 'mine' || m1 === w.id || p0.mode !== 'place' || p1.placed <= p0.placed || f1 !== null || !f2 || f2 === 'mine') console.log('PROBLEMS: contextual strike', JSON.stringify({ m0, m1, p0, p1, f1, f2 }));
+  },
+  // the lunge-stab: a foe just out of reach, the doll drops and drives the blade out straight
+  async lunge() {
+    await sleep(1200);
+    await evalg(() => { const g = window.__game; g.story.skipBirth(); if (g.story.skipTutorial) g.story.skipTutorial(); g.save.hasBlade = true; g.player.actor.blade = true; g.enemies.calm = 999; });
+    await sleep(2500);
+    const r = await evalg(() => { const g = window.__game, p = g.player, a = p.actor; for (const e of g.actors) if (e.team === 'enemy') e.removed = true;
+      a.face(1); const e = g.enemies.spawn('husk', a.c.x + 120, a.c.y, 0); e.ai.cd = 99; e.hp = e.maxHp = 400; window.__lx = a.c.x;
+      window.__R = Math.random; Math.random = () => 0.05; return true; });
+    await page.keyboard.down('KeyJ'); await sleep(30); await page.keyboard.up('KeyJ'); await sleep(20);
+    const k = await evalg(() => { Math.random = window.__R; const a = window.__game.player.actor; return a.attack && a.attack.kind; });
+    const rr = k;
+    console.log('lunge kind', rr);
+    for (let i = 0; i < 8; i++) { await sleep(45); await shot('film-' + i); }
+    const d = await evalg(() => ({ moved: Math.round(window.__game.player.actor.c.x - window.__lx), hits: 400 - (window.__game.actors.find(a => a.team === 'enemy' && !a.removed) || { hp: 400 }).hp }));
+    console.log('lunge', JSON.stringify(d));
+    if (rr !== 'lungestab' || d.moved < 45) console.log('PROBLEMS: lunge', JSON.stringify({ rr, d }));
+  },
   async persist() {
     await sleep(1200);
     const before = await evalg(() => { const g = window.__game; g.story.skipBirth(); g.save.hasBlade = true; g.player.actor.blade = true; g.enemies.calm = 999;

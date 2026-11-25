@@ -321,6 +321,12 @@ export class UI {
     }
     if (Input.pressed('menu')) { Input.consume('menu'); const c = d.cancel; this.closeDialog(); if (c) c(); }
   }
+  // the touch Strike button says what it will do: strike, mine or place
+  strikeMode(mode) {
+    const b = document.querySelector('.tb[data-a="attack"]'); if (!b) return;
+    b.dataset.mode = mode || '';
+    const sp = b.querySelector('span'); if (sp) sp.textContent = mode === 'mine' ? 'Mine' : mode === 'place' ? 'Place' : 'Strike';
+  }
   shop(name, items) {
     this.dialog(name, ['Have a look. Everything is honest, mostly.'], items.map(it => ({ label: it.label, cost: it.cost, act: it.act })).concat([{ label: 'Farewell' }]));
     this.dlg.shown = 999;

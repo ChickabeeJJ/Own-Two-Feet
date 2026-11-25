@@ -165,7 +165,7 @@ export class Player {
       const tx = Math.floor(wp.x / TILE), ty = Math.floor(wp.y / TILE);
       const d = Math.hypot(tx * TILE + 16 - cx, ty * TILE + 16 - cy);
       target = { tx, ty, far: d > REACH, px: wp.x, py: wp.y };
-    } else if (this.buildMode || g.touchBuild) {
+    } else {
       if (g.touchBuild && g.touchBuild.tx !== undefined) { const tb = g.touchBuild; target = { tx: tb.tx, ty: tb.ty, far: Math.hypot(tb.tx * TILE + 16 - cx, tb.ty * TILE + 16 - cy) > REACH }; }
       else {
         const f = a.facing;
@@ -206,8 +206,20 @@ export class Player {
       target.why = !have ? (usable(sel) ? '' : this.sv.hotbar.length ? 'none left' : 'mine a block first') : pdist > REACH || target.far ? 'too far' : pt !== T.AIR ? '' : !ok ? (TILES[sel].solid && this.bodyIn(target.ptx, target.pty) ? 'someone is standing there' : 'needs a block beside it') : '';
     }
     this.cursor = target;
-    // mine: hold left mouse (or Strike in build mode)
-    const mineHeld = (this.mouseAim && Input.mouse.l && !this.buildMode && !this.foeNear) || ((this.buildMode || g.touchBuild) && (Input.down.attack || (g.touchBuild && g.touchBuild.mode === 'mine' && g.touchBuild.pid !== null)));
+    // contextual Strike: with a fight near (any foe, the dummy or a nest close, or a chain still going) it
+    // swings; otherwise it mines the block you face, or places the block in your hand into open space
+    const ctxMode = !this.mouseAim && !this.buildMode && !g.touchBuild;
+    this.fightNear = this.foeNear || (a.attack && a.attack.kind !== 'mine') || (g.time - (this.lastHitT || -9) < 1.2);
+    if (!this.fightNear) for (const e of g.targets()) if ((e.team === 'enemy' || e.kind === 'nest' || e.kind === 'dummy') && e.mode !== 'dead' && !e.removed && Math.abs(e.c.x - cx) < 230 && Math.abs(e.c.y - a.c.y) < 120) { this.fightNear = true; break; }
+    let strikeAs = null;
+    if (target && !this.fightNear && !this.buildMode && !g.touchBuild && this.sv.hasBlade !== false) {
+      const sel = this.sv.hotbar[this.sv.sel];
+      if (ctxMode && target.canMine) strikeAs = 'mine';
+      else if (target.canPlace && placeable(sel) && target.tile === T.AIR) strikeAs = 'place';
+    }
+    if (strikeAs !== this.strikeAs) { this.strikeAs = strikeAs; g.ui && g.ui.strikeMode && g.ui.strikeMode(strikeAs); }
+    // mine: hold left mouse (or Strike in build mode, or Strike facing a block)
+    const mineHeld = (this.mouseAim && Input.mouse.l && !this.buildMode && !this.foeNear) || (this.strikeAs === 'mine' && Input.down.attack) || ((this.buildMode || g.touchBuild) && (Input.down.attack || (g.touchBuild && g.touchBuild.mode === 'mine' && g.touchBuild.pid !== null)));
     if (target && target.canMine && mineHeld && this.sv.hasBlade !== false) {
       if (!this.mine || this.mine.tx !== target.tx || this.mine.ty !== target.ty) this.mine = { tx: target.tx, ty: target.ty, t: 0, tile: target.tile };
       const pick = this.sv.equip && this.sv.equip.pick && ITEMS[this.sv.equip.pick] ? ITEMS[this.sv.equip.pick].mine : 1;
@@ -238,7 +250,7 @@ export class Player {
     // place: right mouse (hold and drag to lay a line), E in build mode, or a touch drag in build mode
     const tb = g.touchBuild;
     const placeHeld = (this.mouseAim && Input.mouse.r && !this.buildMode) || (tb && tb.mode === 'place' && tb.pid !== null);
-    const placeP = (this.mouseAim && Input.mouse.rp && !this.buildMode) || (this.buildMode && Input.pressed('interact')) || (tb && tb.tap);
+    const placeP = (this.mouseAim && Input.mouse.rp && !this.buildMode) || (this.buildMode && Input.pressed('interact')) || (tb && tb.tap) || (this.strikeAs === 'place' && (Input.pressed('attack') || (this.mouseAim && Input.mouse.lp)));
     if (tb) tb.tap = false;
     this.placeCD = Math.max(0, (this.placeCD || 0) - dt);
     if (target && (placeP || (placeHeld && this.placeCD <= 0))) {
@@ -376,6 +388,7 @@ export class Player {
     const held = !!Input.down.attack || mouseHold;
     const pressed = Input.pressed('attack') || (this.mouseAim && Input.mouse.lp && !(this.cursor && this.cursor.canMine && !this.buildMode && !this.foeNear));
     if (this.consumeAttack) { this.consumeAttack = false; if (!Input.pressed('attack')) return this.activeHits(dt); }
+    if (this.strikeAs === 'place' || (this.strikeAs === 'mine' && !this.mouseAim)) { this.charging = false; this.chargeK = 0; this.holdT = 0; return this.activeHits(dt); }
     this.counterT = Math.max(0, (this.counterT || 0) - dt);
     if (this.punchT > 0) { this.punchT -= dt; if (this.punchT <= 0 && !(g.bagK > 0.05)) g.cam.zoomT = 1; }
     const able = this.sv.hasBlade && !this.buildMode && a.mode === 'ctrl' && !a.crawling && !a.mantle;
@@ -412,12 +425,25 @@ export class Player {
     let step;
     if (kind) step = { k: kind, dur: 0.3, launch: kind === 'up' && !air };
     else { step = W.chain[(this.chainI || 0) % W.chain.length]; this.chainI = (this.chainI || 0) + 1; }
+    // now and then a blade or the daggers lunge and stab instead: often when a foe stands just out of reach,
+    // sometimes as the second blow of a chain
+    let lunge = false;
+    if (!kind && !air && (W === WEAPONS.w_blade || W === WEAPONS.w_daggers) && !step.ender) {
+      let gap = false;
+      for (const e of this.game.targets()) { if (e.team !== 'enemy' || e.mode === 'dead') continue; const dx = (e.cx ?? e.c.x) - a.c.x; if (Math.sign(dx) === a.facing && Math.abs(dx) > 70 && Math.abs(dx) < 150 && Math.abs((e.cy ?? e.c.y) - a.c.y) < 80) { gap = true; break; } }
+      lunge = gap ? Math.random() < 0.55 : (this.chainI === 2 && Math.random() < 0.25);
+      if (lunge) step = { k: 'lungestab', dur: 0.4, mult: 1.45, poise: 1.6, lunge: true };
+    }
     const dur = step.dur * 0.87 * (this.perk('swift_strike') ? 0.9 : 1) / (W.speed > 1 ? Math.sqrt(W.speed) : 1);
     a.startAttack(step.k, dur);
     a.attack.step = step; a.attack.W = W;
     a.attackCD = dur * 0.82;
     // follow-through: a grounded swing carries the body a short step forward, a little further toward a foe in reach
-    if (!air && !W.ranged && !kind) {
+    if (lunge) {
+      a.c.vx = a.facing * 560; a.inv = Math.max(a.inv, 0.12);
+      this.game.fx.dust && this.game.fx.dust(a.c.x - a.facing * 10, a.c.y, 6);
+      Audio.play('dash', { pitch: 1.2, vol: 0.5 });
+    } else if (!air && !W.ranged && !kind) {
       let near = false;
       for (const e of this.game.targets()) { const dx = (e.cx ?? e.c.x) - a.c.x; if (e.mode !== 'dead' && Math.sign(dx) === a.facing && Math.abs(dx) < 120 && Math.abs((e.cy ?? e.c.y) - a.c.y) < 90) { near = true; break; } }
       a.c.vx += a.facing * (W === WEAPONS.w_hammer ? 130 : 200) * (near ? 1.5 : 1);
@@ -446,6 +472,12 @@ export class Player {
     if (!at) { a.prevBlade = null; return; }
     if (at.kind === 'mine') { a.prevBlade = null; return; }   // digging never cuts or leaves a slash
     const step = at.step || {}, W = at.W || weaponOf(this.sv);
+    // the lunge carries the body forward through the first part of the stab, stopping short of a foe's body
+    if (step.lunge && at.t < 0.46 && a.c.ground) {
+      let block = false;
+      for (const e of g.targets()) if (e.team === 'enemy' && e.mode !== 'dead' && Math.sign(e.c.x - a.c.x) === a.facing && Math.abs(e.c.x - a.c.x) < 34 && Math.abs(e.c.y - a.c.y) < 70) { block = true; break; }
+      a.c.vx = block ? 0 : a.facing * 470 * (1 - at.t);
+    }
     // the sling releases a shot instead of cutting
     if (W.ranged) {
       if (at.t > 0.45 && !at.fired) { at.fired = true; this.fireSling(W, step); }
@@ -500,6 +532,7 @@ export class Player {
     if (this.counterT > 0) dmg = Math.round(dmg * 1.6);
     if (fin) dmg = Math.round(dmg * (e.staggered ? 3 : 2));
     const infuse = this.sv.infuse && this.sv.infuse[weaponId(this.sv)];
+    this.lastHitT = this.game.time;
     const res = e.hurt ? e.hurt(dmg, { x: hx, y: hy, dx: dirx, dy: diry, from: this, kind, poise: W.poise * (step.poise || 1) * mult * (this.perk('heavy_hand') ? 1.4 : 1), knock: W.knock * (step.heavy ? 1.6 : 1), launch: step.launch, bleed: W.bleed, element: infuse, finisher: fin, breaksGuard: W === WEAPONS.w_hammer || step.heavy }) : null;
     const armored = res === 'armor';
     // feedback scaled by weight
@@ -760,7 +793,7 @@ export class Player {
   drawCursor(ctx) {
     const c = this.cursor, g = this.game;
     if (!c || this.dead || g.cinematic) return;
-    if (!(this.mouseAim || this.buildMode || g.touchBuild)) return;
+    if (!(this.mouseAim || this.buildMode || g.touchBuild || this.strikeAs)) return;
     const a = this.actor, ccx = a.c.x, ccy = a.c.y - 46;
     // far away the cursor stays quiet; just past reach it shows (dimmed) so you learn the range
     if (c.far && Math.hypot(c.tx * TILE + 16 - ccx, c.ty * TILE + 16 - ccy) > REACH + 2 * TILE) return;
