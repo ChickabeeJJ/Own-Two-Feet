@@ -92,7 +92,11 @@ async function boot() {
   game.saveNow = () => {
     const p = game.player;
     if (!p) return;
-    if ((game.net && game.net.visiting) || (game.rift && game.rift.active)) { sv.hp = Math.max(1, p.hp); Save.write(null); return; }
+    for (const s of game.systems) if (s && s.save) try { s.save(); } catch (e) { /* keep saving the rest */ }
+    if ((game.net && game.net.visiting) || (game.rift && game.rift.active)) {
+      const tm = p.tempMax || 0; sv.maxHp -= tm; sv.hp = Math.min(sv.maxHp, Math.max(1, p.hp - tm));
+      Save.write(null); sv.maxHp += tm; return;
+    }
     if (!p.dead && p.actor.mode === 'ctrl' && p.actor.c.ground) sv.pos = { x: p.x, y: p.y };
     sv.hp = Math.max(1, p.hp);
     Save.write(game.world);

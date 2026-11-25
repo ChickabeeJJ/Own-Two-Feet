@@ -87,6 +87,13 @@ export class World {
     return c;
   }
   surface(tx) { return this.col(tx).h; }
+  // the floor an object should stand on: the solid tile with open space above it nearest the generated
+  // surface, so a mined dip, a stamped town street or a built-up step all carry what sits on them
+  floorTy(tx, near) {
+    const s = near ?? this.surface(tx), ok = (ty) => TILES[this.get(tx, ty)].solid && !TILES[this.get(tx, ty - 1)].solid && !TILES[this.get(tx, ty - 2)].solid;
+    for (let d = 0; d <= 16; d++) { if (ok(s + d)) return s + d; if (d && ok(s - d)) return s - d; }
+    return s;
+  }
   shrineNear(tx) {
     const k = Math.round((tx - 20) / SHRINE_EVERY);
     const sx = k * SHRINE_EVERY + 20;

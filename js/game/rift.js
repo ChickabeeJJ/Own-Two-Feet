@@ -23,6 +23,13 @@ export class Rift {
   constructor(game) { this.game = game; this.active = false; this.r = null; }
   get sv() { return this.game.player.sv; }
   // ------------------------------------------------------------ entering and leaving
+  // a run in progress is remembered: leaving the page ends it, and the wave reached still counts
+  save() { const sv = this.sv; if (!sv || !sv.rift) return; sv.rift.left = this.active && this.r ? this.r.wave : 0; if (sv.rift.left) sv.rift.best = Math.max(sv.rift.best || 0, sv.rift.left); }
+  restore() {
+    const sv = this.sv; if (!sv || !sv.rift || !sv.rift.left) return;
+    const w = sv.rift.left; sv.rift.left = 0;
+    this.game.ui && this.game.ui.toast(`Your Rift Trials run ended at wave ${w} when you left. Best: wave ${sv.rift.best || w}`);
+  }
   enter() {
     const g = this.game, p = g.player;
     if (this.active || !p || p.dead || (g.net && g.net.active)) return;
@@ -96,6 +103,7 @@ export class Rift {
   }
   // ------------------------------------------------------------ the run
   update(dt) {
+    if (!this.restored && this.game.player && this.game.story && this.game.story.stage >= 5) { this.restored = true; this.restore(); }
     if (!this.active || !this.r) return;
     const g = this.game, p = g.player, r = this.r;
     if (r.over || (g.ui && g.ui.modal)) return;

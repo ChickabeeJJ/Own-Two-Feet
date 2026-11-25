@@ -32,17 +32,28 @@ export class Sites {
         const key = kind + x;
         if (!this.list.has(key)) this.list.set(key, this.make(kind, x));
       }
+      for (const s of this.list.values()) {
+        s.y = W.floorTy(s.tx, Math.round(s.y / TILE)) * TILE; if (s.chest) s.chest.y = s.y;
+        if (s.items) for (const b of s.items) b.y = W.floorTy(b.tx, Math.round(b.y / TILE)) * TILE;
+      }
       for (const [k, s] of this.list) if (Math.abs(s.x / TILE - ptx) > 110) { if (s.units) for (const u of s.units) u.removed = true; this.list.delete(k); }
     }
     for (const s of this.list.values()) this.tick(s, dt);
   }
+  // partly lit braziers are written into the save
+  save() { for (const s of this.list.values()) if (s.kind === 'brazier' && !s.solved) { const L = s.items.map(b => (b.lit ? 1 : 0)); if (L.some(Boolean)) this.sv.puzzles[s.key + 'L'] = L; else delete this.sv.puzzles[s.key + 'L']; } }
   make(kind, x) {
     const W = this.game.world, sv = this.sv, key = kind + x;
-    const gy = W.surface(x) * TILE;
+    const gy = W.floorTy(x) * TILE;
     const s = { kind, key, tx: x, x: x * TILE + 16, y: gy, solved: !!sv.puzzles[key], chest: null };
     if (s.solved) s.chest = { x: s.x, y: gy, open: !!sv.puzzles[key + 'c'], t: sv.puzzles[key + 'c'] ? 1 : 0, fade: sv.puzzles[key + 'c'] ? 0 : 1 };
-    if (kind === 'brazier') s.items = [-7, 0, 7].map(d => ({ tx: x + d, y: W.surface(x + d) * TILE, lit: false }));
-    if (kind === 'plates') s.items = [-5, 5].map(d => ({ tx: x + d, y: W.surface(x + d) * TILE, down: false }));
+    if (kind === 'brazier') {
+      // braziers you lit stay lit across a reload, with the full time to light the rest
+      const was = sv.puzzles[key + 'L'] || [];
+      s.items = [-7, 0, 7].map((d, i) => ({ tx: x + d, y: W.floorTy(x + d) * TILE, lit: !s.solved && !!was[i] }));
+      if (s.items.some(b => b.lit)) s.timer = 22;
+    }
+    if (kind === 'plates') s.items = [-5, 5].map(d => ({ tx: x + d, y: W.floorTy(x + d) * TILE, down: false }));
     if (kind === 'race') { s.rings = []; s.i = 0; s.active = false; }
     if (kind === 'camp') { s.units = []; s.spawned = false; s.elite = null; s.name = ELITE_NAMES[Math.floor(hash2(x, 61, W.seed) * ELITE_NAMES.length)]; }
     return s;

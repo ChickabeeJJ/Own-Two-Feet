@@ -29,8 +29,21 @@ export class Surges {
     if (Math.floor(p.y / TILE) > W.surface(tx) + 4) return false;
     return true;
   }
+  // an open rift and unopened rift chests survive leaving: the rift tears open again where it was
+  save() {
+    const sv = this.sv; if (!sv) return;
+    sv.surge = this.s ? { x: this.s.x, y: this.s.y, tier: this.s.tier, lvl: this.s.lvl, waves: this.s.waves } : null;
+    sv.surgeChests = this.chests.filter(c => !c.open).map(c => ({ x: c.x, y: c.y, tier: c.tier, swift: c.swift, lvl: c.lvl }));
+  }
+  restore() {
+    const sv = this.sv, g = this.game, W = g.world; if (!sv) return;
+    for (const c of sv.surgeChests || []) { const gy = W.groundBelow(c.x, c.y - 120, 400); this.chests.push(Object.assign({ open: false, t: 0, fade: 1 }, c, { y: gy ?? c.y })); }
+    const o = sv.surge;
+    if (o && !this.s) { const gy = W.groundBelow(o.x, o.y - 160, 420) ?? o.y; this.s = { x: o.x, y: gy, t: 0, state: 'warn', wave: 0, waves: o.waves || 2, tier: o.tier || 0, lvl: o.lvl || 1, queue: [], alive: [], spawnT: 0, farT: 0, waveAt: 0, kills: 0 }; }
+  }
   update(dt) {
     const g = this.game;
+    if (!this.restored && g.player && g.story && g.story.stage >= 5) { this.restored = true; this.restore(); }
     for (const c of this.chests) { if (c.open) { c.t = Math.min(1, c.t + dt * 3); c.fade -= dt / 2.4; } }
     this.chests = this.chests.filter(c => c.fade > 0);
     const s = this.s;

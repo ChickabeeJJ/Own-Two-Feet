@@ -38,6 +38,9 @@ if (args.includes('--cg')) await page.addInitScript({ path: path.join(root, 'too
 if (fresh) await page.addInitScript(() => { try { if (!sessionStorage.getItem('keep')) localStorage.clear(); } catch (e) {} });
 const q = opt('q', '');
 await page.goto(`http://localhost:${port}/${q ? '?' + q : ''}`);
+// teaching cards pause the game; scenarios other than 'cards' wave them through
+await page.addInitScript(() => { setInterval(() => { if (window.__keepCards) return; const b = document.querySelector('.tcard .tok'); if (b) b.click(); }, 150); });
+await page.evaluate(() => { setInterval(() => { if (window.__keepCards) return; const b = document.querySelector('.tcard .tok'); if (b) b.click(); }, 150); });
 const sleep = ms => page.waitForTimeout(ms);
 const key = async (k, ms = 120) => { await page.keyboard.down(k); await sleep(ms); await page.keyboard.up(k); };
 const shot = async (name) => { await page.screenshot({ path: path.join(out, name + '.png') }); console.log('shot', name); };

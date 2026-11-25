@@ -800,6 +800,7 @@ export default ({ page, sleep, key, shot, evalg }) => ({
   // guidance: the Threads of Light card appears when that goal begins, the compass strip shows points, the
   // Guide tab keeps the card
   async cards() {
+    await evalg(() => { window.__keepCards = true; });
     await sleep(1200);
     await evalg(() => { const g = window.__game; g.story.skipBirth(); if (g.story.skipTutorial) g.story.skipTutorial(); g.save.hasBlade = true; g.player.actor.blade = true; g.enemies.calm = 999;
       g.story.firstFoeDown = true; g.save.met = { 105: 1 }; g.save.respawn = { x: g.player.x, y: g.player.y }; });
@@ -819,6 +820,33 @@ export default ({ page, sleep, key, shot, evalg }) => ({
     console.log('guide items', items);
     await shot('cards-2-guide');
     if (c0.card !== 'Threads of Light' || c1.card !== 'Always a way forward' || !comp.length || items < 2) console.log('PROBLEMS: cards', JSON.stringify({ c0, c1, comp, items }));
+  },
+  // leave and come back: a lit brazier, an open rift and a timber block are still there; content stands on the ground
+  async saveall() {
+    await sleep(1200);
+    const before = await evalg(() => { const g = window.__game, p = g.player; g.story.skipBirth(); if (g.story.skipTutorial) g.story.skipTutorial(); g.save.hasBlade = true; p.actor.blade = true;
+      // a brazier site: make it, light one
+      const bx = g.content.sites('brazier', -2000, 2000)[0]; let lit = null;
+      if (bx !== undefined) { const s = g.sites.make('brazier', bx); g.sites.list.set(s.key, s); g.sites.light(s, s.items[0]); lit = s.key; }
+      // a surge rift right here
+      g.surges.s = { x: p.x + 200, y: p.y, t: 0, state: 'warn', wave: 0, waves: 2, tier: 0, lvl: 1, queue: [], alive: [], spawnT: 0, farT: 0, waveAt: 0, kills: 0 };
+      // a timber block
+      const tx = Math.floor(p.x / 32) + 3, ty = g.world.surface(tx) - 1; g.world.set(tx, ty, 38);
+      g.saveNow(); return { lit, tx, ty }; });
+    console.log('before', JSON.stringify(before));
+    await evalg(() => sessionStorage.setItem('keep', '1'));
+    await page.reload(); await page.waitForFunction(() => window.__game && window.__game.player);
+    await sleep(3000);
+    const after = await evalg((b) => { const g = window.__game, W = g.world;
+      const L = b.lit ? (g.save.puzzles[b.lit + 'L'] || []) : null;
+      const off = [];
+      for (const [x, c] of g.content.chests) if (!c.cave && !W.solidAt(c.x, c.y + 4)) off.push('chest' + x);
+      for (const [x, n] of g.content.nests) if (n.ent && !W.solidAt(n.ent.c.x, n.ent.c.y + 30)) off.push('nest' + x);
+      for (const s of g.sites.list.values()) if (s.items) for (const it of s.items) if (!W.solidAt(it.tx * 32 + 16, it.y + 4)) off.push(s.key);
+      return { lit: L, surge: !!g.surges.s || !!g.save.surge, timber: W.get(b.tx, b.ty), off };
+    }, before);
+    console.log('after', JSON.stringify(after));
+    if ((before.lit && !(after.lit && after.lit[0])) || !after.surge || after.timber !== 38 || after.off.length) console.log('PROBLEMS: saveall', JSON.stringify(after));
   },
   async persist() {
     await sleep(1200);

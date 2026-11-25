@@ -86,6 +86,12 @@ export class Content {
       for (const x of this.sites('chest', a, b)) if (!this.chests.has(x)) this.chests.set(x, this.makeChest(x));
       for (const x of this.sites('stitch', a, b)) if (!this.stitches.has(x) && !this.sv.stitches[x]) this.stitches.set(x, this.makeStitch(x));
       for (const x of this.sites('nest', a, b)) if (!this.nests.has(x) && !this.sv.nests[x]) this.spawnNest(x);
+      // keep everything standing on the real ground: mining under it, building, or a town or turf pass
+      // changing the column moves it with the floor
+      const W = g.world;
+      for (const [x, c] of this.chests) if (!c.cave) { const ty = W.floorTy(x, Math.round(c.y / TILE)); c.y = ty * TILE; if (c.ent) c.ent.c.y = ty * TILE - 14; }
+      for (const [x, n] of this.nests) if (n.ent && n.ent.mode !== 'dead') n.ent.c.y = W.floorTy(x, Math.round((n.ent.c.y + 26) / TILE)) * TILE - 26;
+      for (const [x, st] of this.stitches) if (!st.cave && !st.got && st.lift) st.py = W.floorTy(x, Math.round((st.py + st.lift) / TILE)) * TILE - st.lift;
       for (const m of [this.dolls, this.chests, this.stitches, this.nests]) for (const [x, o] of m) if (Math.abs(x - ptx) > 110) { if (o.actor) o.actor.removed = true; if (o.ent) o.ent.removed = true; m.delete(x); }
     }
     // dolls being woken walk away
@@ -142,7 +148,7 @@ export class Content {
   spawnDoll(x) {
     const g = this.game, W = g.world;
     const inCave = hash2(x, 9, W.seed) < 0.3 ? this.caveSpot(x) : null;
-    const ty = inCave ?? W.surface(x);
+    const ty = inCave ?? W.floorTy(x);
     const sv = newSave(Math.floor(hash2(x, 2, W.seed) * 1e9));
     const colors = COSMETICS.filter(c => c.slot === 'color'), heads = ['h_none', 'h_leaf', 'h_hood', 'h_horns', 'h_tophat', 'h_antlers'], capes = COSMETICS.filter(c => c.slot === 'cape' && c.v);
     sv.look.color = colors[Math.floor(hash2(x, 3, W.seed) * colors.length)].id;
@@ -178,8 +184,8 @@ export class Content {
   makeChest(x) {
     const W = this.game.world;
     const cave = hash2(x, 7, W.seed) < 0.45 ? this.caveSpot(x) : null;
-    const ty = cave ?? W.surface(x);
-    return { x: x * TILE + 16, y: ty * TILE, open: !!this.sv.chests[x], t: this.sv.chests[x] ? 1 : 0, ent: this.chestTarget(x, ty) };
+    const ty = cave ?? W.floorTy(x);
+    return { x: x * TILE + 16, y: ty * TILE, cave: cave !== null, open: !!this.sv.chests[x], t: this.sv.chests[x] ? 1 : 0, ent: this.chestTarget(x, ty) };
   }
   chestTarget(x, ty) {
     // a hittable proxy so a blade strike opens it too
@@ -219,8 +225,9 @@ export class Content {
     let px = x * TILE + 16, py;
     const cave = r < 0.4 ? this.caveSpot(x) : null;
     if (cave) py = cave * TILE - 40;
-    else py = W.surface(x) * TILE - (r < 0.75 ? 150 : 70);   // some hover out of reach: build up or double jump
-    return { x, px, py, t: r * 6, got: false, cave: !!cave };
+    const lift = r < 0.75 ? 150 : 70;   // some hover out of reach: build up or double jump
+    if (!cave) py = W.floorTy(x) * TILE - lift;
+    return { x, px, py, lift, t: r * 6, got: false, cave: !!cave };
   }
   takeStitch(x, st) {
     const g = this.game, sv = this.sv;
@@ -242,7 +249,7 @@ export class Content {
   // ------------------------------------------------------------ nests
   spawnNest(x) {
     const g = this.game, W = g.world;
-    const ty = W.surface(x);
+    const ty = W.floorTy(x);
     const self = this;
     const e = { id: 'nest' + x, team: 'enemy', kind: 'nest', mode: 'ctrl', scale: 1.6, hitR: 30, hp: 140 + W.tierAtX(x * TILE) * 60, removed: false, glows: [], flash: 0,
       c: { x: x * TILE + 16, y: ty * TILE - 26, vx: 0, vy: 0, w: 60, h: 50 },
