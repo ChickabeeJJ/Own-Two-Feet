@@ -76,6 +76,8 @@ export class Guide {
     this.tips(dt);
   }
   show(L, st) {
+    if (L.id === 'bench' && this.game.ui && this.game.ui.teach) this.game.ui.teach('craft');
+    if (L.id === 'perk' && this.game.ui && this.game.ui.teach) this.game.ui.teach('perk');
     const g = this.game;
     this.cur = L; this.curT = 0; this.y0 = this.game.player.y;
     st.seen++; st.last = g.time;

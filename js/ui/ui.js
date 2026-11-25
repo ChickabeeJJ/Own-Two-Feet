@@ -18,6 +18,8 @@ import { mulberry, hashStr, TAU, clamp, shade } from '../core/util.js';
 import { Platform } from '../platform.js';
 import { iconURL, TILE_ICON, IMG } from '../art/images.js';
 import { gateReq, LORE } from '../game/content.js';
+import { CARDS, drawCardPic, compassHTML } from './teach.js';
+import { townCenter, biomeIndexAt } from '../world/tiles.js';
 
 const $ = s => document.querySelector(s);
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html !== undefined) e.innerHTML = html; return e; };
@@ -321,6 +323,64 @@ export class UI {
     }
     if (Input.pressed('menu')) { Input.consume('menu'); const c = d.cancel; this.closeDialog(); if (c) c(); }
   }
+  // ------------------------------------------------------------ teaching cards (first time only, kept in the Guide)
+  teach(id, force) {
+    const C = CARDS[id], g = this.game, sv = this.sv; if (!C || !sv) return false;
+    sv.cards = sv.cards || {};
+    if (sv.cards[id] && !force) return false;
+    if (this.modal || g.cinematic || this.dlg) { this.teachQ = this.teachQ || []; if (!this.teachQ.includes(id)) this.teachQ.push(id); return false; }
+    sv.cards[id] = 1;
+    const box = el('div', 'teach'), card = el('div', 'tcard');
+    const cv = document.createElement('canvas'); cv.width = 400; cv.height = 180; drawCardPic(cv, C.pic);
+    card.appendChild(cv);
+    card.appendChild(el('div', 'tt', esc(C.title)));
+    for (const l of C.lines) card.appendChild(el('p', '', esc(l)));
+    const ok = el('button', 'tok', 'Got it'); card.appendChild(ok);
+    box.appendChild(card); document.body.appendChild(box);
+    this.modal = 'teach'; document.body.classList.add('modal');
+    const mp = g.net && g.net.active; if (!mp) g.paused = true;
+    Audio.play('chime', { pitch: 1.1, vol: 0.6 });
+    const close = () => {
+      if (!box.isConnected) return;
+      box.classList.add('out'); setTimeout(() => box.remove(), 260);
+      window.removeEventListener('keydown', key, true);
+      this.modal = null; document.body.classList.remove('modal'); g.paused = false;
+      Audio.play('blip'); g.saveNow && g.saveNow();
+    };
+    const key = (e) => { if (['Enter', 'Space', 'Escape', 'KeyE', 'KeyJ'].includes(e.code)) { e.preventDefault(); e.stopPropagation(); close(); } };
+    setTimeout(() => window.addEventListener('keydown', key, true), 350);
+    ok.onclick = close;
+    return true;
+  }
+  // the compass strip: the gate, the nearest Thread of Light, the tracked place, shrines and towns, with distances
+  compassStrip() {
+    const g = this.game, p = g.player, sv = this.sv, c = $('#compass'); if (!c || !p) return;
+    if (g.bosses && g.bosses.active) { if (c.innerHTML) c.innerHTML = ''; return; }
+    const ptx = Math.floor(p.x / TILE), range = 260, pois = [];
+    const add = (tx, cls, name, main) => { const dx = tx - ptx; pois.push({ dx, cls, name, main, label: Math.abs(dx) < 3 ? 'here' : Math.abs(dx) + ' m' }); };
+    for (const d of [-1, 1]) {
+      let gi = gateNear(ptx); if ((gi.gx - ptx) * d < 0) gi = gateNear(ptx + d * 340);
+      if ((gi.gx - ptx) * d >= 0 && !sv.bosses['g' + gi.k]) { const B = BOSS_TYPES[biomeOf(gi.guard).id]; add(gi.gx, 'gate', B ? B.name : 'Gate'); break; }
+    }
+    const act = g.content && g.content.nearestActivity(p.x);
+    if (act) add(Math.floor(act.x / TILE), 'light', 'Thread of Light: ' + ({ doll: 'a sleeping doll', stitch: 'a stitch', nest: 'a Hollow nest' }[act.kind] || 'light'), true);
+    const qt = g.quests && g.quests.tracked && g.quests.tracked() && g.quests.target();
+    if (qt) add(Math.floor(qt.x / TILE), 'quest', 'Tracked quest');
+    let best = null; for (const sx of g.world.shrinesBetween(ptx - range * 2, ptx + range * 2)) if (!best || Math.abs(sx - ptx) < Math.abs(best - ptx)) best = sx;
+    if (best !== null && Math.abs(best - ptx) > 6) add(best, 'shrine', 'Shrine');
+    const bi = biomeIndexAt(ptx); let tb = null; for (const b of [bi - 1, bi, bi + 1]) { const cx = townCenter(b); if (!tb || Math.abs(cx - ptx) < Math.abs(tb - ptx)) tb = cx; }
+    if (tb !== null && Math.abs(tb - ptx) > 50) add(tb, 'town', 'Town');
+    const html = compassHTML(pois, range);
+    if (c.dataset.h !== html) { c.innerHTML = html; c.dataset.h = html; }
+  }
+  tab_guide(body) {
+    const seen = this.sv.cards || {}, ids = Object.keys(CARDS).filter(k => seen[k]);
+    body.appendChild(el('div', 'sec-title', 'What you have learned'));
+    if (!ids.length) { body.appendChild(el('p', 'dim', 'Nothing yet. Each new thing you meet is explained here.')); return; }
+    const grid = el('div', 'guide-grid');
+    for (const k of ids) { const C = CARDS[k], b = el('button', 'guide-item', `<b>${esc(C.title)}</b><span>${esc(C.lines[0])}</span>`); b.onclick = () => { this.closeMenu(); this.teach(k, true); }; grid.appendChild(b); }
+    body.appendChild(grid);
+  }
   // the touch Strike button says what it will do: strike, mine or place
   strikeMode(mode) {
     const b = document.querySelector('.tb[data-a="attack"]'); if (!b) return;
@@ -360,7 +420,7 @@ export class UI {
     return g.actors.some(a => a.npcKind === 'tailor' && Math.abs(a.c.x - g.player.x) < 260);
   }
   renderMenu() {
-    const tabs = [['journey', 'Journey'], ['character', 'Character'], ['quests', 'Quests'], ['journal', 'Journal'], ['look', 'Look'], ['craft', 'Craft'], ['together', 'Together'], ['settings', 'Settings'], ['controls', 'Controls']];
+    const tabs = [['journey', 'Journey'], ['character', 'Character'], ['quests', 'Quests'], ['journal', 'Journal'], ['look', 'Look'], ['craft', 'Craft'], ['together', 'Together'], ['settings', 'Settings'], ['guide', 'Guide'], ['controls', 'Controls']];
     const th = $('#menu .tabs');
     // tabs are built once; the underline slides between them
     if (!th.querySelector('.tab')) {
@@ -818,23 +878,9 @@ export class UI {
       if (pr.dataset.h !== html) { pr.innerHTML = html; pr.dataset.h = html; }
       pr.classList.remove('hidden');
     } else pr.classList.add('hidden');
-    // compass toward the next unbeaten gate in the facing direction
-    if ((g.frame % 15) === 0) {
-      const ptx = Math.floor(p.x / TILE);
-      let best = null;
-      for (const d of [p.actor.facing, -p.actor.facing]) {
-        let gi = gateNear(ptx);
-        if ((gi.gx - ptx) * d < 0) gi = gateNear(ptx + d * 340);
-        if ((gi.gx - ptx) * d < 0) continue;
-        if (!sv.bosses['g' + gi.k]) { best = { gi, d }; break; }
-      }
-      const c = $('#compass');
-      if (best && !(g.bosses && g.bosses.active)) {
-        const B = BOSS_TYPES[biomeOf(best.gi.guard).id];
-        const dist = Math.abs(best.gi.gx - ptx);
-        c.innerHTML = `${best.d < 0 ? '<i class="chev l"></i>' : ''}<b>${esc(B.name)}</b> · ${dist} m${best.d > 0 ? '<i class="chev r"></i>' : ''}`;
-      } else c.innerHTML = '';
-    }
+    // the compass strip, and any teaching card that waited for a quiet moment
+    if ((g.frame % 15) === 0) this.compassStrip();
+    if (this.teachQ && this.teachQ.length && !this.modal && !this.dlg && !g.cinematic) this.teach(this.teachQ.shift());
   }
   pausedTick(dt) { /* menus animate via CSS; dialog/preview run in frame() */ }
   renderHotbar() {

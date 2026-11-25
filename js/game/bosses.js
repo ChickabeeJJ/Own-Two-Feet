@@ -55,7 +55,7 @@ export class Bosses {
         if (!this.sealSide || Math.abs(dx) > gi.half + 6 * TILE) this.sealSide = sign(dx) || -1;
         const edge = gi.gxw + this.sealSide * (gi.half + 1.5 * TILE);
         const a = p.actor.c;
-        if ((a.x - edge) * this.sealSide < 0) { a.x = edge; a.vx = 0; if (!this.sealWarn || g.time - this.sealWarn > 5) { this.sealWarn = g.time; g.story && g.story.say(`Sealed. It needs ${need} threads of light. We have ${have}.`, 3.2, true); g.ui && g.ui.toast(`Gate sealed · ${have}/${need} Threads of Light`); Audio.play('shard', { pitch: 0.5 }); } }
+        if ((a.x - edge) * this.sealSide < 0) { a.x = edge; a.vx = 0; if (!this.sealWarn || g.time - this.sealWarn > 5) { this.sealWarn = g.time; g.story && g.story.say(`Sealed. Carry ${need} Threads of Light to open it (you have ${have}). I’ll show you where to find them.`, 3.6, true); g.ui && g.ui.toast(`Sealed · ${have}/${need} Threads of Light`); g.ui && g.ui.teach && g.ui.teach('gate'); Audio.play('shard', { pitch: 0.5 }); } }
         this.sealed = { x: edge, gy: g.world.surface(gi.gx) * TILE, k: gi.k };
         return;
       }

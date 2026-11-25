@@ -797,6 +797,29 @@ export default ({ page, sleep, key, shot, evalg }) => ({
     console.log('lunge', JSON.stringify(d));
     if (rr !== 'lungestab' || d.moved < 45) console.log('PROBLEMS: lunge', JSON.stringify({ rr, d }));
   },
+  // guidance: the Threads of Light card appears when that goal begins, the compass strip shows points, the
+  // Guide tab keeps the card
+  async cards() {
+    await sleep(1200);
+    await evalg(() => { const g = window.__game; g.story.skipBirth(); if (g.story.skipTutorial) g.story.skipTutorial(); g.save.hasBlade = true; g.player.actor.blade = true; g.enemies.calm = 999;
+      g.story.firstFoeDown = true; g.save.met = { 105: 1 }; g.save.respawn = { x: g.player.x, y: g.player.y }; });
+    await sleep(2500);
+    const c0 = await evalg(() => ({ modal: window.__game.ui.modal, card: document.querySelector('.tcard .tt') && document.querySelector('.tcard .tt').textContent, obj: document.querySelector('#objective .ob-text') && document.querySelector('#objective .ob-text').textContent }));
+    console.log('card', JSON.stringify(c0));
+    await shot('cards-0-lights');
+    await page.keyboard.press('Enter'); await sleep(600);
+    const c1 = await evalg(() => ({ modal: window.__game.ui.modal, card: document.querySelector('.tcard .tt') && document.querySelector('.tcard .tt').textContent }));
+    console.log('card2', JSON.stringify(c1));
+    await page.keyboard.press('Enter'); await sleep(900);
+    const comp = await evalg(() => [...document.querySelectorAll('#compass .cs-poi')].map(e => e.className + ':' + e.textContent));
+    console.log('compass', JSON.stringify(comp));
+    await shot('cards-1-compass');
+    await evalg(() => window.__game.ui.openMenu('guide')); await sleep(500);
+    const items = await evalg(() => document.querySelectorAll('.guide-item').length);
+    console.log('guide items', items);
+    await shot('cards-2-guide');
+    if (c0.card !== 'Threads of Light' || c1.card !== 'Always a way forward' || !comp.length || items < 2) console.log('PROBLEMS: cards', JSON.stringify({ c0, c1, comp, items }));
+  },
   async persist() {
     await sleep(1200);
     const before = await evalg(() => { const g = window.__game; g.story.skipBirth(); g.save.hasBlade = true; g.player.actor.blade = true; g.enemies.calm = 999;

@@ -46,7 +46,7 @@ export class Surges {
     s.farT = far ? s.farT + dt : 0;
     if (s.farT > 4 || p.dead) { this.close(false); return; }
     if (s.state === 'warn') {
-      if (s.t > 2.2) { s.state = 'wave'; s.wave = 1; this.startWave(); }
+      if (s.t > 2.2) { s.state = 'wave'; s.wave = 1; this.startWave(); this.game.ui && this.game.ui.teach && this.game.ui.teach('surge'); }
     } else if (s.state === 'wave') {
       // spawn the queue a body at a time, out of the tear
       s.spawnT -= dt;

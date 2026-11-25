@@ -674,3 +674,33 @@ body.modal #guidechip, body.bag-open #guidechip { opacity: 0; }
 #dialog .opt .oi { width: 22px; height: 22px; vertical-align: -6px; margin-right: 8px; }
 .tb[data-a="attack"][data-mode="mine"] { border-color: rgba(255,217,160,.85); }
 .tb[data-a="attack"][data-mode="place"] { border-color: rgba(159,243,255,.85); }
+
+/* ---------------------------------------------------------------- compass strip */
+#compass { width: min(46vw, 420px); height: 30px; letter-spacing: 0; text-transform: none; pointer-events: none; }
+#compass .cs-line { position: absolute; left: 0; right: 0; top: 9px; height: 1px; background: linear-gradient(90deg, transparent, rgba(255,240,220,.28) 12%, rgba(255,240,220,.28) 88%, transparent); }
+#compass .cs-me { position: absolute; left: 50%; top: 4px; width: 1px; height: 11px; background: rgba(255,240,220,.6); }
+#compass .cs-poi { position: absolute; top: 3px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 3px; transition: left .4s var(--ease); }
+#compass .cs-poi i { width: 9px; height: 9px; transform: rotate(45deg); border-radius: 2px; background: #ffd9a0; box-shadow: 0 0 0 1px rgba(36,26,18,.55), 0 0 8px rgba(255,217,160,.35); }
+#compass .cs-poi span { font: 700 9px Manrope, sans-serif; color: rgba(243,236,224,.7); letter-spacing: .04em; white-space: nowrap; text-shadow: 0 1px 3px #000; }
+#compass .cs-poi.light i { background: #bff6ff; border-radius: 50%; transform: none; box-shadow: 0 0 10px rgba(191,246,255,.9); }
+#compass .cs-poi.gate i { background: #e8b070; width: 10px; height: 12px; transform: none; border-radius: 5px 5px 1px 1px; }
+#compass .cs-poi.shrine i { background: #ffb36b; border-radius: 50% 50% 2px 2px; transform: none; width: 8px; height: 10px; }
+#compass .cs-poi.town i { background: #d06a50; transform: none; width: 0; height: 0; border-radius: 0; background: none; border-left: 6px solid transparent; border-right: 6px solid transparent; border-bottom: 9px solid #d06a50; box-shadow: none; }
+#compass .cs-poi.quest i { background: #ffd9a0; }
+#compass .cs-poi.main span { color: #e6fbff; }
+#compass .cs-poi.edge { opacity: .7; }
+#compass .cs-poi.edge span::after { content: ''; }
+
+/* ---------------------------------------------------------------- teaching cards */
+.teach { position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; background: radial-gradient(ellipse at center, rgba(8,7,12,.35), rgba(4,3,7,.78)); animation: fadeIn .3s var(--ease); pointer-events: auto; }
+.teach.out { opacity: 0; transition: opacity .25s; }
+.tcard { width: min(90vw, 440px); padding: 20px 22px 18px; text-align: center; border: 14px solid transparent; border-image: url(../assets/ui/panel.png) 30 fill / 14px stretch; animation: menuIn .4s cubic-bezier(.2,.8,.2,1) both; }
+.tcard canvas { position: static; display: block; width: 100%; height: auto; aspect-ratio: 400 / 180; border-radius: 10px; background: linear-gradient(180deg, #1d1926, #121017); }
+.tcard .tt { font-family: var(--serif); font-size: 26px; letter-spacing: .08em; margin: 12px 0 6px; color: #f3ece0; }
+.tcard p { font-size: 13px; line-height: 1.5; color: rgba(243,236,224,.78); margin: 4px 0; }
+.tcard .tok { margin-top: 14px; padding: 9px 28px; border-radius: 999px; border: 1px solid rgba(255,217,160,.6); background: rgba(255,217,160,.12); color: #f6efe4; font: 700 11px Manrope, sans-serif; letter-spacing: .2em; text-transform: uppercase; cursor: pointer; }
+.tcard .tok:hover { background: rgba(255,217,160,.24); }
+.guide-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; margin-top: 10px; }
+.guide-item { text-align: left; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line); background: rgba(255,255,255,.03); color: var(--text); cursor: pointer; display: flex; flex-direction: column; gap: 4px; }
+.guide-item b { font-family: var(--serif); font-size: 18px; font-weight: 500; }
+.guide-item span { font-size: 12px; color: var(--dim); line-height: 1.4; }

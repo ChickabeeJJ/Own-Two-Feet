@@ -53,14 +53,21 @@ const TUT = [
 
 // the goal chain. each: id, text, hint(touch), target(game) -> {x,y} | null, done(game) -> bool
 const nextGate = (s) => { const p = s.game.player.x / TILE; let gi = gateNear(Math.floor(p)); for (let i = 0; i < 4 && s.game.bosses.defeated(gi.k); i++) gi = gateNear(gi.gx + 440 * (gi.gx >= 0 ? 1 : -1)); return gi; };
+// what the nearest Thread of Light is, so the goal always says what to do next
+function lightHint(s) {
+  const g = s.game, a = g && g.content && g.content.nearestActivity(g.player.x);
+  if (!a) return 'wake lost dolls · find stitches · break nests · help keepers';
+  const d = Math.round(Math.abs(a.x - g.player.x) / TILE);
+  return `nearest: ${{ doll: 'a sleeping doll to wake', stitch: 'a glowing stitch', nest: 'a Hollow nest to break' }[a.kind] || 'a Thread of Light'}${d > 4 ? `, ${d} m ${a.x > g.player.x ? 'right' : 'left'}` : ', right here'}`;
+}
 const GOALS = [
   { id: 'hollow', text: 'Defeat the Hollow', hint: k => k ? 'tap Strike' : '<kbd>J</kbd> or <kbd>Click</kbd> strike', target: s => s.firstFoe && !s.firstFoe.removed ? { x: s.firstFoe.c.x, y: s.firstFoe.c.y - 50 } : null, done: s => s.firstFoeDown },
   { id: 'shrine', text: 'Follow Thread to the fire', hint: () => 'someone keeps a shrine ahead', target: s => ({ x: 105 * TILE + 16, y: s.game.world.surface(105) * TILE - 40 }), done: s => Object.keys(s.sv.met).length > 0 },
   { id: 'rest', text: 'Rest at the shrine', hint: k => k ? 'tap the action button by the fire' : '<kbd>E</kbd> by the fire', target: s => ({ x: 105 * TILE + 16, y: s.game.world.surface(105) * TILE - 40 }), done: s => !!s.sv.respawn },
-  { id: 'lights', text: s => `Gather Threads of Light ${Math.min(s.sv.lights || 0, gateReq(nextGate(s).tier))}/${gateReq(nextGate(s).tier)}`, hint: () => 'wake lost dolls · find stitches · break nests · help keepers', target: s => s.game.content && s.game.content.nearestActivity(s.game.player.x), done: s => (s.sv.lights || 0) >= gateReq(nextGate(s).tier) },
+  { id: 'lights', text: s => `Threads of Light ${Math.min(s.sv.lights || 0, gateReq(nextGate(s).tier))}/${gateReq(nextGate(s).tier)} · they open the gate`, hint: s => lightHint(s), target: s => s.game.content && s.game.content.nearestActivity(s.game.player.x), done: s => (s.sv.lights || 0) >= gateReq(nextGate(s).tier) },
   { id: 'warden', text: 'The gate is open: face its Warden', hint: () => 'watch the wind-up, then dash through', target: s => { const g = nextGate(s); return { x: g.gx * TILE, y: s.game.world.surface(g.gx) * TILE - 60 }; }, done: s => Object.keys(s.sv.bosses).length > 0 },
   { id: 'home', text: 'Make a home: place a Hearth', hint: k => k ? 'craft it in the menu' : '<kbd>Q</kbd> craft · <kbd>Right-click</kbd> place', target: () => null, done: s => !!s.sv.home },
-  { id: 'onward', text: s => `Carry more light to the next gate ${Math.min(s.sv.lights || 0, gateReq(nextGate(s).tier))}/${gateReq(nextGate(s).tier)}`, hint: () => 'every gate holds more of her light', target: s => (s.sv.lights || 0) >= gateReq(nextGate(s).tier) ? { x: nextGate(s).gx * TILE, y: s.game.world.surface(nextGate(s).gx) * TILE - 60 } : s.game.content && s.game.content.nearestActivity(s.game.player.x), done: () => false },
+  { id: 'onward', text: s => `Threads of Light ${Math.min(s.sv.lights || 0, gateReq(nextGate(s).tier))}/${gateReq(nextGate(s).tier)} · for the next gate`, hint: s => (s.sv.lights || 0) >= gateReq(nextGate(s).tier) ? 'enough light: the gate will open, follow the marker' : lightHint(s), target: s => (s.sv.lights || 0) >= gateReq(nextGate(s).tier) ? { x: nextGate(s).gx * TILE, y: s.game.world.surface(nextGate(s).gx) * TILE - 60 } : s.game.content && s.game.content.nearestActivity(s.game.player.x), done: () => false },
 ];
 
 export class Story {
@@ -443,13 +450,13 @@ export class Story {
       this.foeLostT = lost ? (this.foeLostT || 0) + dt : 0;
       if (this.foeLostT > 2) { this.foeLostT = 0; if (f && !f.removed) f.removed = true; this.spawnFirstFoe(); }
     }
-    const T_ = G.target(this);
-    this.thread.target = T_;
+    const T_ = G.target(this) || (g.content && g.content.nearestActivity(g.player.x));
+    this.thread.target = T_; this.navTarget = T_;
     if (ui && !g.cinematic) {
       let dist = '';
       if (T_) { const d = Math.round(Math.abs(T_.x - g.player.x) / TILE); dist = d > 4 ? `${d} m ${T_.x > g.player.x ? '>' : '<'}` : ''; }
       // when Thread's target is buried or out of reach above, say how to get there
-      let hint = G.hint(!!g.touch);
+      let hint = G.id === 'lights' || G.id === 'onward' ? G.hint(this) : G.hint(!!g.touch);
       if (T_) {
         const dx = Math.abs(T_.x - g.player.x), dy = T_.y - (g.player.y - 50);
         if (dx < 8 * TILE && dy > 3 * TILE) hint = g.touch ? 'it is underground: tap Build, then dig down' : 'it is underground: <kbd>Hold Click</kbd> the ground to dig down';
@@ -472,6 +479,7 @@ export class Story {
   enterGoal(G) {
     const g = this.game, sv = this.sv;
     if (G.id === 'hollow') this.spawnFirstFoe();
+    if (G.id === 'lights') { g.ui && g.ui.teach && (g.ui.teach('lights'), g.ui.teach('marker')); }
     if (G.id === 'lights') this.say('The gate ahead is sealed with her thread. Light opens it. Lost dolls, stitches, nests... let\u2019s find them.', 4.4);
     if (G.id === 'shrine') this.say('There’s a fire ahead. Someone’s keeping it. Follow me.', 3.4);
     if (G.id === 'rest') this.say('Rest by the fire. The shrine will remember you if you fall.', 3.4);

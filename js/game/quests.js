@@ -230,7 +230,7 @@ export class Quests {
   // screen-space marker: a chevron on the screen edge pointing at the tracked place, or a small diamond over it
   draw(ctx, a, layer) {
     if (layer !== 'screen' || !this.navOn || this.game.cinematic || (this.game.ui && this.game.ui.modal)) return;
-    const g = this.game, T_ = this.target();
+    const g = this.game, T_ = this.target() || (g.story && g.story.navTarget);
     if (!T_) return;
     const c = g.cam, sc = g.baseZoom * c.zoom * g.pxRatio;
     let sx = (T_.x - c.rx) * sc + g.W / 2, sy = (T_.y - c.ry) * sc + g.H / 2;

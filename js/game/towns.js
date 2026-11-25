@@ -48,6 +48,7 @@ export class Towns {
     if (!p || (g.rift && g.rift.active)) return;
     if (p.wellRested > 0) p.wellRested -= dt;
     const tx = Math.floor(p.x / TILE);
+    if (g.ui && g.ui.teach && townNear(tx, 0) && !(p.sv.cards && p.sv.cards.town) && g.story && g.story.stage >= 5) g.ui.teach('town');
     // townsfolk live while you are near
     const tn = townNear(tx, 30);   // townsfolk only exist while the town is close
     for (const [bi, list] of this.folk) if (!tn || tn.bi !== bi) { for (const a of list) a.removed = true; this.folk.delete(bi); }

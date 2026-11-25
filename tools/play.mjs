@@ -124,6 +124,7 @@ while ((Date.now() - t0) / 1000 < SECS) {
     } else await tap('KeyE');
     await sleep(250); continue;
   }
+  if (st.modal === 'teach') { await sleep(700); await page.evaluate(() => { const b = document.querySelector('.tcard .tok'); if (b) b.click(); }); await sleep(300); continue; }
   if (st.modal === 'menu' || (st.modal === 'bag' && st.tut !== 'craft')) { await tap('Escape', 120); await sleep(200); continue; }
   if (st.dead) { await setPhase('dead'); await releaseAll(); await sleep(400); continue; }
 
