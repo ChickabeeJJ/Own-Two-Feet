@@ -246,5 +246,145 @@
  "req/charm_ember": [
   51,
   76
+ ],
+ "town/house": [
+  404,
+  342
+ ],
+ "town/smithy": [
+  408,
+  340
+ ],
+ "town/store": [
+  428,
+  342
+ ],
+ "town/inn": [
+  560,
+  454
+ ],
+ "town/tailor": [
+  380,
+  330
+ ],
+ "town/alchemist": [
+  398,
+  340
+ ],
+ "town/waystone": [
+  188,
+  230
+ ],
+ "town/well": [
+  188,
+  222
+ ],
+ "town/board": [
+  212,
+  188
+ ],
+ "town/stall": [
+  236,
+  190
+ ],
+ "town/lamp": [
+  132,
+  226
+ ],
+ "town/gate": [
+  128,
+  214
+ ],
+ "town/yard": [
+  134,
+  192
+ ],
+ "town/sign_store": [
+  158,
+  140
+ ],
+ "town/sign_smithy": [
+  156,
+  140
+ ],
+ "town/sign_tailor": [
+  154,
+  140
+ ],
+ "town/sign_alchemist": [
+  152,
+  140
+ ],
+ "town/folk_merchant": [
+  188,
+  250
+ ],
+ "town/folk_smith": [
+  148,
+  232
+ ],
+ "town/folk_tailor": [
+  144,
+  260
+ ],
+ "town/folk_alchemist": [
+  154,
+  264
+ ],
+ "town/folk_innkeeper": [
+  152,
+  246
+ ],
+ "town/folk_child": [
+  128,
+  210
+ ],
+ "ui/shop_buy": [
+  120,
+  118
+ ],
+ "ui/shop_temper": [
+  118,
+  118
+ ],
+ "ui/shop_tailor": [
+  120,
+  118
+ ],
+ "ui/shop_brew": [
+  120,
+  120
+ ],
+ "ui/shop_rest": [
+  116,
+  118
+ ],
+ "ui/shop_coin": [
+  120,
+  118
+ ],
+ "ui/slot": [
+  134,
+  136
+ ],
+ "ui/slot_hover": [
+  136,
+  140
+ ],
+ "ui/slot_sel": [
+  136,
+  140
+ ],
+ "ui/ring": [
+  222,
+  180
+ ],
+ "ui/panel": [
+  424,
+  164
+ ],
+ "ui/touch": [
+  92,
+  94
  ]
 }

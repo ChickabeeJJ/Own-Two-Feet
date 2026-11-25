@@ -657,3 +657,12 @@ body.modal #guidechip, body.bag-open #guidechip { opacity: 0; }
 @media (max-height: 500px) { #guidechip { bottom: 96px; } }
 
 .vessel.vfly { position: fixed; z-index: 70; pointer-events: none; margin: 0; }
+
+/* ---------------------------------------------------------------- painted UI pieces from the town sheet */
+.slot { background: url(../assets/ui/slot.png) center / 100% 100% no-repeat; border-color: transparent; backdrop-filter: none; -webkit-backdrop-filter: none; border-radius: 12px; }
+.slot:hover { background-image: url(../assets/ui/slot_hover.png); }
+.slot.sel { background-image: url(../assets/ui/slot_sel.png); border-color: transparent; box-shadow: 0 6px 22px rgba(0,0,0,.4); }
+.tb { background-image: url(../assets/ui/touch.png); background-size: 100% 100%; background-repeat: no-repeat; background-position: center; }
+.ring { background: url(../assets/ui/ring.png) center / 100% 100% no-repeat, radial-gradient(circle, color-mix(in srgb, var(--rc) 22%, transparent), transparent 68%); }
+#menu .panel { border: 14px solid transparent; border-image: url(../assets/ui/panel.png) 30 fill / 14px stretch; }
+#dialog .opt .oi { width: 22px; height: 22px; vertical-align: -6px; margin-right: 8px; }

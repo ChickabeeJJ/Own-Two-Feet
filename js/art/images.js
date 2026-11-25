@@ -4,6 +4,7 @@ const BIOMES = ['meadow', 'glass', 'hollow', 'ember', 'frost'];
 const TEX = [];
 for (const b of BIOMES) for (const k of ['groundA', 'groundB', 'rock', 'detail', 'accent', 'stone', 'ore', 'bark', 'foliage']) TEX.push(`tex/${b}_${k}`);
 for (const k of ['plank', 'brick', 'stone', 'plaster', 'obsidian', 'lava', 'sand', 'snow', 'ice']) TEX.push(`tex/build_${k}`);
+for (const k of ['roof', 'cobble', 'timber', 'plaster', 'window']) TEX.push(`tex/town_${k}`);
 const PROPS = ['shrine', 'campfire', 'bladestone', 'hearth', 'lantern', 'banner', 'seed'].map(n => 'props/' + n);
 const ICONS = ['stone', 'deepstone', 'shadowstone', 'sandstone', 'snow', 'earth', 'wood', 'planks', 'brick', 'ice', 'marble', 'obsidian', 'rootcrystal', 'sunstone', 'emberrock', 'rime', 'lantern', 'brazier'].map(n => 'icons/b_' + n)
   .concat(['vessel', 'vessel_empty', 'glimmer', 'r_djump', 'r_wall', 'r_plunge', 'r_surge', 'r_vessel'].map(n => 'icons/' + n));
@@ -11,13 +12,17 @@ const TREES = ['meadow', 'glass', 'hollow', 'ember', 'frost'].map(n => 'trees/' 
 const REQ = ['nest', 'satchel', 'ladder', 'platform', 'door', 'step', 'chest', 'bench', 'forge', 'loom', 'draught', 'flare', 'charge', 'lamp', 'pick_gilt', 'pick_crystal', 'charm_thread', 'charm_ember'].map(n => 'req/' + n);
 // painted cutscene plates (assets/cine/<name>.png): list a name here once its file exists and it replaces the built plate
 const CINE = [].map(n => 'cine/' + n);
+// the painted town sheet: buildings, props, signs, townsfolk; shop icons and UI frames
+const TOWN = ['house', 'smithy', 'store', 'inn', 'tailor', 'alchemist', 'waystone', 'well', 'board', 'stall', 'lamp', 'gate', 'yard',
+  'sign_store', 'sign_smithy', 'sign_tailor', 'sign_alchemist', 'folk_merchant', 'folk_smith', 'folk_tailor', 'folk_alchemist', 'folk_innkeeper', 'folk_child'].map(n => 'town/' + n)
+  .concat(['shop_buy', 'shop_temper', 'shop_tailor', 'shop_brew', 'shop_rest', 'shop_coin', 'slot', 'slot_hover', 'slot_sel', 'ring', 'panel', 'touch'].map(n => 'ui/' + n));
 const FX = ['slash', 'spark', 'wave', 'souls', 'dust', 'thread'].map(n => 'fx/' + n);
 
 export const IMG = {};
 let base = 'assets/';
 export function setBase(b) { base = b; }
 export function loadImages() {
-  const all = [...TEX, ...PROPS, ...ICONS, ...FX, ...TREES, ...REQ, ...CINE];
+  const all = [...TEX, ...PROPS, ...ICONS, ...FX, ...TREES, ...REQ, ...CINE, ...TOWN];
   return Promise.all(all.map(name => new Promise(res => {
     const im = new Image();
     im.onload = () => { IMG[name] = im; res(); };

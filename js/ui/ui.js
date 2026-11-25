@@ -67,6 +67,17 @@ export function drawSigil(canvas, seed) {
   g.setTransform(1, 0, 0, 1, 0, 0);
 }
 
+// the painted shop icons beside dialog choices: picked by what the choice does
+function optIcon(label, who) {
+  if (/^(Farewell|Stay|Not now|Leave|Drop it)/.test(label)) return null;
+  if (/^Temper|forge/i.test(label)) return 'shop_temper';
+  if (/^Sell|^Claim|bount/i.test(label)) return 'shop_coin';
+  if (/^Rest|Wake at|sleep/i.test(label)) return 'shop_rest';
+  if (/draught|tonic|elixir|brew/i.test(label) || who === 'Alchemist') return 'shop_brew';
+  if (/sew|tailor|cloth/i.test(label)) return 'shop_tailor';
+  if (/ x\d+$/.test(label)) return 'shop_buy';
+  return null;
+}
 export class UI {
   constructor(game) {
     this.game = game;
@@ -265,7 +276,8 @@ export class UI {
     if (!d.opts) d.opts = [];
     if (!d.opts.some(o => /^(Farewell|Wake at|Leave|Not now)/.test(o.label))) d.opts.push({ label: 'Farewell' });
     d.opts.forEach((o, i) => {
-      const b = el('button', 'opt', esc(o.label) + (o.cost ? ` <small>${o.cost.glimmer} glimmer${(o.cost.items || []).map(([t, n]) => ` + ${n} ${esc(TILES[t].name)}`).join('')}</small>` : ''));
+      const ic = optIcon(o.label, d.name);
+      const b = el('button', 'opt', (ic ? `<img class="oi" src="assets/ui/${ic}.png" alt="">` : '') + esc(o.label) + (o.cost ? ` <small>${o.cost.glimmer} glimmer${(o.cost.items || []).map(([t, n]) => ` + ${n} ${esc(TILES[t].name)}`).join('')}</small>` : ''));
       b.addEventListener('click', () => this.pickOpt(i));
       box.appendChild(b);
     });

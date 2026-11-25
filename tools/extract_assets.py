@@ -327,3 +327,125 @@ def clean_banner(outdir):
     im[..., 3][low & (lum < 95) & (sat < 40)] = 0
     rows = np.where(im[..., 3].max(axis=1) > 20)[0]; im = im[:rows.max() + 1]
     Image.fromarray(im.astype(np.uint8), 'RGBA').save(p, optimize=True)
+
+
+# the town sheet (1484 x 1060): boxes in sheet pixels, generous, stopping above each label
+TOWN_BOXES = {
+    # buildings
+    'town/house': (70, 165, 272, 346), 'town/smithy': (284, 165, 500, 346), 'town/store': (512, 165, 726, 346),
+    'town/inn': (728, 112, 1012, 346), 'town/tailor': (1008, 165, 1200, 346), 'town/alchemist': (1216, 165, 1418, 346),
+    # props
+    'town/waystone': (84, 448, 178, 574), 'town/well': (214, 452, 330, 574), 'town/board': (366, 468, 476, 574),
+    'town/stall': (512, 466, 648, 574), 'town/lamp': (690, 450, 780, 574), 'town/gate': (828, 456, 916, 574),
+    'town/yard': (968, 466, 1062, 574),
+    # shop signs
+    'town/sign_store': (1108, 484, 1198, 566), 'town/sign_smithy': (1198, 484, 1286, 566),
+    'town/sign_tailor': (1286, 484, 1374, 566), 'town/sign_alchemist': (1372, 484, 1460, 566),
+    # townsfolk
+    'town/folk_merchant': (806, 680, 920, 812), 'town/folk_smith': (930, 690, 1026, 812), 'town/folk_tailor': (1040, 676, 1136, 812),
+    'town/folk_alchemist': (1146, 676, 1240, 812), 'town/folk_innkeeper': (1252, 680, 1354, 812), 'town/folk_child': (1370, 700, 1442, 812),
+    # shop UI icons
+    'ui/shop_buy': (46, 922, 114, 994), 'ui/shop_temper': (114, 922, 182, 994), 'ui/shop_tailor': (182, 922, 250, 994),
+    'ui/shop_brew': (250, 922, 318, 994), 'ui/shop_rest': (318, 922, 386, 994), 'ui/shop_coin': (384, 922, 452, 994),
+    # UI elements
+    'ui/slot': (498, 912, 572, 990), 'ui/slot_hover': (571, 912, 645, 990), 'ui/slot_sel': (645, 912, 719, 990),
+    'ui/ring': (764, 868, 896, 992), 'ui/panel': (930, 906, 1154, 1000), 'ui/touch': (1190, 924, 1243, 990),
+}
+# seamless 64 x 64 tiles: cut the inner square of each painted swatch
+TOWN_TILES = {'roof': (64, 694, 168, 798), 'cobble': (206, 694, 306, 798), 'timber': (342, 694, 446, 798), 'plaster': (480, 694, 578, 798), 'window': (614, 694, 716, 798)}
+
+
+TOWN_DISC = {'town/lamp': 24, 'town/waystone': 56}
+TOWN_HOLLOW = {'ui/ring', 'ui/touch'}
+TOWN_CLEAR = {'town/inn': [(728, 100, 800, 150)]}   # header text that falls inside a box (sheet coords)   # rings: the dark inside becomes see-through   # dark painted glow discs count as board
+
+
+def matte(reg, thr=22, disc=None):
+    """flood the board away from the crop border; soft rim; colours bled into the rim"""
+    from collections import deque
+    from PIL import ImageFilter
+    h, w, _ = reg.shape
+    ring = np.concatenate([reg[:2].reshape(-1, 3), reg[-2:].reshape(-1, 3), reg[:, :2].reshape(-1, 3), reg[:, -2:].reshape(-1, 3)])
+    bg = np.median(ring, axis=0)
+    d = np.sqrt(((reg - bg) ** 2).sum(axis=2))
+    bgl = d < thr
+    if disc: bgl |= (reg.mean(axis=2) - bg.mean()) < disc
+    flood = np.zeros((h, w), bool); q = deque()
+    for y in range(h):
+        for x in (0, w - 1):
+            if bgl[y, x] and not flood[y, x]: flood[y, x] = True; q.append((y, x))
+    for x in range(w):
+        for y in (0, h - 1):
+            if bgl[y, x] and not flood[y, x]: flood[y, x] = True; q.append((y, x))
+    while q:
+        y, x = q.popleft()
+        for ny, nx in ((y + 1, x), (y - 1, x), (y, x + 1), (y, x - 1)):
+            if 0 <= ny < h and 0 <= nx < w and not flood[ny, nx] and bgl[ny, nx]:
+                flood[ny, nx] = True; q.append((ny, nx))
+    a = (~flood).astype(np.float32)
+    edge = np.asarray(Image.fromarray((a * 255).astype(np.uint8)).filter(ImageFilter.MinFilter(3))).astype(np.float32) / 255
+    rim = (a > 0) & (edge < 1)
+    a[rim] = np.clip((d[rim] - 10) / 40, 0.3, 1)
+    a = np.asarray(Image.fromarray((a * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(0.5))).astype(np.float32) / 255
+    col = reg.copy(); solid = edge >= 1
+    for _ in range(2):
+        acc = np.zeros_like(col); n = np.zeros(solid.shape, np.float32)
+        for sy, sx in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            m = np.roll(np.roll(solid, sy, 0), sx, 1); c = np.roll(np.roll(col, sy, 0), sx, 1)
+            acc += c * m[..., None]; n += m
+        grow = (~solid) & (n > 0) & rim
+        col[grow] = acc[grow] / n[grow][:, None]; solid = solid | grow
+    return col, a
+
+
+def keep_main(a, pad=6):
+    from collections import deque
+    m = a > 0.04; h, w = m.shape; lab = np.zeros((h, w), np.int32); boxes = []
+    for sy, sx in zip(*np.where(m)):
+        if lab[sy, sx]: continue
+        n = len(boxes) + 1; lab[sy, sx] = n; q = deque([(sy, sx)]); b = [sx, sy, sx, sy, 0]
+        while q:
+            y, x = q.popleft(); b[0] = min(b[0], x); b[1] = min(b[1], y); b[2] = max(b[2], x); b[3] = max(b[3], y); b[4] += 1
+            for ny, nx in ((y + 1, x), (y - 1, x), (y, x + 1), (y, x - 1)):
+                if 0 <= ny < h and 0 <= nx < w and m[ny, nx] and not lab[ny, nx]: lab[ny, nx] = n; q.append((ny, nx))
+        boxes.append(b)
+    big = max(boxes, key=lambda b: b[4])
+    keep = np.zeros((h, w), bool)
+    for i, b in enumerate(boxes):
+        if b[2] >= big[0] - pad and b[0] <= big[2] + pad and b[3] >= big[1] - pad and b[1] <= big[3] + pad: keep |= lab == i + 1
+    return a * keep
+
+
+def town_sprites(p, outdir, scale=2):
+    """cut the painted town sheet: buildings, props, signs, townsfolk, shop icons and UI pieces as sprites
+    (upscaled 2x with a smooth filter so they hold up at game size), and the five tiles as seamless 64 x 64"""
+    img = load(p)
+    # the section header rules run behind the inn's roof and the crafting ring: paint their grey-brown
+    # pixels back to board colour (the red roof and the gold ring are kept)
+    bg = img[150, 60].copy()
+    for y in (133, 134, 135, 136, 895, 896, 897, 898):
+        row = img[y]; r, g_, b = row[:, 0], row[:, 1], row[:, 2]
+        line = (np.abs(r - g_) < 35) & (np.abs(g_ - b) < 30)
+        row[line] = bg
+    meta = json.load(open(outdir + '/sprites.json'))
+    for name, (x0, y0, x1, y1) in TOWN_BOXES.items():
+        os.makedirs(os.path.dirname(f'{outdir}/{name}.png'), exist_ok=True)
+        col, a = matte(img[y0:y1, x0:x1], disc=TOWN_DISC.get(name))
+        if name in TOWN_HOLLOW: a[col.mean(axis=2) < 45] = 0
+        for cx0, cy0, cx1, cy1 in TOWN_CLEAR.get(name, []): a[max(0, cy0 - y0):max(0, cy1 - y0), max(0, cx0 - x0):max(0, cx1 - x0)] = 0
+        # keep the largest connected blob and whatever touches its box (drops stray header text)
+        a = keep_main(a)
+        ys, xs = np.where(a > 0.04)
+        if not len(xs): print('empty', name); continue
+        bx0, bx1, by0, by1 = xs.min(), xs.max() + 1, ys.min(), ys.max() + 1
+        rgba = np.dstack([col[by0:by1, bx0:bx1], a[by0:by1, bx0:bx1] * 255]).clip(0, 255).astype(np.uint8)
+        im = Image.fromarray(rgba, 'RGBA')
+        im = im.resize((im.width * scale, im.height * scale), Image.LANCZOS)
+        im.save(f'{outdir}/{name}.png', optimize=True)
+        meta[name] = (im.width, im.height)
+    os.makedirs(outdir + '/tex', exist_ok=True)
+    for name, (x0, y0, x1, y1) in TOWN_TILES.items():
+        w, h = x1 - x0, y1 - y0; ix, iy = int(w * 0.12), int(h * 0.12)
+        sw = Image.fromarray(img[y0 + iy:y1 - iy, x0 + ix:x1 - ix].clip(0, 255).astype(np.uint8), 'RGB').resize((64, 64), Image.LANCZOS)
+        sw.save(f'{outdir}/tex/town_{name}.png', optimize=True)
+    json.dump(meta, open(outdir + '/sprites.json', 'w'), indent=1)

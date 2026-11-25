@@ -45,7 +45,9 @@ function texName(t, id) {
     case T.BRICK: return 'build_brick';
     case T.RUIN: case T.GATE: return 'build_stone';
     case T.MARBLE: return 'build_plaster';
-    case T.ROAD: return 'build_stone';
+    case T.ROAD: return IMG['tex/town_cobble'] ? 'town_cobble' : 'build_stone';
+    case T.ROOF: return 'town_roof';
+    case T.TIMBER: return 'town_timber';
     case T.OBSIDIAN: return 'build_obsidian';
     case T.LOG: case T.WOOD: return id + '_bark';
     case T.LEAVES: return id + '_foliage';
