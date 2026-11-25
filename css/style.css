@@ -595,13 +595,19 @@ body.modal #combo, body.modal #streak, body.bag-open #combo { opacity: 0; }
 @media (max-height: 500px) { #combo { top: 26%; right: 12px; } }
 
 /* level and experience */
-#xp { display: flex; align-items: center; gap: 7px; margin-top: 6px; }
-#lvl { min-width: 20px; height: 20px; padding: 0 5px; border-radius: 6px; display: grid; place-items: center; font: 800 11px Manrope; color: #10212a; background: linear-gradient(180deg, #dff9ff, #8fd8ee); }
-#xp-bar { width: 96px; height: 3px; border-radius: 2px; background: rgba(255,255,255,.12); overflow: hidden; }
-#xp-fill { height: 100%; width: 0; background: linear-gradient(90deg, #8fd8ee, #e6fbff); transition: width .35s var(--ease); }
-#xp.bump #lvl { animation: comboBump .3s var(--ease); }
-#xp.pick #lvl { box-shadow: 0 0 0 0 rgba(191,246,255,.7); animation: pickPulse 1.4s ease-in-out infinite; }
-@keyframes pickPulse { 50% { box-shadow: 0 0 0 6px rgba(191,246,255,0); } }
+/* a thin line of experience just above the hotbar, the level in a small serif badge at its left */
+#xp { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(max(18px, env(safe-area-inset-bottom)) + 58px); width: min(52vw, 460px); display: flex; align-items: center; gap: 9px; pointer-events: auto; }
+#lvl { flex: 0 0 auto; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font: 500 15px/1 'Cormorant Garamond', serif; color: #f3ece0; background: radial-gradient(circle at 50% 35%, #2a2533, #15121b); box-shadow: 0 0 0 1px rgba(255,217,160,.55), 0 2px 8px rgba(0,0,0,.45); }
+#xp-bar { flex: 1 1 auto; height: 3px; border-radius: 2px; background: rgba(255,255,255,.1); overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,.35); }
+#xp-fill { height: 100%; width: 0; background: linear-gradient(90deg, #6fbcd2, #dff9ff); box-shadow: 0 0 6px rgba(159,243,255,.6); transition: width .5s var(--ease); }
+#xp.bump #xp-fill { animation: xpFlash .5s ease-out; }
+#xp.up #lvl { animation: lvlPop .6s var(--ease); }
+#xp.pick #lvl { animation: pickPulse 1.4s ease-in-out infinite; box-shadow: 0 0 0 1px rgba(191,246,255,.9), 0 2px 8px rgba(0,0,0,.45); }
+@keyframes xpFlash { 0% { filter: brightness(2.2); } 100% { filter: none; } }
+@keyframes lvlPop { 0% { transform: scale(1); } 35% { transform: scale(1.35); color: #bff6ff; } 100% { transform: scale(1); } }
+body.touch #xp { bottom: calc(max(12px, env(safe-area-inset-bottom)) + 50px); width: min(46vw, 380px); }
+body.bag-open #xp, body.modal #xp { opacity: 0; pointer-events: none; transition: opacity .3s; }
+@keyframes pickPulse { 50% { box-shadow: 0 0 0 1px rgba(191,246,255,.9), 0 0 0 7px rgba(191,246,255,0); } }
 .char { display: flex; flex-direction: column; gap: 14px; }
 .char-head { display: flex; align-items: center; gap: 22px; flex-wrap: wrap; }
 .char-lv { display: flex; flex-direction: column; align-items: center; }
