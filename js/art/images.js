@@ -9,13 +9,15 @@ const ICONS = ['stone', 'deepstone', 'shadowstone', 'sandstone', 'snow', 'earth'
   .concat(['vessel', 'vessel_empty', 'glimmer', 'r_djump', 'r_wall', 'r_plunge', 'r_surge', 'r_vessel'].map(n => 'icons/' + n));
 const TREES = ['meadow', 'glass', 'hollow', 'ember', 'frost'].map(n => 'trees/' + n);
 const REQ = ['nest', 'satchel', 'ladder', 'platform', 'door', 'step', 'chest', 'bench', 'forge', 'loom', 'draught', 'flare', 'charge', 'lamp', 'pick_gilt', 'pick_crystal', 'charm_thread', 'charm_ember'].map(n => 'req/' + n);
+// painted cutscene plates (assets/cine/<name>.png): list a name here once its file exists and it replaces the built plate
+const CINE = [].map(n => 'cine/' + n);
 const FX = ['slash', 'spark', 'wave', 'souls', 'dust', 'thread'].map(n => 'fx/' + n);
 
 export const IMG = {};
 let base = 'assets/';
 export function setBase(b) { base = b; }
 export function loadImages() {
-  const all = [...TEX, ...PROPS, ...ICONS, ...FX, ...TREES, ...REQ];
+  const all = [...TEX, ...PROPS, ...ICONS, ...FX, ...TREES, ...REQ, ...CINE];
   return Promise.all(all.map(name => new Promise(res => {
     const im = new Image();
     im.onload = () => { IMG[name] = im; res(); };

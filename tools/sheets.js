@@ -5,7 +5,8 @@ import { Cape, drawShadow } from '../js/physics/skin.js';
 import { drawDoll } from '../js/art/doll.js';
 import { lookFromSave, newSave } from '../js/game/progress.js';
 import { LOOKS } from '../js/game/npcs.js';
-import { HUSK_LOOK, BRUTE_LOOK, drawWispSprite } from '../js/game/enemies.js';
+import { HUSK_LOOK, BRUTE_LOOK, LANCER_LOOK, SLINGER_LOOK, drawWispSprite } from '../js/game/enemies.js';
+import { PrologueArt, WARDEN_INFO } from '../js/art/prologue.js';
 import { TYPES, Warden, Wraith, Golem } from '../js/game/bosses.js';
 import { drawThreadSprite } from '../js/game/thread.js';
 import { drawGlow } from '../js/world/light.js';
@@ -321,6 +322,55 @@ function towns() {
   slot(1580, 1590, 760, 340, 'Shop UI icons', '96 x 96 each', 'buy, sell, temper, rest, travel, bounty', (cx, gy) => { ['BUY', 'SELL', 'TEMPER', 'REST', 'TRAVEL', 'BOUNTY'].forEach((t, i) => { const x = cx - 300 + i * 120, y = gy - 120; g.strokeStyle = 'rgba(255,240,220,.45)'; g.lineWidth = 2; g.beginPath(); g.arc(x, y, 42, 0, TAU); g.stroke(); g.fillStyle = 'rgba(243,236,224,.6)'; g.font = '600 11px Manrope'; g.textAlign = 'center'; g.fillText(t, x, y + 4); }); });
 }
 
+// ---------------------------------------------------------------- requests 2: cutscene, rigs, weapons, effects
+function requests2() {
+  const W = 2400, H = 2380;
+  const g = board('requests2', W, H, 'Art requests II', 'cutscene plates, enemy and warden rig parts, weapons and effects: the current build shown in each slot, paint over it');
+  const slot = (x, y, w, h, name, size, note, draw) => {
+    g.save();
+    g.fillStyle = 'rgba(255,255,255,.03)'; g.beginPath(); g.roundRect(x, y, w, h, 16); g.fill();
+    g.setLineDash([6, 6]); g.strokeStyle = 'rgba(255,240,220,.25)'; g.lineWidth = 1.5; g.beginPath(); g.roundRect(x, y, w, h, 16); g.stroke(); g.setLineDash([]);
+    g.restore();
+    g.save(); g.beginPath(); g.rect(x + 10, y + 10, w - 20, h - 74); g.clip(); draw(x + w / 2, y + (h - 64) / 2 + 5, w - 20, h - 74); g.restore();
+    label(g, x + w / 2, y + h - 34, name, size + (note ? ' · ' + note : ''));
+  };
+  const note = (x, y, lines) => { g.fillStyle = 'rgba(243,236,224,.55)'; g.font = 'italic 500 19px Cormorant'; g.textAlign = 'left'; lines.forEach((t, i) => g.fillText(t, x, y + i * 24)); };
+  const P = new PrologueArt(); P.p.finish();
+  const plate = (name) => (cx, cy, w, h) => { const im = P.p.get(name); if (!im) return; const k = Math.min(w / im.width, h / im.height); g.drawImage(im, cx - im.width * k / 2, cy - im.height * k / 2, im.width * k, im.height * k); };
+  section(g, 60, 196, 'Cutscene: vista layers (1600 x 900 each, saved as assets/cine/<name>.png)');
+  note(60, 226, ['Four layers that slide at different speeds: sky is opaque, the other three are transparent above their shapes. Keep the low sun at the left third and the rose window on the centre line.']);
+  [['sky', 'opaque'], ['far', 'transparent, distant ridges'], ['cath', 'transparent, the Loom-Cathedral'], ['near', 'transparent, framing cliffs']].forEach(([n, t], i) => slot(60 + i * 575, 250, 555, 380, 'cine/' + n + '.png', '1600 x 900', t, plate(n)));
+  section(g, 60, 696, 'Cutscene: the five Warden portraits (1600 x 900, full plate)');
+  note(60, 726, ['One figure, centred, standing on the lower tenth; keep the top 12% and the band at 76 to 84% calm for the lore line and the name card. Clean, sleek, minimal: big readable shapes, one light.']);
+  WARDEN_INFO.forEach((wi, i) => slot(60 + i * 460, 750, 440, 330, 'cine/w' + i + '.png', '1600 x 900', wi.name, plate('w' + i)));
+  section(g, 60, 1146, 'In-game rigs: separate parts per character (side view facing right, transparent PNG)');
+  note(60, 1176, ['Each character is a jointed doll: head, torso, pelvis, upper arm, forearm, hand, thigh, shin, foot. Paint each part on its own, joints as round ends so they rotate cleanly.', 'Name them rig/<character>/<part>.png. Sizes are for a doll 120 px tall (the in-game doll is about 64 px; I scale down).']);
+  const rigDiagram = (cx, cy) => {
+    const parts = [['head', 0, -96, 22, 22], ['torso', 0, -48, 24, 34], ['pelvis', 0, -6, 20, 10], ['upper arm', -54, -56, 8, 22], ['forearm', -54, -14, 7, 20], ['hand', -54, 14, 7, 7], ['thigh', 54, -14, 9, 24], ['shin', 54, 30, 8, 22], ['foot', 54, 62, 14, 6]];
+    for (const [n, dx, dy, rx, ry] of parts) { g.strokeStyle = 'rgba(255,217,160,.6)'; g.lineWidth = 2; g.beginPath(); g.roundRect(cx + dx - rx, cy + dy - ry, rx * 2, ry * 2, Math.min(rx, ry)); g.stroke(); g.fillStyle = 'rgba(243,236,224,.6)'; g.font = '500 12px Manrope'; g.textAlign = 'center'; g.fillText(n, cx + dx + (dx < 0 ? -48 : dx > 0 ? 50 : 52), cy + dy + 4); }
+  };
+  slot(60, 1226, 440, 400, 'Part layout', 'one PNG per part', 'joint at each end', rigDiagram);
+  const eye = '#ff6a4a';
+  const rigs = [['Husk', HUSK_LOOK(eye), 2.6], ['Lancer', LANCER_LOOK(eye), 2.6], ['Slinger', SLINGER_LOOK(eye), 2.6], ['Brute', BRUTE_LOOK(eye), 2.2]];
+  rigs.forEach(([n, look, sc], i) => slot(520 + i * 330, 1226, 310, 400, n, 'rig/' + n.toLowerCase() + '/', 'parts', (cx, cy) => drawFigure(g, cx, cy + 130, look, sc, { st: { mode: 'ground' }, ticks: 40 }, { blade: true })));
+  slot(1860, 1226, 480, 400, 'Wisp', '192 x 192', 'one sprite, 4-frame wing loop', (cx, cy) => { g.save(); g.translate(cx, cy); g.scale(2.4, 2.4); drawWispSprite(g, 0, 0, 1.3, eye); g.restore(); });
+  section(g, 60, 1692, 'Weapons and effects (transparent PNG)');
+  note(60, 1722, ['Weapons lie flat pointing right, grip at the left, as they are held. Effects are additive glows on black or transparent.']);
+  const icon = (id) => (cx, cy) => drawItemIcon(g, id, cx, cy, 150);
+  [['w_blade', 'Blade', '256 x 64'], ['w_spear', 'Spear', '384 x 64'], ['w_hammer', 'Greathammer', '256 x 128'], ['w_daggers', 'Twin daggers', '128 x 48 each'], ['w_sling', 'Sling', '128 x 128']].forEach(([id, n, sz], i) => slot(60 + i * 300, 1746, 280, 300, n, sz, 'weapons/' + id.slice(2) + '.png', icon(id)));
+  const fxSlot = (draw) => (cx, cy) => { g.save(); g.globalCompositeOperation = 'lighter'; draw(cx, cy); g.restore(); };
+  slot(1560, 1746, 380, 300, 'Infusion glows', '256 x 64 each', 'ember, frost', fxSlot((cx, cy) => { [['#ff8a3a', -40], ['#9ff3ff', 40]].forEach(([c, dy]) => { const gr = g.createLinearGradient(cx - 120, 0, cx + 120, 0); gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(0.5, c); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.strokeStyle = gr; g.lineWidth = 10; g.lineCap = 'round'; g.beginPath(); g.moveTo(cx - 120, cy + dy); g.lineTo(cx + 120, cy + dy); g.stroke(); }); }));
+  slot(1960, 1746, 380, 300, 'Double jump', '192 x 96', 'a ring of light under the feet', fxSlot((cx, cy) => { g.strokeStyle = '#bff6ff'; g.lineWidth = 4; g.beginPath(); g.ellipse(cx, cy + 30, 80, 20, 0, 0, TAU); g.stroke(); g.lineWidth = 2; g.beginPath(); g.ellipse(cx, cy + 30, 50, 12, 0, 0, TAU); g.stroke(); }));
+  slot(60, 2066, 560, 270, 'Rift tear', '256 x 384', 'a vertical wound in the air, cyan core', fxSlot((cx, cy) => { const gr = g.createLinearGradient(cx - 30, 0, cx + 30, 0); gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(0.5, '#9ff3ff'); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.beginPath(); g.moveTo(cx, cy - 90); g.quadraticCurveTo(cx + 30, cy, cx, cy + 90); g.quadraticCurveTo(cx - 30, cy, cx, cy - 90); g.closePath(); g.fill(); }));
+  slot(640, 2066, 900, 270, 'Level bar frame', '9-slice, 640 x 24', 'thin line, a round badge for the number at its left', (cx, cy) => {
+    g.strokeStyle = 'rgba(255,240,220,.4)'; g.lineWidth = 2; g.beginPath(); g.roundRect(cx - 300, cy - 5, 640, 10, 5); g.stroke();
+    g.fillStyle = 'rgba(159,214,224,.8)'; g.beginPath(); g.roundRect(cx - 300, cy - 5, 380, 10, 5); g.fill();
+    g.fillStyle = '#16131c'; g.strokeStyle = 'rgba(255,217,160,.7)'; g.beginPath(); g.arc(cx - 340, cy, 30, 0, TAU); g.fill(); g.stroke();
+    g.fillStyle = '#f3ece0'; g.font = '500 28px Cormorant'; g.textAlign = 'center'; g.fillText('7', cx - 340, cy + 9);
+  });
+  slot(1560, 2066, 780, 270, 'Tutorial card frame', '9-slice, 720 x 420', 'the panel that teaches each new thing', (cx, cy) => { g.fillStyle = 'rgba(20,17,26,.92)'; g.strokeStyle = 'rgba(255,217,160,.35)'; g.lineWidth = 2; g.beginPath(); g.roundRect(cx - 220, cy - 90, 440, 180, 14); g.fill(); g.stroke(); g.strokeStyle = 'rgba(255,240,220,.15)'; g.strokeRect(cx - 200, cy - 72, 160, 144); });
+}
+
 setBase('../assets/');
 const loadImg = (src) => new Promise(r => { const i = new Image(); i.onload = () => r(i); i.onerror = () => r(null); i.src = src; });
 Promise.all(['meadow', 'glass', 'hollow', 'ember', 'frost', 'shrine'].map(id => loadImg('../art/sheets/scenes/' + id + '.png').then(i => [id, i])))
@@ -330,5 +380,6 @@ Promise.all(['meadow', 'glass', 'hollow', 'ember', 'frost', 'shrine'].map(id => 
   try { assets(); } catch (e) { console.error('assets', e.stack); }
   try { requests(); } catch (e) { console.error('requests', e.stack); }
   try { towns(); } catch (e) { console.error('towns', e.stack); }
+  try { requests2(); } catch (e) { console.error('requests2', e.stack); }
   window.__sheetsDone = true;
 });

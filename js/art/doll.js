@@ -202,8 +202,12 @@ function headMid(g, look, r, s, f, tint, o) {
   const h = look.head;
   if (h === 'crescent') {
     // a pale half mask over the facing side of the face
-    g.fillStyle = tint(look.maskCol || '#d8c7a8');
-    g.beginPath(); g.arc(0, 0, r * 0.98, -Math.PI / 2, Math.PI / 2, f < 0); g.quadraticCurveTo(r * 0.35 * f, 0, 0, -r * 0.98); g.fill();
+    // a clean face plate on the facing side: one closed shape, a soft ramp, one hairline crack
+    const R = Math.round, mc = tint(look.maskCol || '#d8c7a8'), mx = R(r * 0.22 * f), mw = R(r * 0.7), mh = R(r * 0.86);
+    const mg = g.createLinearGradient(mx - mw, -mh, mx + mw, mh); mg.addColorStop(0, shade(mc, 0.08)); mg.addColorStop(1, shade(mc, -0.28));
+    g.beginPath(); g.ellipse(mx, R(r * 0.04), mw, mh, 0, 0, TAU); g.closePath(); g.fillStyle = mg; g.fill();
+    g.lineJoin = g.lineCap = 'round'; g.lineWidth = Math.max(1, R(0.9 * s)); g.strokeStyle = rgba('#0c0a0e', 0.45); g.stroke();
+    g.strokeStyle = rgba('#0c0a0e', 0.6); g.beginPath(); g.moveTo(mx + R(r * 0.18 * f), R(-mh * 0.95)); g.lineTo(mx + R(r * 0.3 * f), R(-r * 0.42)); g.lineTo(mx + R(r * 0.16 * f), R(-r * 0.24)); g.stroke();
   } else if (h === 'ears') {
     // lighter muzzle
     g.fillStyle = tint(shade(look.body, 0.25)); g.beginPath(); g.ellipse(r * 0.35 * f, r * 0.3, r * 0.42, r * 0.32, 0, 0, TAU); g.fill();
