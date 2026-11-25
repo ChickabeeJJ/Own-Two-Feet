@@ -5,7 +5,6 @@ import { Body, P } from '../physics/body.js';
 import { Animator } from '../physics/pose.js';
 import { Cape, drawBody, drawShadow, bladeGeom } from '../physics/skin.js';
 import { clamp, lerp, sign } from '../core/util.js';
-import { IMG } from '../art/images.js';
 const smooth01 = (t) => t * t * (3 - 2 * t);
 
 export const PHYS = {
@@ -496,15 +495,6 @@ export class Actor {
     const px = b.ipx(P.PELVIS, a), py = b.ipy(P.PELVIS, a);
     const gy = this.world.groundBelow(px, py, 220);
     if (gy !== null) drawShadow(ctx, px, gy, 22 * this.scale, clamp(1 - (gy - py - 30 * this.scale) / 180, 0, 1) * alpha);
-    // a painted townsperson: the sprite stands on the ground, faces its way, bobs as it walks
-    const spr = this.sprite && IMG[this.sprite];
-    if (spr && gy !== null) {
-      const h = 84 * this.scale, w = spr.width * h / spr.height, sp = Math.abs(this.c.vx);
-      const bob = sp > 8 ? Math.abs(Math.sin((this.game ? this.game.time : 0) * 9)) * 2.5 : 0, lean = clamp(this.c.vx / 900, -0.06, 0.06);
-      ctx.save(); ctx.globalAlpha = alpha; ctx.translate(Math.round(this.c.x), Math.round(gy - bob)); ctx.rotate(lean); ctx.scale(this.facing < 0 ? -1 : 1, 1);
-      ctx.drawImage(spr, -w / 2, -h + 4, w, h); ctx.restore();
-      return;
-    }
     // dash after-images
     if (this.trail.length) {
       ctx.save(); ctx.globalCompositeOperation = 'lighter';

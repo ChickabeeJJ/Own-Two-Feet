@@ -324,34 +324,17 @@ export class UI {
     if (Input.pressed('menu')) { Input.consume('menu'); const c = d.cancel; this.closeDialog(); if (c) c(); }
   }
   // ------------------------------------------------------------ teaching cards (first time only, kept in the Guide)
-  teach(id, force) {
-    const C = CARDS[id], g = this.game, sv = this.sv; if (!C || !sv) return false;
-    sv.cards = sv.cards || {};
-    if (sv.cards[id] && !force) return false;
-    if (this.modal || g.cinematic || this.dlg) { this.teachQ = this.teachQ || []; if (!this.teachQ.includes(id)) this.teachQ.push(id); return false; }
-    sv.cards[id] = 1;
-    const box = el('div', 'teach'), card = el('div', 'tcard');
-    const cv = document.createElement('canvas'); cv.width = 400; cv.height = 180; drawCardPic(cv, C.pic);
-    card.appendChild(cv);
-    card.appendChild(el('div', 'tt', esc(C.title)));
-    for (const l of C.lines) card.appendChild(el('p', '', esc(l)));
-    const ok = el('button', 'tok', 'Got it'); card.appendChild(ok);
-    box.appendChild(card); document.body.appendChild(box);
-    this.modal = 'teach'; document.body.classList.add('modal');
-    const mp = g.net && g.net.active; if (!mp) g.paused = true;
-    Audio.play('chime', { pitch: 1.1, vol: 0.6 });
-    const close = () => {
-      if (!box.isConnected) return;
-      box.classList.add('out'); setTimeout(() => box.remove(), 260);
-      window.removeEventListener('keydown', key, true);
-      this.modal = null; document.body.classList.remove('modal'); g.paused = false;
-      Audio.play('blip'); g.saveNow && g.saveNow();
-    };
-    const key = (e) => { if (['Enter', 'Space', 'Escape', 'KeyE', 'KeyJ'].includes(e.code)) { e.preventDefault(); e.stopPropagation(); close(); } };
-    setTimeout(() => window.addEventListener('keydown', key, true), 350);
-    ok.onclick = close;
+  // something new became relevant: it goes into the Guide (no pop-up), with a quiet note and a dot on the menu
+  teach(id) {
+    const C = CARDS[id], sv = this.sv; if (!C || !sv) return false;
+    sv.cards = sv.cards || {}; sv.cardsNew = sv.cardsNew || {};
+    if (sv.cards[id]) return false;
+    sv.cards[id] = 1; sv.cardsNew[id] = 1;
+    this.toast(`New in the Guide: ${C.title}`);
+    this.guideDot();
     return true;
   }
+  guideDot() { const b = $('#btn-menu'); if (b) b.classList.toggle('newdot', Object.keys((this.sv && this.sv.cardsNew) || {}).length > 0); }
   // the compass strip: the gate, the nearest Thread of Light, the tracked place, shrines and towns, with distances
   compassStrip() {
     const g = this.game, p = g.player, sv = this.sv, c = $('#compass'); if (!c || !p) return;
@@ -373,20 +356,35 @@ export class UI {
     const html = compassHTML(pois, range);
     if (c.dataset.h !== html) { c.innerHTML = html; c.dataset.h = html; }
   }
+  // the Guide: a small book. Entries on the left page by section, the open entry on the right page
   tab_guide(body) {
-    const seen = this.sv.cards || {}, ids = Object.keys(CARDS).filter(k => seen[k]);
-    body.appendChild(el('div', 'sec-title', 'What you have learned'));
-    if (!ids.length) { body.appendChild(el('p', 'dim', 'Nothing yet. Each new thing you meet is explained here.')); return; }
-    const grid = el('div', 'guide-grid');
-    for (const k of ids) { const C = CARDS[k], b = el('button', 'guide-item', `<b>${esc(C.title)}</b><span>${esc(C.lines[0])}</span>`); b.onclick = () => { this.closeMenu(); this.teach(k, true); }; grid.appendChild(b); }
-    body.appendChild(grid);
+    const sv = this.sv, seen = sv.cards || {}, fresh = sv.cardsNew || (sv.cardsNew = {});
+    const ids = Object.keys(CARDS).filter(k => seen[k]);
+    const book = el('div', 'gbook');
+    if (!ids.length) { book.appendChild(el('div', 'gb-empty', '<b>Nothing written yet</b><span>Each new thing you meet is explained here.</span>')); body.appendChild(book); return; }
+    if (!this.guideOpen || !seen[this.guideOpen]) this.guideOpen = ids.find(k => fresh[k]) || ids[0];
+    const left = el('div', 'gb-page gb-list'), right = el('div', 'gb-page gb-entry');
+    for (const sec of ['Basics', 'World', 'Combat', 'Building']) {
+      const list = ids.filter(k => (CARDS[k].sec || 'Basics') === sec); if (!list.length) continue;
+      left.appendChild(el('div', 'gb-sec', sec));
+      for (const k of list) {
+        const b = el('button', 'gb-item' + (k === this.guideOpen ? ' on' : ''), `<i class="gb-ic"></i><span>${esc(CARDS[k].title)}</span>${fresh[k] ? '<em>new</em>' : ''}`);
+        b.onclick = () => { this.guideOpen = k; Audio.play('blip'); this.renderMenu(); };
+        left.appendChild(b);
+      }
+    }
+    const C = CARDS[this.guideOpen];
+    delete fresh[this.guideOpen]; this.guideDot();
+    const cv = document.createElement('canvas'); cv.width = 400; cv.height = 180; cv.className = 'gb-pic'; drawCardPic(cv, C.pic);
+    right.appendChild(cv);
+    right.appendChild(el('div', 'gb-title', esc(C.title)));
+    for (const l of C.lines) right.appendChild(el('p', 'gb-line', esc(l)));
+    const how = this.game.touch ? C.touch : C.keys;
+    if (how) right.appendChild(el('div', 'gb-how', how));
+    book.appendChild(left); book.appendChild(right);
+    body.appendChild(book);
   }
-  // the touch Strike button says what it will do: strike, mine or place
-  strikeMode(mode) {
-    const b = document.querySelector('.tb[data-a="attack"]'); if (!b) return;
-    b.dataset.mode = mode || '';
-    const sp = b.querySelector('span'); if (sp) sp.textContent = mode === 'mine' ? 'Mine' : mode === 'place' ? 'Place' : 'Strike';
-  }
+
   shop(name, items) {
     this.dialog(name, ['Have a look. Everything is honest, mostly.'], items.map(it => ({ label: it.label, cost: it.cost, act: it.act })).concat([{ label: 'Farewell' }]));
     this.dlg.shown = 999;
@@ -880,7 +878,7 @@ export class UI {
     } else pr.classList.add('hidden');
     // the compass strip, and any teaching card that waited for a quiet moment
     if ((g.frame % 15) === 0) this.compassStrip();
-    if (this.teachQ && this.teachQ.length && !this.modal && !this.dlg && !g.cinematic) this.teach(this.teachQ.shift());
+    if ((g.frame % 90) === 0) this.guideDot();
   }
   pausedTick(dt) { /* menus animate via CSS; dialog/preview run in frame() */ }
   renderHotbar() {

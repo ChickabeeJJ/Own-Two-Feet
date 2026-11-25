@@ -15,8 +15,6 @@ import { drawGlow } from '../world/light.js';
 import { rand, clamp, rgba, hash2, TAU, lerp } from '../core/util.js';
 
 const KEEPER = { store: ['wanderer', 'Merchant'], smithy: ['smith', 'Smith'], tailor: ['tailor', 'Tailor'], alchemist: ['sage', 'Alchemist'], inn: ['wanderer', 'Innkeeper'] };
-const KEEPER_SPRITE = { store: 'folk_merchant', smithy: 'folk_smith', tailor: 'folk_tailor', alchemist: 'folk_alchemist', inn: 'folk_innkeeper' };
-const FOLK_SPRITES = ['folk_merchant', 'folk_smith', 'folk_tailor', 'folk_alchemist', 'folk_child', 'folk_innkeeper'];
 const FOLK_COLS = ['#efe6d6', '#d8c8ae', '#c9b48a', '#eab3b8', '#b8c8d8', '#c0d8b8', '#d8b8e0'];
 const BARKS = ['Mind the rift-scars on the road.', 'Fresh bread at the inn!', 'They say a Warden stirs past the gate.', 'Another doll on two feet? Welcome.', 'The smith can make that edge sing.', 'Bounties on the board, if you have the nerve.', 'Lovely evening for it.', 'My cousin crossed the gate. Never wrote back.'];
 const STORE = [
@@ -82,13 +80,13 @@ export class Towns {
     const g = this.game, list = [], base = this.base(tn.cx);
     for (const B of BUILDINGS) {
       const k = KEEPER[B.kind]; if (!k) continue;
-      const a = this.spawn(k[0], k[1], (tn.cx + B.x + B.w / 2) * TILE, base * TILE, { keeper: B.kind, sprite: KEEPER_SPRITE[B.kind] });
+      const a = this.spawn(k[0], k[1], (tn.cx + B.x + B.w / 2) * TILE, base * TILE, { keeper: B.kind });
       list.push(a);
     }
     for (let i = 0; i < 6; i++) {
       const x = tn.cx + (hash2(tn.bi, i, 7) - 0.5) * 90;
       const kind = ['wanderer', 'smith', 'tailor', 'sage'][i % 4];
-      const a = this.spawn(kind, ['Townsfolk', 'Carter', 'Lamplighter', 'Baker', 'Child', 'Watch'][i], x * TILE, base * TILE, { folk: true, col: FOLK_COLS[i % FOLK_COLS.length], scale: i === 4 ? 0.72 : 1, sprite: FOLK_SPRITES[i % FOLK_SPRITES.length] });
+      const a = this.spawn(kind, ['Townsfolk', 'Carter', 'Lamplighter', 'Baker', 'Child', 'Watch'][i], x * TILE, base * TILE, { folk: true, col: FOLK_COLS[i % FOLK_COLS.length], scale: i === 4 ? 0.72 : 1 });
       a.walkDir = hash2(tn.bi, i, 9) < 0.5 ? -1 : 1; a.walkT = rand(1, 4); a.home = tn.cx;
       list.push(a);
     }
@@ -99,7 +97,7 @@ export class Towns {
     const look = Object.assign({}, LOOKS[kind]);
     if (o.col) { look.body = look.limb = o.col; }
     const a = new Actor(g, { x, y, team: 'npc', look, facing: Math.random() < 0.5 ? -1 : 1, blade: false, scale: o.scale || 1, run: 70 });
-    a.npcKind = o.keeper === 'tailor' ? 'tailor' : kind; a.npcName = name; if (o.sprite) a.sprite = 'town/' + o.sprite; a.townKeeper = o.keeper || null; a.folk = !!o.folk;
+    a.npcKind = o.keeper === 'tailor' ? 'tailor' : kind; a.npcName = name; a.townKeeper = o.keeper || null; a.folk = !!o.folk;
     g.actors.push(a);
     return a;
   }

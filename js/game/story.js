@@ -412,6 +412,7 @@ export class Story {
   finishTutorial(skipped) {
     const g = this.game;
     this.sv.tutDone = 1; this.sv.obj = 0;
+    if (g.ui && g.ui.teach) for (const k of ['build', 'parry', 'mend']) g.ui.teach(k);
     this.ui && this.ui.tutorial(null);
     if (!skipped) { this.card('Tutorial complete', 'now the world is yours', 'small gain', 2.6); Audio.play('chime'); }
     // the training doll has done its job: it comes apart in a puff of straw

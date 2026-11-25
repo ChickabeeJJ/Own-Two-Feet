@@ -11,6 +11,9 @@ import { norm, placeable, usable, onHotbar, ITEMS } from './items.js';
 import { WEAPONS, weaponOf, weaponId, INFUSE } from './weapons.js';
 
 const REACH = 6 * TILE;
+// reach is a square of whole blocks around the chest: a block is in reach or it isn't, edge to edge
+const REACH_T = 5;
+const inReach = (cx, cy, tx, ty) => Math.max(Math.abs(tx - Math.floor(cx / TILE)), Math.abs(ty - Math.floor(cy / TILE))) <= REACH_T;
 
 export class Player {
   constructor(game, sv, x, y) {
@@ -161,18 +164,21 @@ export class Player {
     // an enemy close by: clicks strike instead of digging
     this.foeNear = false;
     for (const e of g.targets()) if (e.mode !== 'dead' && e.kind !== 'dummy' && e.kind !== 'nest' && !e.removed && Math.abs(e.c.x - cx) < 110 && Math.abs(e.c.y - a.c.y) < 90) { this.foeNear = true; break; }
-    if (this.mouseAim && !this.buildMode) {
+    // blocks are only mined and placed in build mode (B, or Build on touch); outside it Strike only fights
+    const building = this.buildMode || !!g.touchBuild;
+    if (!building) {
+      target = null;
+    } else if (this.mouseAim) {
       const tx = Math.floor(wp.x / TILE), ty = Math.floor(wp.y / TILE);
-      const d = Math.hypot(tx * TILE + 16 - cx, ty * TILE + 16 - cy);
-      target = { tx, ty, far: d > REACH, px: wp.x, py: wp.y };
+      target = { tx, ty, far: !inReach(cx, cy, tx, ty), px: wp.x, py: wp.y };
     } else {
-      if (g.touchBuild && g.touchBuild.tx !== undefined) { const tb = g.touchBuild; target = { tx: tb.tx, ty: tb.ty, far: Math.hypot(tb.tx * TILE + 16 - cx, tb.ty * TILE + 16 - cy) > REACH }; }
+      if (g.touchBuild && g.touchBuild.tx !== undefined) { const tb = g.touchBuild; target = { tx: tb.tx, ty: tb.ty, far: !inReach(cx, cy, tb.tx, tb.ty) }; }
       else {
         const f = a.facing;
         let tx = Math.floor((cx + f * 30) / TILE), ty = Math.floor((a.c.y - 20) / TILE);
         if (a.intent.up) ty -= 2; else if (a.intent.down) { ty += 1; tx = Math.floor(cx / TILE) + (W.solid(Math.floor(cx / TILE), ty) ? 0 : f); }
         else if (!W.solid(tx, ty) && W.solid(tx, ty - 1)) ty -= 1;
-        target = { tx, ty };
+        target = { tx, ty, far: !inReach(cx, cy, tx, ty) };
       }
     }
     if (target) {
@@ -200,27 +206,14 @@ export class Player {
         if (W.get(target.tx + dx, target.ty + dy) === T.AIR) { target.ptx = target.tx + dx; target.pty = target.ty + dy; }
       }
       const pt = W.get(target.ptx, target.pty);
-      const pdist = Math.hypot(target.ptx * TILE + 16 - cx, target.pty * TILE + 16 - cy);
-      const ok = have && pt === T.AIR && pdist <= REACH && this.placeOk(target.ptx, target.pty, sel);
+      const pfar = !inReach(cx, cy, target.ptx, target.pty);
+      const ok = have && pt === T.AIR && !pfar && this.placeOk(target.ptx, target.pty, sel);
       target.canPlace = ok && !(target.ptx === target.tx && target.pty === target.ty && blocked);
-      target.why = !have ? (usable(sel) ? '' : this.sv.hotbar.length ? 'none left' : 'mine a block first') : pdist > REACH || target.far ? 'too far' : pt !== T.AIR ? '' : !ok ? (TILES[sel].solid && this.bodyIn(target.ptx, target.pty) ? 'someone is standing there' : 'needs a block beside it') : '';
+      target.why = !have ? (usable(sel) ? '' : this.sv.hotbar.length ? 'none left' : 'mine a block first') : pfar || target.far ? 'too far' : pt !== T.AIR ? '' : !ok ? (TILES[sel].solid && this.bodyIn(target.ptx, target.pty) ? 'someone is standing there' : 'needs a block beside it') : '';
     }
     this.cursor = target;
-    // contextual Strike: with a fight near (any foe, the dummy or a nest close, or a chain still going) it
-    // swings; otherwise it mines the block you face, or places the block in your hand into open space
-    const ctxMode = !this.mouseAim && !this.buildMode && !g.touchBuild;
-    this.fightNear = this.foeNear || (a.attack && a.attack.kind !== 'mine') || (g.time - (this.lastHitT || -9) < 1.2);
-    if (!this.fightNear) for (const e of g.targets()) if ((e.team === 'enemy' || e.kind === 'nest' || e.kind === 'dummy') && e.mode !== 'dead' && !e.removed && Math.abs(e.c.x - cx) < 230 && Math.abs(e.c.y - a.c.y) < 120) { this.fightNear = true; break; }
-    let strikeAs = null;
-    if (target && !this.fightNear && !this.buildMode && !g.touchBuild && this.sv.hasBlade !== false) {
-      const sel = this.sv.hotbar[this.sv.sel];
-      if (ctxMode && target.canMine) strikeAs = 'mine';
-      // placing by Strike only while standing still, so swinging on the run never walls you in
-      else if (target.canPlace && placeable(sel) && target.tile === T.AIR && (this.mouseAim || (Math.abs(a.c.vx) < 40 && !a.intent.mx))) strikeAs = 'place';
-    }
-    if (strikeAs !== this.strikeAs) { this.strikeAs = strikeAs; g.ui && g.ui.strikeMode && g.ui.strikeMode(strikeAs); }
-    // mine: hold left mouse (or Strike in build mode, or Strike facing a block)
-    const mineHeld = (this.mouseAim && Input.mouse.l && !this.buildMode && !this.foeNear) || (this.strikeAs === 'mine' && Input.down.attack) || ((this.buildMode || g.touchBuild) && (Input.down.attack || (g.touchBuild && g.touchBuild.mode === 'mine' && g.touchBuild.pid !== null)));
+    // mine (build mode only): hold left mouse, or hold Strike, or a touch hold in Build
+    const mineHeld = building && ((this.mouseAim && Input.mouse.l) || Input.down.attack || (g.touchBuild && g.touchBuild.mode === 'mine' && g.touchBuild.pid !== null));
     if (target && target.canMine && mineHeld && this.sv.hasBlade !== false) {
       if (!this.mine || this.mine.tx !== target.tx || this.mine.ty !== target.ty) this.mine = { tx: target.tx, ty: target.ty, t: 0, tile: target.tile };
       const pick = this.sv.equip && this.sv.equip.pick && ITEMS[this.sv.equip.pick] ? ITEMS[this.sv.equip.pick].mine : 1;
@@ -241,7 +234,7 @@ export class Player {
     } else this.mine = null;
     // a consumable in hand: right click (toward the pointer), R, or tapping its slot again on touch
     const selId = this.sv.hotbar[this.sv.sel];
-    if (usable(selId) && ((this.mouseAim && Input.mouse.rp && !this.buildMode) || Input.pressed('use') || this.useQueued)) {
+    if (usable(selId) && ((this.mouseAim && Input.mouse.rp && !building) || Input.pressed('use') || this.useQueued)) {
       this.useQueued = false;
       const aim = this.mouseAim ? { x: wp.x, y: wp.y } : { x: a.c.x + a.facing * 220, y: a.c.y - 120 };
       this.useItem(selId, aim);
@@ -250,8 +243,8 @@ export class Player {
     this.useQueued = false;
     // place: right mouse (hold and drag to lay a line), E in build mode, or a touch drag in build mode
     const tb = g.touchBuild;
-    const placeHeld = (this.mouseAim && Input.mouse.r && !this.buildMode) || (tb && tb.mode === 'place' && tb.pid !== null);
-    const placeP = (this.mouseAim && Input.mouse.rp && !this.buildMode) || (this.buildMode && Input.pressed('interact')) || (tb && tb.tap) || (this.strikeAs === 'place' && (Input.pressed('attack') || (this.mouseAim && Input.mouse.lp)));
+    const placeHeld = building && ((this.mouseAim && Input.mouse.r) || (tb && tb.mode === 'place' && tb.pid !== null));
+    const placeP = building && ((this.mouseAim && Input.mouse.rp) || (this.buildMode && Input.pressed('interact')) || (tb && tb.tap));
     if (tb) tb.tap = false;
     this.placeCD = Math.max(0, (this.placeCD || 0) - dt);
     if (target && (placeP || (placeHeld && this.placeCD <= 0))) {
@@ -385,11 +378,10 @@ export class Player {
   // lands parries it. Staggered or nearly-dead Hollows (and some chain enders) get a finisher.
   updateCombat(dt, wp) {
     const g = this.game, a = this.actor, W = weaponOf(this.sv);
-    const mouseHold = this.mouseAim && Input.mouse.l && (this.foeNear || !(this.cursor && this.cursor.canMine));
+    const mouseHold = this.mouseAim && Input.mouse.l && !this.buildMode;
     const held = !!Input.down.attack || mouseHold;
-    const pressed = Input.pressed('attack') || (this.mouseAim && Input.mouse.lp && !(this.cursor && this.cursor.canMine && !this.buildMode && !this.foeNear));
+    const pressed = Input.pressed('attack') || (this.mouseAim && Input.mouse.lp && !this.buildMode);
     if (this.consumeAttack) { this.consumeAttack = false; if (!Input.pressed('attack')) return this.activeHits(dt); }
-    if (this.strikeAs === 'place' || (this.strikeAs === 'mine' && !this.mouseAim)) { this.charging = false; this.chargeK = 0; this.holdT = 0; return this.activeHits(dt); }
     this.counterT = Math.max(0, (this.counterT || 0) - dt);
     if (this.punchT > 0) { this.punchT -= dt; if (this.punchT <= 0 && !(g.bagK > 0.05)) g.cam.zoomT = 1; }
     const able = this.sv.hasBlade && !this.buildMode && a.mode === 'ctrl' && !a.crawling && !a.mantle;
@@ -790,19 +782,15 @@ export class Player {
     ctx.restore();
   }
   // build cursor: a ghost of the chosen block where it will go, cracks on a block being mined, a soft red
-  // frame (and a reason on click) when an action isn't possible, and the reach ring while building
+  // frame (and a reason on click) when an action isn't possible
   drawCursor(ctx) {
     const c = this.cursor, g = this.game;
     if (!c || this.dead || g.cinematic) return;
-    if (!(this.mouseAim || this.buildMode || g.touchBuild || this.strikeAs)) return;
+    if (!(this.buildMode || g.touchBuild)) return;
     const a = this.actor, ccx = a.c.x, ccy = a.c.y - 46;
-    // far away the cursor stays quiet; just past reach it shows (dimmed) so you learn the range
-    if (c.far && Math.hypot(c.tx * TILE + 16 - ccx, c.ty * TILE + 16 - ccy) > REACH + 2 * TILE) return;
+    // out of reach the cursor stays quiet: a block is either within the square reach or not
+    if (c.far) return;
     ctx.save();
-    if (this.buildMode || g.touchBuild) {
-      ctx.strokeStyle = rgba('#ffffff', 0.12); ctx.lineWidth = 1.5; ctx.setLineDash([3, 7]);
-      ctx.beginPath(); ctx.arc(ccx, ccy, REACH, 0, TAU); ctx.stroke(); ctx.setLineDash([]);
-    }
     const x = c.tx * TILE, y = c.ty * TILE;
     const sel = this.sv.hotbar[this.sv.sel];
     const mining = c.tile !== T.AIR && c.tile !== undefined;

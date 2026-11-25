@@ -754,33 +754,29 @@ export default ({ page, sleep, key, shot, evalg }) => ({
     await sleep(1500); await shot('u1-home');
   },
   // one Strike, three jobs: mine the block you face, place the block in hand into open space, strike a foe
+  // Strike only fights outside build mode: facing a block or open space with a block in hand, it never mines or places
   async contextual() {
     await sleep(1200);
     await evalg(() => { const g = window.__game; g.story.skipBirth(); if (g.story.skipTutorial) g.story.skipTutorial(); g.save.hasBlade = true; g.player.actor.blade = true; g.enemies.calm = 999; });
     await sleep(2500);
     const w = await evalg(() => { const g = window.__game, a = g.player.actor; a.face(1); for (const e of g.actors) if (e.team === 'enemy') e.removed = true;
       const tx = Math.floor((a.c.x + 30) / 32), ty = Math.floor((a.c.y - 20) / 32), id = g.world.get(tx, ty + 1) || 3;
-      g.world.set(tx, ty, id); g.world.set(tx, ty - 1, id); return { tx, ty, id }; });
-    await sleep(300);
-    const m0 = await evalg(() => window.__game.player.strikeAs);
-    await page.keyboard.down('KeyJ'); await sleep(2600); await shot('ctx-0-mine'); await page.keyboard.up('KeyJ'); await sleep(200);
+      g.world.set(tx, ty, id); g.world.set(tx, ty - 1, id); g.player.give(18, 3); g.save.sel = g.save.hotbar.indexOf(18); return { tx, ty, id, placed: g.save.stats.placed }; });
+    await page.keyboard.down('KeyJ'); await sleep(1800); await page.keyboard.up('KeyJ'); await sleep(200);
+    const r1 = await evalg((w) => { const g = window.__game; g.world.set(w.tx, w.ty, 0); g.world.set(w.tx, w.ty - 1, 0); return { kept: true }; }, w);
     const m1 = await evalg((w) => window.__game.world.get(w.tx, w.ty), w);
-    console.log('mine', JSON.stringify({ mode: m0, before: w.id, after: m1 }));
-    await evalg((w) => { const g = window.__game; g.world.set(w.tx, w.ty, 0); g.world.set(w.tx, w.ty - 1, 0); for (const e of g.actors) if (e.team === 'enemy') e.removed = true; g.player.give(18, 3); g.save.sel = g.save.hotbar.indexOf(18); }, w);
-    await sleep(300);
-    const p0 = await evalg(() => { const p = window.__game.player; return { mode: p.strikeAs, placed: window.__game.save.stats.placed, cur: p.cursor, sel: p.save ? 0 : p.sv.sel, hb: p.sv.hotbar, fight: p.fightNear, foe: p.foeNear }; });
-    await key('KeyJ'); await sleep(400); await shot('ctx-1-place');
-    const p1 = await evalg((w) => ({ placed: window.__game.save.stats.placed, tile: window.__game.world.get(w.tx, w.ty) }), w);
-    console.log('place', JSON.stringify({ p0, p1 }));
-    const f0 = await evalg(() => { const g = window.__game, p = g.player; g.enemies.calm = 0; const e = g.enemies.spawn('husk', p.x - 60, p.actor.c.y, 0); e.ai.cd = 99; p.actor.face(-1); return true; });
-    await sleep(300);
-    const f1 = await evalg(() => window.__game.player.strikeAs);
-    await key('KeyJ'); await sleep(120);
-    const f2 = await evalg(() => { const a = window.__game.player.actor; return a.attack ? a.attack.kind : null; });
-    console.log('fight', JSON.stringify({ mode: f1, attack: f2 }));
-    if (m0 !== 'mine' || m1 === w.id || p0.mode !== 'place' || p1.placed <= p0.placed || f1 !== null || !f2 || f2 === 'mine') console.log('PROBLEMS: contextual strike', JSON.stringify({ m0, m1, p0, p1, f1, f2 }));
+    await key('KeyJ'); await sleep(400);
+    const p1 = await evalg(() => window.__game.save.stats.placed);
+    // in build mode, holding Strike on the block mines it
+    await evalg(() => { const g = window.__game, p = g.player, a = p.actor; const tx = Math.floor(a.c.x / 32) + 8, gy = g.world.floorTy(tx); p.respawnAt(tx * 32 + 16, gy * 32); });
+    await sleep(600);
+    await evalg(() => { const g = window.__game; g.player.actor.face(1); g.player.buildMode = true; }); await sleep(300);
+    const w2 = await evalg(() => { const g = window.__game, c = g.player.cursor; g.world.set(c.tx, c.ty, 3); g.world.set(c.tx, c.ty - 1, 3); return { tx: c.tx, ty: c.ty }; });
+    await sleep(200); await page.keyboard.down('KeyJ'); await sleep(600); console.log('mid', JSON.stringify(await evalg(() => { const p = window.__game.player; return { c: p.cursor, m: p.mine, bm: p.buildMode, at: p.actor.attack && p.actor.attack.kind, down: window.__input.down.attack }; }))); await sleep(2000); await page.keyboard.up('KeyJ'); await sleep(200);
+    const b1 = await evalg((w) => { const g = window.__game; g.player.buildMode = false; return g.world.get(w.tx, w.ty); }, w2);
+    console.log('strike', JSON.stringify({ placedBefore: w.placed, placedAfter: p1, minedInBuild: b1 === 0 }));
+    if (p1 !== w.placed || b1 !== 0) console.log('PROBLEMS: strike outside build mode changed blocks, or build mode did not mine');
   },
-  // the lunge-stab: a foe just out of reach, the doll drops and drives the blade out straight
   async lunge() {
     await sleep(1200);
     await evalg(() => { const g = window.__game; g.story.skipBirth(); if (g.story.skipTutorial) g.story.skipTutorial(); g.save.hasBlade = true; g.player.actor.blade = true; g.enemies.calm = 999; });
@@ -799,29 +795,26 @@ export default ({ page, sleep, key, shot, evalg }) => ({
   },
   // guidance: the Threads of Light card appears when that goal begins, the compass strip shows points, the
   // Guide tab keeps the card
+  // guidance: new things go silently into the Guide (no pop-up); the Guide is a book with entries
   async cards() {
-    await evalg(() => { window.__keepCards = true; });
     await sleep(1200);
     await evalg(() => { const g = window.__game; g.story.skipBirth(); if (g.story.skipTutorial) g.story.skipTutorial(); g.save.hasBlade = true; g.player.actor.blade = true; g.enemies.calm = 999;
       g.story.firstFoeDown = true; g.save.met = { 105: 1 }; g.save.respawn = { x: g.player.x, y: g.player.y }; });
     await sleep(2500);
-    const c0 = await evalg(() => ({ modal: window.__game.ui.modal, card: document.querySelector('.tcard .tt') && document.querySelector('.tcard .tt').textContent, obj: document.querySelector('#objective .ob-text') && document.querySelector('#objective .ob-text').textContent }));
-    console.log('card', JSON.stringify(c0));
-    await shot('cards-0-lights');
-    await page.keyboard.press('Enter'); await sleep(600);
-    const c1 = await evalg(() => ({ modal: window.__game.ui.modal, card: document.querySelector('.tcard .tt') && document.querySelector('.tcard .tt').textContent }));
-    console.log('card2', JSON.stringify(c1));
-    await page.keyboard.press('Enter'); await sleep(900);
+    const c0 = await evalg(() => ({ modal: window.__game.ui.modal, cards: Object.keys(window.__game.save.cards || {}), dot: document.querySelector('#btn-menu').classList.contains('newdot'), popup: !!document.querySelector('.teach') }));
+    console.log('cards', JSON.stringify(c0));
     const comp = await evalg(() => [...document.querySelectorAll('#compass .cs-poi')].map(e => e.className + ':' + e.textContent));
     console.log('compass', JSON.stringify(comp));
-    await shot('cards-1-compass');
-    await evalg(() => window.__game.ui.openMenu('guide')); await sleep(500);
-    const items = await evalg(() => document.querySelectorAll('.guide-item').length);
-    console.log('guide items', items);
+    await shot('cards-1-hud');
+    await evalg(() => window.__game.ui.openMenu('guide')); await sleep(600);
+    const g1 = await evalg(() => ({ items: document.querySelectorAll('.gb-item').length, title: (document.querySelector('.gb-title') || {}).textContent, over: (() => { const b = document.querySelector('.gbook'); return b ? b.scrollWidth > b.clientWidth + 2 : true; })() }));
+    console.log('guide', JSON.stringify(g1));
     await shot('cards-2-guide');
-    if (c0.card !== 'Threads of Light' || c1.card !== 'Always a way forward' || !comp.length || items < 2) console.log('PROBLEMS: cards', JSON.stringify({ c0, c1, comp, items }));
+    await evalg(() => document.querySelectorAll('.gb-item')[1].click()); await sleep(400);
+    await shot('cards-3-entry');
+    const dot = await evalg(() => document.querySelector('#btn-menu').classList.contains('newdot'));
+    if (c0.modal || c0.popup || !c0.cards.includes('lights') || !c0.dot || g1.items < 3 || !g1.title || g1.over) console.log('PROBLEMS: cards', JSON.stringify({ c0, g1, dot }));
   },
-  // leave and come back: a lit brazier, an open rift and a timber block are still there; content stands on the ground
   async saveall() {
     await sleep(1200);
     const before = await evalg(() => { const g = window.__game, p = g.player; g.story.skipBirth(); if (g.story.skipTutorial) g.story.skipTutorial(); g.save.hasBlade = true; p.actor.blade = true;

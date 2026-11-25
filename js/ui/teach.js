@@ -5,13 +5,16 @@ import { TAU } from '../core/util.js';
 
 // each card: a title, two short lines, and a picture drawn in clean shapes
 export const CARDS = {
-  lights: { title: 'Threads of Light', lines: ['The Warden’s gate is sealed with her thread. Light opens it.', 'Wake sleeping dolls, find glowing stitches, break Hollow nests and help keepers. Each gives Threads of Light.'], pic: 'lights' },
-  gate: { title: 'Sealed gates', lines: ['Each gate needs enough Threads of Light to open. The count is on the top left.', 'Follow Thread (the little light) or the diamond marker to the nearest source.'], pic: 'gate' },
-  marker: { title: 'Always a way forward', lines: ['The diamond shows where to go next; at the screen edge an arrow points to it.', 'The strip at the top shows the gate, the nearest Thread of Light, shrines and towns.'], pic: 'marker' },
-  surge: { title: 'Hollow surges', lines: ['A rift tears open and Hollows pour out in waves.', 'Clear every wave before it closes and it leaves a chest.'], pic: 'surge' },
-  town: { title: 'Towns', lines: ['Shops, a smith to temper your weapon, an inn to rest, a waystone to travel.', 'The notice board has bounties; the yard opens the Rift Trials.'], pic: 'town' },
-  perk: { title: 'Levels and perks', lines: ['Everything you do gives experience: the line above your hotbar.', 'Every third level, choose a perk in the menu under Character.'], pic: 'perk' },
-  craft: { title: 'Crafting', lines: ['Blocks you mine and things you find become tools, parts and gear.', 'Open the satchel by a workbench, forge or loom to make more.'], pic: 'craft' },
+  lights: { sec: 'World', title: 'Threads of Light', lines: ['The Warden\u2019s gate is sealed with her thread. Light opens it.', 'Wake sleeping dolls, find glowing stitches, break Hollow nests and help keepers. Each gives Threads of Light.'], pic: 'lights', keys: 'The count is at the top left. Follow Thread, the little light.', touch: 'The count is at the top left. Follow Thread, the little light.' },
+  gate: { sec: 'World', title: 'Sealed gates', lines: ['Each gate needs enough Threads of Light to open. The count is on the top left.', 'Follow Thread (the little light) or the diamond marker to the nearest source.'], pic: 'gate' },
+  marker: { sec: 'Basics', title: 'Always a way forward', lines: ['The diamond shows where to go next; at the screen edge an arrow points to it.', 'The strip at the top shows the gate, the nearest Thread of Light, shrines and towns.'], pic: 'marker' },
+  build: { sec: 'Building', title: 'Build mode', lines: ['Blocks are mined and placed only in build mode. Outside it, Strike only fights.', 'Reach is a square of five blocks around you; the block under the cursor is outlined.'], pic: 'build', keys: 'B for build mode · hold Click to mine · Right-click to place', touch: 'Build button · hold a block to mine · tap open space to place' },
+  craft: { sec: 'Building', title: 'Crafting', lines: ['Blocks you mine and things you find become tools, parts and gear.', 'Open the satchel by a workbench, forge or loom to make more.'], pic: 'craft', keys: 'I or Tab opens the satchel', touch: 'Bag button' },
+  parry: { sec: 'Combat', title: 'Parry and charge', lines: ['Strike just as a Hollow\u2019s blow lands and you turn it back.', 'Hold Strike to charge a heavy blow that breaks a guard.'], pic: 'parry', keys: 'J or Click · hold to charge', touch: 'Strike · hold to charge' },
+  mend: { sec: 'Combat', title: 'Mending', lines: ['Hits fill your breath. With enough breath you can mend a lost vessel.', 'Mend when it is quiet: it takes a moment.'], pic: 'mend', keys: 'Hold H', touch: 'Hold Mend' },
+  surge: { sec: 'Combat', title: 'Hollow surges', lines: ['A rift tears open and Hollows pour out in waves.', 'Clear every wave before it closes and it leaves a chest.'], pic: 'surge' },
+  town: { sec: 'World', title: 'Towns', lines: ['Shops, a smith to temper your weapon, an inn to rest, a waystone to travel.', 'The notice board has bounties; the yard opens the Rift Trials.'], pic: 'town', keys: 'E to talk, trade and travel', touch: 'The action button talks, trades and travels' },
+  perk: { sec: 'Basics', title: 'Levels and perks', lines: ['Everything you do gives experience: the line above your hotbar.', 'Every third level, choose a perk in the menu under Character.'], pic: 'perk', keys: 'Esc, then Character', touch: 'Menu, then Character' },
 };
 
 function pic(c, kind) {
@@ -69,6 +72,19 @@ function pic(c, kind) {
     g.fillStyle = 'rgba(255,255,255,.12)'; g.fillRect(R(W * 0.3), R(cy - 2), R(W * 0.55), 4);
     g.fillStyle = '#9fd6e0'; g.fillRect(R(W * 0.3), R(cy - 2), R(W * 0.36), 4);
     for (let i = 0; i < 3; i++) { const x = W * (0.38 + i * 0.2), y = cy + 46; shape([[x - 22, y - 16], [x + 22, y - 16], [x + 22, y + 16], [x - 22, y + 16]], i === 1 ? 'rgba(191,246,255,.18)' : 'rgba(255,255,255,.06)', i === 1 ? 'rgba(191,246,255,.8)' : 'rgba(255,240,220,.3)'); }
+  } else if (kind === 'build') {
+    const s0 = 30, x0 = R(cx - s0 * 3), y0 = R(H * 0.78 - s0 * 2);
+    for (let i = 0; i < 6; i++) for (let j = 0; j < 2; j++) shape([[x0 + i * s0, y0 + j * s0], [x0 + i * s0 + s0, y0 + j * s0], [x0 + i * s0 + s0, y0 + j * s0 + s0], [x0 + i * s0, y0 + j * s0 + s0]], j ? '#5a4a3e' : '#7a6a5a', 'rgba(0,0,0,.35)');
+    g.strokeStyle = 'rgba(255,255,255,.85)'; g.lineWidth = 2; g.strokeRect(x0 + 3 * s0 + 1, y0 + 1, s0 - 2, s0 - 2);
+    g.globalAlpha = 0.55; shape([[x0 + 4 * s0, y0 - s0], [x0 + 5 * s0, y0 - s0], [x0 + 5 * s0, y0], [x0 + 4 * s0, y0]], '#9b7653', 'rgba(191,246,255,.9)'); g.globalAlpha = 1;
+  } else if (kind === 'parry') {
+    line([[cx - 90, cy + 40], [cx + 10, cy - 30]], '#d8dde6', 5); line([[cx + 90, cy + 40], [cx - 10, cy - 30]], '#4a4450', 5);
+    glow(cx, cy - 22, 46, '255,230,170', 0.8); g.fillStyle = '#fff'; g.beginPath(); g.arc(R(cx), R(cy - 22), 4, 0, TAU); g.fill();
+    for (let i = 0; i < 6; i++) { const a = i / 6 * TAU; line([[cx + Math.cos(a) * 12, cy - 22 + Math.sin(a) * 12], [cx + Math.cos(a) * 26, cy - 22 + Math.sin(a) * 26]], 'rgba(255,230,170,.8)', 2); }
+  } else if (kind === 'mend') {
+    for (let i = 0; i < 5; i++) { const x = cx - 80 + i * 40, y = cy; shape([[x, y - 18], [x + 11, y - 4], [x, y + 18], [x - 11, y - 4]], i < 3 ? '#bff6ff' : 'rgba(255,255,255,.12)', 'rgba(36,26,18,.5)'); }
+    glow(cx + 40, cy, 34, '191,246,255', 0.5);
+    g.fillStyle = 'rgba(255,255,255,.12)'; g.fillRect(R(cx - 100), R(cy + 40), 200, 5); g.fillStyle = '#ffd9e4'; g.fillRect(R(cx - 100), R(cy + 40), 150, 5);
   } else if (kind === 'craft') {
     g.strokeStyle = 'rgba(255,217,160,.75)'; g.lineWidth = 2; g.beginPath(); g.arc(R(cx), R(cy), 46, 0, TAU); g.stroke();
     shape([[cx - 18, cy + 18], [cx - 18, cy - 4], [cx, cy - 14], [cx + 18, cy - 4], [cx + 18, cy + 18]], '#9b7653', 'rgba(0,0,0,.4)');
