@@ -300,6 +300,7 @@ export class Player {
   }
   placeOk(tx, ty, tile) {
     const g = this.game, W = g.world;
+    if (tile === T.LOG) tile = T.WOOD;
     if (!TILES[tile].place) return false;
     if (tile === T.DOOR && (W.get(tx, ty - 1) !== T.AIR || this.bodyIn(tx, ty - 1) || !TILES[W.get(tx, ty + 1)].solid)) return false;
     // needs something to attach to
@@ -353,6 +354,7 @@ export class Player {
   placeTile(tx, ty, tile, layer) {
     const g = this.game;
     if (!this.take(tile, 1)) return;
+    if (tile === T.LOG) tile = T.WOOD;   // timber goes down as a solid block of wood
     g.world.set(tx, ty, tile, layer);
     if (g.net) g.net.sendEdit(tx, ty, tile, layer);
     if (tile === T.DOOR && !layer) { g.world.set(tx, ty - 1, T.DOOR); if (g.net) g.net.sendEdit(tx, ty - 1, T.DOOR, 0); }

@@ -109,7 +109,8 @@ export class Bosses {
     if (g.net && g.net.visiting) { this.worldMap()['g' + k] = true; sv.coopRelics = (sv.coopRelics || 0) + 1; }
     else sv.bosses['g' + k] = true;
     if (g.net) g.net.bossDown(B);
-    const relic = n < 4 ? RELICS[n] : RELICS[4];
+    let relic = n < 4 ? RELICS[n] : RELICS[4];
+    if (relic.id === 'djump') relic = RELICS[4];   // the double jump is yours from the start: a vessel instead
     g.levels && g.levels.gain(400 + n * 250, g.player.actor.c.x, g.player.actor.c.y - 110, 'Warden');
     if (relic.id === 'vessel') { sv.maxHp++; g.player.hp = sv.maxHp; }
     else { sv.abil[relic.id] = true; if (relic.id === 'djump' || relic.id === 'wall') g.player.actor.abil[relic.id] = true; }
@@ -144,7 +145,7 @@ export class Bosses {
         const gy = g.world.surface(gi.gx) * TILE;
         const down = this.defeated(gi.k);
         ctx.save(); if (down) ctx.globalAlpha = 0.45;
-        for (const sd of [-1, 1]) if (!drawSprite(ctx, 'props/banner', gi.gxw + sd * (gi.half - 40), gy + 4, 170, { grade: g.biomeAt(gi.gxw) })) drawGateBanner(ctx, gi.gxw + sd * (gi.half - 40), gy + 1, 1, down ? '#6a6470' : spec.col, g.time + sd);
+        for (const sd of [-1, 1]) if (!drawSprite(ctx, 'props/banner', gi.gxw + sd * (gi.half - 40), gy - 6, 160, { grade: g.biomeAt(gi.gxw) })) drawGateBanner(ctx, gi.gxw + sd * (gi.half - 40), gy + 1, 1, down ? '#6a6470' : spec.col, g.time + sd);
         ctx.restore();
       }
     }

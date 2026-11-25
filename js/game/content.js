@@ -96,7 +96,17 @@ export class Content {
         a.look_at = { x: p.x, y: p.y - 60 };
         // sit up, rise, stretch, then wave
         if (ph > 1.0 && ph < 2.1) a.scriptPose = { mode: 'getup', getup: clamp((ph - 1.0) / 1.1, 0, 1), strength: 1 };
-        if (ph >= 2.1 && a.mode === 'script') { a.mode = 'ctrl'; a.c.ground = true; a.doEmote('cheer', 0.9); }
+        if (ph >= 2.1 && a.mode === 'script') {
+          // stand on the real ground under the doll (not the height it lay at), then let it move normally
+          a.mode = 'ctrl'; a.scriptPose = null;
+          const gy = g.world.groundBelow(a.c.x, a.c.y - 70, 420);
+          if (gy !== null) a.c.y = gy;
+          a.c.vy = 0; a.c.vx = 0; a.c.ground = gy !== null; a.unstick && a.unstick();
+          // start from a clean standing skeleton (the lying pose's joint angles must not carry over)
+          if (a.anim && a.anim.cur) { a.anim.cur.fill(0); a.anim.rootY = null; a.anim.squash = a.anim.squashV = 0; }
+          a.body.reset(a.c.x, a.c.y - a.pelvisH);
+          a.doEmote('cheer', 0.9);
+        }
         if (ph > 3.1 && !d.waved) { d.waved = true; a.face(sign(p.x - a.c.x) || 1); a.doEmote('wave', 1.6); }
         if (d.t < 0) { d.state = 'leave'; d.t = 3; }
       } else if (d.state === 'leave') {

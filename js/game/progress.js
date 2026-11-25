@@ -104,7 +104,7 @@ export function newSave(seed) {
     v: 1, seed, born: false, name: genName(seed), sigil: seed ^ 0x5bd1e995,
     pos: null, respawn: null, hp: 5, maxHp: 5, breath: 0, glimmer: 0, level: 1, xp: 0, perks: [], perkPicks: 0, towns: {}, rift: { best: 0 },
     hasBlade: false, inv: {}, hotbar: [], sel: 0,
-    abil: { djump: false, wall: false, plunge: false, surge: false },
+    abil: { djump: true, wall: false, plunge: false, surge: false },
     lvl: { blade: 0, vessel: 0, breath: 0 },
     look: { color: 'c_bone', mat: 'm_cloth', head: 'h_none', cape: 'k_red', eyes: 'e_cyan', blade: 'b_steel' },
     unlocked: ['c_bone', 'm_cloth', 'h_none', 'h_leaf', 'k_none', 'k_red', 'k_scarf', 'e_cyan', 'e_amber', 'e_none', 'b_steel'],
@@ -148,6 +148,7 @@ export const Save = {
     for (const k in base.lvl) if (d.lvl[k] === undefined) d.lvl[k] = 0;
     for (const k in base.stats) if (d.stats[k] === undefined) d.stats[k] = 0;
     // the blade from the stone is a weapon you carry and wear
+    if (d.abil) d.abil.djump = true;   // everyone has the double jump from the start
     if (!d.level) { d.level = 1; d.xp = 0; } if (!d.perks) d.perks = []; if (d.perkPicks === undefined) d.perkPicks = 0;
     if (!d.towns) d.towns = {}; if (!d.rift) d.rift = { best: 0 };
     if (d.hasBlade && !(d.inv.w_blade > 0)) d.inv.w_blade = 1;

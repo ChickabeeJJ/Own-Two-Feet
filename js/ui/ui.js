@@ -774,7 +774,14 @@ export class UI {
       if (box.childElementCount !== sv.maxHp) { box.innerHTML = ''; for (let i = 0; i < sv.maxHp; i++) box.appendChild(el('div', 'vessel')); }
       [...box.children].forEach((v, i) => {
         const full = i < p.hp;
-        if (!full && v.classList.contains('full')) { v.classList.remove('lost'); void v.offsetWidth; v.classList.add('lost'); }
+        if (!full && v.classList.contains('full')) {
+          v.classList.remove('lost'); void v.offsetWidth; v.classList.add('lost');
+          // the gem itself lifts out of its slot and fades as it rises
+          const r = v.getBoundingClientRect(), fly = v.cloneNode(true);
+          fly.className = 'vessel full vfly'; Object.assign(fly.style, { left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px' });
+          document.body.appendChild(fly);
+          fly.animate([{ transform: 'translateY(0) scale(1)', opacity: 1, filter: 'brightness(1.6) drop-shadow(0 0 10px #9ff3ff)' }, { transform: 'translateY(-16px) scale(1.08)', opacity: 0.9, offset: 0.25 }, { transform: 'translateY(-58px) scale(0.55)', opacity: 0, filter: 'brightness(1) drop-shadow(0 0 2px #9ff3ff)' }], { duration: 650, easing: 'cubic-bezier(.2,.7,.3,1)', fill: 'forwards' }).onfinish = () => fly.remove();
+        }
         v.classList.toggle('full', full);
       });
       this.lastHp = p.hp; this.lastMax = sv.maxHp;

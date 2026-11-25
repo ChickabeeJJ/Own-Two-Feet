@@ -11,6 +11,8 @@ export const T = {
   LADDER: 25, PLATFORM: 26, TORCH: 27, DOOR: 28, DOOR_OPEN: 29, STEP: 30, STORE: 31, BENCH: 32, FORGE: 33, LOOM: 34,
   // towns
   ROAD: 35, ROOF: 36, TIMBER: 37,
+  // placed timber: a solid block of wood (natural trunks stay LOG under the tree sprites)
+  WOOD: 38,
 };
 
 // k: key colour role resolved per biome ('dirt','stone','deep','grass','leaf') or a fixed hex
@@ -53,6 +55,7 @@ TILES[T.STORE] = D({ name: 'Storage Chest', k: '#8a6440', solid: false, opaque: 
 TILES[T.BENCH] = D({ name: 'Workbench', k: '#9b7653', solid: false, opaque: false, hard: 0.5, natural: false, station: 'bench' });
 TILES[T.FORGE] = D({ name: 'Forge', k: '#6e6670', solid: false, opaque: false, hard: 0.8, natural: false, station: 'forge', light: [1.0, 0.5, 0.22] });
 TILES[T.LOOM] = D({ name: 'Loom', k: '#b08a62', solid: false, opaque: false, hard: 0.5, natural: false, station: 'loom' });
+TILES[T.WOOD] = D({ name: 'Timber Block', k: '#7a5a3e', hard: 0.5, natural: false, drop: T.LOG });
 TILES[T.ROAD] = D({ name: 'Cobbles', k: '#8d857b', hard: 1.0, natural: false });
 TILES[T.ROOF] = D({ name: 'Roof Tiles', k: '#8a4a3c', hard: 0.7, natural: false });
 TILES[T.TIMBER] = D({ name: 'Timber Beam', k: '#5e4330', hard: 0.8, natural: false });

@@ -220,23 +220,7 @@ export function drawSkyFeature(ctx, B, W, H, camX, camY, zoom, time, alpha) {
   ctx.globalAlpha = alpha;
   const par = (f) => -camX * f * zoom;
   switch (B.id) {
-    case 'meadow': {
-      // distant floating isles with threads of water
-      for (let i = 0; i < 3; i++) {
-        const x = ((par(0.02) + i * W * 0.45 + W * 0.15) % (W * 1.35) + W * 1.35) % (W * 1.35) - W * 0.15;
-        const y = H * (0.18 + i * 0.07) + Math.sin(time * 0.3 + i) * 6 - camY * 0.01 * zoom;
-        const s = H / 900 * (1.2 - i * 0.25);
-        const col = mix(B.sky[1], B.fog, 0.45);
-        ctx.fillStyle = col;
-        ctx.beginPath(); ctx.moveTo(x - 80 * s, y); ctx.quadraticCurveTo(x, y - 18 * s, x + 80 * s, y); ctx.quadraticCurveTo(x + 30 * s, y + 30 * s, x + 4 * s, y + 70 * s); ctx.quadraticCurveTo(x - 30 * s, y + 30 * s, x - 80 * s, y); ctx.fill();
-        ctx.fillStyle = mix(col, '#9cbd8c', 0.35);
-        for (const [dx, r] of [[-40, 16], [-18, 22], [10, 18], [36, 14]]) { ctx.beginPath(); ctx.arc(x + dx * s, y - 12 * s, r * s, 0, TAU); ctx.fill(); }
-        const fall = ctx.createLinearGradient(0, y, 0, y + 220 * s);
-        fall.addColorStop(0, rgba('#e8f4ff', 0.5)); fall.addColorStop(1, rgba('#e8f4ff', 0));
-        ctx.fillStyle = fall; ctx.fillRect(x + 22 * s, y + 6 * s, 3 * s, 220 * s);
-      }
-      break;
-    }
+    case 'meadow': break;   // open sky over the meadow (no floating isles)
     case 'glass': {
       ctx.globalCompositeOperation = 'lighter';
       for (let i = 0; i < 4; i++) {

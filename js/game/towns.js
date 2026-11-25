@@ -302,13 +302,14 @@ export class Towns {
       ctx.fillText(this.name(tn.bi).toUpperCase().slice(0, 12), x, gy - 8 * TILE + 60);
     } else if (kind === 'yard') {
       // a straw target, a training doll and the rift gate's sign
-      ctx.fillStyle = '#5e4230'; ctx.fillRect(x - 30, gy - 40, 3, 40);
-      ballShade(ctx, x - 29, gy - 50, 13, '#d8c39a', { dark: 0.3 });
-      ctx.strokeStyle = '#b0453a'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(x - 29, gy - 50, 8, 0, TAU); ctx.stroke(); ctx.beginPath(); ctx.arc(x - 29, gy - 50, 3, 0, TAU); ctx.stroke();
-      ctx.fillStyle = '#3a2c2a'; ctx.fillRect(x + 10, gy - 60, 3, 60);
-      ctx.fillStyle = '#2a1418'; ctx.beginPath(); ctx.roundRect(x - 6, gy - 82, 36, 24, 4); ctx.fill();
-      ctx.fillStyle = '#ff9a8a'; ctx.font = '700 8px Manrope, sans-serif'; ctx.textAlign = 'center'; ctx.fillText('RIFT', x + 12, gy - 72); ctx.fillText('TRIALS', x + 12, gy - 63);
-      ctx.globalCompositeOperation = 'lighter'; drawGlow(ctx, x + 12, gy - 70, 30, [1, 0.35, 0.3], 0.35 + Math.sin(t * 5) * 0.1);
+      // the sign sits right on the spot you use (so the prompt arrow is centred over it); the target beside it
+      ctx.fillStyle = '#5e4230'; ctx.fillRect(x - 46, gy - 40, 3, 40);
+      ballShade(ctx, x - 45, gy - 50, 13, '#d8c39a', { dark: 0.3 });
+      ctx.strokeStyle = '#b0453a'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(x - 45, gy - 50, 8, 0, TAU); ctx.stroke(); ctx.beginPath(); ctx.arc(x - 45, gy - 50, 3, 0, TAU); ctx.stroke();
+      ctx.fillStyle = '#3a2c2a'; ctx.fillRect(x - 1.5, gy - 60, 3, 60);
+      ctx.fillStyle = '#2a1418'; ctx.beginPath(); ctx.roundRect(x - 18, gy - 82, 36, 24, 4); ctx.fill();
+      ctx.fillStyle = '#ff9a8a'; ctx.font = '700 8px Manrope, sans-serif'; ctx.textAlign = 'center'; ctx.fillText('RIFT', x, gy - 72); ctx.fillText('TRIALS', x, gy - 63);
+      ctx.globalCompositeOperation = 'lighter'; drawGlow(ctx, x, gy - 70, 30, [1, 0.35, 0.3], 0.35 + Math.sin(t * 5) * 0.1);
     }
     ctx.restore();
   }

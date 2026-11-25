@@ -47,7 +47,7 @@ function texName(t, id) {
     case T.MARBLE: return 'build_plaster';
     case T.ROAD: return 'build_stone';
     case T.OBSIDIAN: return 'build_obsidian';
-    case T.LOG: return id + '_bark';
+    case T.LOG: case T.WOOD: return id + '_bark';
     case T.LEAVES: return id + '_foliage';
   }
   return null;
@@ -92,6 +92,7 @@ function matOf(t, p) {
     case T.RUIN: case T.GATE: return ['ruin', t === T.GATE ? '#4a4652' : '#a39d93'];
     case T.MARBLE: return ['marble', '#e9e4dc'];
     case T.ROAD: return ['ruin', '#8d857b'];
+    case T.WOOD: return ['plank', '#7a5a3e'];
     case T.ROOF: return ['brick', '#8a4a3c'];
     case T.TIMBER: return ['plank', '#5e4330'];
     case T.OBSIDIAN: return ['obsidian', '#2a2440'];
@@ -556,9 +557,10 @@ export function biomeBlendAt(x) {
   const tx = x / TILE;
   const bi = biomeIndexAt(tx), local = biomeLocal(tx);
   const A = biomeOf(bi);
-  const edge = 30;
-  if (local < edge) return { A: biomeOf(bi - 1), B: A, k: smooth(0.5 + local / edge / 2), bi };
-  if (local > BIOME_W - edge) return { A, B: biomeOf(bi + 1), k: smooth((local - (BIOME_W - edge)) / edge / 2), bi };
+  // a long, gentle crossfade (90 tiles each side of the border) with an S-curve that has no kinks
+  const edge = 90, ss = (u) => { u = Math.min(1, Math.max(0, u)); return u * u * u * (u * (u * 6 - 15) + 10); };
+  if (local < edge) return { A: biomeOf(bi - 1), B: A, k: ss(0.5 + local / edge / 2), bi };
+  if (local > BIOME_W - edge) return { A, B: biomeOf(bi + 1), k: ss((local - (BIOME_W - edge)) / edge / 2), bi };
   return { A, B: A, k: 0, bi };
 }
 

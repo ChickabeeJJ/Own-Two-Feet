@@ -51,7 +51,7 @@ export class FX {
   }
   slash(pts, col, width = 1) { if (pts.length > 1) { const life = 0.17 + (width - 1) * 0.12; this.slashes.push({ pts: pts.map(p => [p[0], p[1], p[2], p[3]]), life, max: life, col, width }); } }
   flash(name, x, y, size, rot = 0, life = 0.22) { this.flashes.push({ name, x, y, size, rot, life, max: life }); }
-  text(x, y, str, col = '#ffffff', size = 18, life = 0.9) { this.texts.push({ x, y, str, col, size, life, max: life, vy: -60 }); }
+  text(x, y, str, col = '#ffffff', size = 18, life = 1.1) { this.texts.push({ x, y, str, col, size, life, max: life, vy: -34 }); }
   souls(x, y, n, target, col = '#bff6ff', onArrive) {
     for (let i = 0; i < n; i++) {
       const a = rand(0, TAU), sp = rand(120, 320);
@@ -112,7 +112,7 @@ export class FX {
     this.flashes = this.flashes.filter(f => f.life > 0);
     for (const s of this.slashes) s.life -= dt;
     this.slashes = this.slashes.filter(s => s.life > 0);
-    for (const t of this.texts) { t.life -= dt; t.y += t.vy * dt; t.vy *= Math.exp(-3 * dt); }
+    for (const t of this.texts) { t.life -= dt; t.y += t.vy * dt; t.vy *= Math.exp(-1.6 * dt); }
     this.texts = this.texts.filter(t => t.life > 0);
   }
 
@@ -183,12 +183,15 @@ export class FX {
     if (!additive) {
       ctx.textAlign = 'center';
       for (const t of this.texts) {
+        // quiet serif marks in the UI's voice: fade in, drift up slowly, fade out; no pop, no drop shadow
         const u = 1 - t.life / t.max;
-        ctx.globalAlpha = u > 0.6 ? 1 - (u - 0.6) / 0.4 : 1;
-        const sc = u < 0.12 ? 1 + (0.12 - u) * 5 : 1;
-        ctx.font = `800 ${t.size * sc}px Manrope, sans-serif`;
-        ctx.fillStyle = rgba('#000000', 0.35); ctx.fillText(t.str, t.x + 1.5, t.y + 2);
-        ctx.fillStyle = t.col; ctx.fillText(t.str, t.x, t.y);
+        ctx.globalAlpha = Math.min(1, u * 8) * (u > 0.55 ? 1 - (u - 0.55) / 0.45 : 1) * 0.92;
+        const sz = Math.round(Math.max(11, t.size * 0.9));
+        ctx.font = `italic 600 ${sz}px 'Cormorant Garamond', serif`;
+        if ('letterSpacing' in ctx) ctx.letterSpacing = '0.06em';
+        const x = Math.round(t.x), y = Math.round(t.y);
+        ctx.lineJoin = 'round'; ctx.lineWidth = 2.5; ctx.strokeStyle = 'rgba(12,10,16,0.45)'; ctx.strokeText(t.str, x, y);
+        ctx.fillStyle = mix(t.col, '#efe6d6', 0.35); ctx.fillText(t.str, x, y);
       }
     }
     ctx.restore();

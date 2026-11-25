@@ -270,6 +270,7 @@ export class Game {
 
   // the next undefeated warden, looming on the horizon as you get close
   teaseInfo(camX, depth) {
+    return null;   // no looming silhouette on the horizon
     if (!this.bosses || !this.save || (this.bosses.active)) return null;
     const ctx = Math.floor(camX / TILE);
     const gi = gateNear(ctx);

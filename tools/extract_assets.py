@@ -311,3 +311,19 @@ def clean_bladestone(outdir):
     meta = json.load(open(outdir + '/sprites.json'))
     meta['props/bladestone'] = (int(out.shape[1]), int(out.shape[0]))
     json.dump(meta, open(outdir + '/sprites.json', 'w'), indent=1)
+
+
+def clean_banner(outdir):
+    """the gate banner was cut with the dark ground shadow under its tassels: drop the shadow rows and the
+    grey pixels around the tassel tips, keep the cloth and the gold"""
+    p = f'{outdir}/props/banner.png'
+    im = np.asarray(Image.open(p).convert('RGBA')).astype(np.float32)
+    rgb, a = im[..., :3], im[..., 3]
+    lum = rgb.mean(axis=2)
+    rows = [y for y in range(im.shape[0]) if ((a[y] > 100) & (lum[y] > 90)).any()]
+    im = im[:max(rows) + 2]
+    rgb = im[..., :3]; lum = rgb.mean(axis=2); sat = rgb.max(axis=2) - rgb.min(axis=2)
+    h = im.shape[0]; low = np.zeros(lum.shape, bool); low[int(h * 0.78):] = True
+    im[..., 3][low & (lum < 95) & (sat < 40)] = 0
+    rows = np.where(im[..., 3].max(axis=1) > 20)[0]; im = im[:rows.max() + 1]
+    Image.fromarray(im.astype(np.uint8), 'RGBA').save(p, optimize=True)

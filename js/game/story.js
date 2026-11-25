@@ -42,7 +42,7 @@ const LORE = [
 // tutorial: one verb at a time, each confirmed before the next
 const TUT = [
   { id: 'move', title: 'Walk', keys: ['A', 'D'], touch: 'drag on the left side of the screen', text: 'Walk toward the light', done: s => Math.abs(s.game.player.x - s.tutX0) > 4 * TILE },
-  { id: 'jump', title: 'Jump', keys: ['Space'], touch: 'tap Jump', text: 'Jump. Tap twice for a higher hop later', done: s => s.jumped },
+  { id: 'jump', title: 'Jump', keys: ['Space'], touch: 'tap Jump', text: 'Jump. Tap again in the air to jump higher', done: s => s.jumped },
   { id: 'blade', title: 'Take the blade', keys: [], touch: 'walk into it', text: 'Walk into the blade in the stone', done: s => s.sv.hasBlade },
   { id: 'strike', title: 'Strike', keys: ['J', 'Click'], touch: 'tap Strike', text: 'Hit the training doll three times', done: s => s.dummyHits >= 3 },
   { id: 'dash', title: 'Dash', keys: ['Shift'], touch: 'tap Dash', text: 'Dash. You can dash in the air too', done: s => s.dashed },
@@ -314,7 +314,7 @@ export class Story {
     if (this.stage === 2 || this.stage === 3) { this.updateWake(dt); return; }
     if (this.bladeY === null) this.bladeY = g.world.surface(BLADE_X) * TILE;
     if (!this.sv.tutDone) this.updateTutorial(dt); else this.updateGoals(dt);
-    if (this.dummy) { const d = this.dummy; d.c.x = this.dummyX; d.c.vx = 0; d.intent.mx = 0; }
+    if (this.dummy && !this.dummy.removed) { const d = this.dummy; d.c.x = this.dummyX; d.c.vx = 0; d.intent.mx = 0; }
     // walking into the blade takes it
     if (!this.sv.hasBlade && Math.abs(p.x - (BLADE_X * TILE + 16)) < 34 && Math.abs(p.y - this.bladeY) < 70 && !g.cinematic) this.takeBlade();
     // biome discovery
@@ -407,7 +407,13 @@ export class Story {
     this.sv.tutDone = 1; this.sv.obj = 0;
     this.ui && this.ui.tutorial(null);
     if (!skipped) { this.card('Tutorial complete', 'now the world is yours', 'small gain', 2.6); Audio.play('chime'); }
-    if (this.dummy) { this.dummy.team = 'npc'; this.dummy.kind = 'dummy'; }
+    // the training doll has done its job: it comes apart in a puff of straw
+    if (this.dummy) {
+      const d = this.dummy;
+      g.fx.dust(d.c.x, d.c.y - 30, 14, '#e8dccb', -Math.PI / 2, 140);
+      g.fx.burst(d.c.x, d.c.y - 50, { n: 12, speed: 160, col: '#e8d2b0', col1: '#b8a07a', life: 0.7, size: 2.2, kind: 'chip' });
+      d.removed = true; this.dummy = null;
+    }
     g.saveNow();
   }
   // a repeat attempt: no cutscene, straight back in
@@ -577,8 +583,8 @@ export class Story {
         const pa = g.player.actor;
         ctx.save(); ctx.globalCompositeOperation = 'lighter';
         drawGlow(ctx, pa.c.x, pa.c.y - 40, 120, [1, 0.88, 0.7], 0.45);
-        ctx.translate(pa.c.x, pa.c.y - 40); ctx.rotate(g.time * 0.6);
-        drawSprite(ctx, 'props/seed', 0, 0, 190, { add: true, alpha: 0.55, anchorY: 0.5 });
+        ctx.translate(Math.round(pa.c.x), Math.round(pa.c.y - 40)); ctx.rotate(g.time * 0.6);
+        drawStar(ctx, 0, 0, 34, 0.9);
         ctx.restore();
       }
       this.thread.draw(ctx, a, 'front');
@@ -742,6 +748,13 @@ const BIOME_LINES = {
 export { BLADE_X, COSMETICS, drawSeed, sign };
 
 // the seed of light: a hot star with a long tail, flickering rays
+// a clean star: a long four-point cross over a short diagonal one, closed paths, a white core
+function drawStar(g, x, y, r, a = 1) {
+  const pt = (n, R, r0, rot) => { g.beginPath(); for (let i = 0; i < n * 2; i++) { const ang = rot + i * Math.PI / n, rr = i % 2 ? r0 : R; g.lineTo(x + Math.cos(ang) * rr, y + Math.sin(ang) * rr); } g.closePath(); };
+  g.fillStyle = `rgba(255,214,160,${0.55 * a})`; pt(4, r * 0.62, r * 0.1, Math.PI / 4); g.fill();
+  g.fillStyle = `rgba(255,236,206,${0.85 * a})`; pt(4, r, r * 0.12, 0); g.fill();
+  g.fillStyle = `rgba(255,255,255,${a})`; g.beginPath(); g.arc(x, y, r * 0.16, 0, TAU); g.fill();
+}
 function drawSeedOfLight(g, x, y, time, t) {
   g.save(); g.globalCompositeOperation = 'lighter';
   const pulse = 1 + Math.sin(time * 9) * 0.08;

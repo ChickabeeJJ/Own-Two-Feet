@@ -84,7 +84,7 @@ button { font-family: var(--sans); color: var(--text); }
 body.touch #btn-menu { width: 46px; height: 46px; }
 #souls-online { color: var(--accent); }
 #souls-online::before { content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 8px var(--accent); margin-right: 8px; vertical-align: 1px; animation: breathe 1.8s infinite; }
-#compass { position: absolute; left: 50%; top: max(22px, env(safe-area-inset-top)); transform: translateX(-50%); font-size: 11px; letter-spacing: .35em; text-transform: uppercase; color: var(--dim); text-shadow: 0 1px 8px rgba(0,0,0,.7); white-space: nowrap; }
+#compass { position: absolute; left: 50%; top: max(22px, env(safe-area-inset-top)); transform: translateX(-50%); font-size: 11px; letter-spacing: .35em; text-transform: uppercase; color: var(--dim); white-space: nowrap; }
 #compass b { color: var(--text); font-weight: 600; }
 #hotbar { position: absolute; left: 50%; bottom: max(18px, env(safe-area-inset-bottom)); transform: translateX(-50%); display: flex; gap: 6px; pointer-events: auto; }
 .slot { width: 46px; height: 46px; border-radius: 10px; background: var(--glass); border: 1px solid var(--line); position: relative; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); cursor: pointer; transition: transform .2s var(--ease), border-color .2s; }
@@ -262,7 +262,7 @@ body.touch #prompt { display: none !important; }
 .tt-keys kbd { font-size: 12px; padding: 4px 9px; border-radius: 9px; min-width: 34px; text-align: center; border-color: rgba(255,240,220,.45); box-shadow: 0 3px 0 rgba(0,0,0,.45); }
 .tt-or { font-size: 10px; color: var(--dim); letter-spacing: .1em; }
 .tt-touch { font: 700 11px Manrope; color: var(--accent); letter-spacing: .08em; text-transform: uppercase; max-width: 130px; text-align: right; }
-.tt-skip { position: absolute; top: -9px; right: 12px; background: rgba(12,11,18,.9); border: 1px solid var(--line); border-radius: 99px; font: 700 9px Manrope; letter-spacing: .16em; text-transform: uppercase; color: var(--dim); cursor: pointer; padding: 3px 9px; }
+.tt-skip { position: absolute; top: -8px; right: 12px; background: rgba(12,11,18,.9); border: 1px solid var(--line); border-radius: 99px; font: 700 7.6px Manrope; letter-spacing: .15em; text-transform: uppercase; color: var(--dim); cursor: pointer; padding: 2.5px 7.6px; }
 .tt-skip:hover { color: var(--text); }
 body.tutoring #compass { opacity: 0; }
 body.touch #tut { width: min(440px, 56vw); top: calc(max(8px, env(safe-area-inset-top)) + 2px); padding: 7px 12px 7px 8px; gap: 10px; }
@@ -655,3 +655,5 @@ body.modal #combo, body.modal #streak, body.bag-open #combo { opacity: 0; }
 #guidechip .gk.t { font: 700 10px Manrope; letter-spacing: .14em; text-transform: uppercase; color: #bff6ff; }
 body.modal #guidechip, body.bag-open #guidechip { opacity: 0; }
 @media (max-height: 500px) { #guidechip { bottom: 96px; } }
+
+.vessel.vfly { position: fixed; z-index: 70; pointer-events: none; margin: 0; }

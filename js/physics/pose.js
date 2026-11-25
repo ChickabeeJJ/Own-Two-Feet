@@ -476,6 +476,7 @@ export class Animator {
     b.headAng = head;
     this.wrist = lerp(this.wrist || 0, wristT, 1 - Math.exp(-(st.attack && st.attack.t < 1 ? 40 : 14) * dt));
     b.wrist = this.wrist;
+    b.mining = !!(st.attack && st.attack.kind === 'mine' && st.attack.t < 1);
     // arm joints stiffen during a swing so the blade really travels
     const atk = st.attack && st.attack.t < 1;
     b.jointK[3] = atk ? 2.4 : 1; b.jointK[4] = atk ? 2.0 : 1;

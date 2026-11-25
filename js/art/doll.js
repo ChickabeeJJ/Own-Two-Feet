@@ -405,7 +405,7 @@ export function bladeGeom(b, look, a) {
   const ex = b.ipx(P.ELB_F, a), ey = b.ipy(P.ELB_F, a), hx = b.ipx(P.HAND_F, a), hy = b.ipy(P.HAND_F, a);
   // the wrist turns the weapon off the forearm line (mirrored with facing)
   const ang = Math.atan2(hy - ey, hx - ex) + (b.wrist || 0) * (b.facing || 1);
-  const L = (look.weaponLen || (look.blade ? look.blade.len : 30)) * s;
+  const L = (look.weaponLen || (look.blade ? look.blade.len : 30)) * s * (b.mining ? 0.55 : 1);   // a short chop when mining: the blade stays at the block's face
   return { x0: hx, y0: hy, x1: hx + Math.cos(ang) * L, y1: hy + Math.sin(ang) * L, ang };
 }
 // the weapon in hand, by kind; infused weapons glow with their element
@@ -420,7 +420,7 @@ export function drawBlade(g, b, look, a, o) {
 }
 function handDir(b, a, e, h) { const ex = b.ipx(e, a), ey = b.ipy(e, a), hx = b.ipx(h, a), hy = b.ipy(h, a); const ang = Math.atan2(hy - ey, hx - ex) + (h === P.HAND_F ? (b.wrist || 0) * (b.facing || 1) : 0); return { hx, hy, ang, ux: Math.cos(ang), uy: Math.sin(ang) }; }
 function drawSpear(g, b, look, a) {
-  const s = b.s, d = handDir(b, a, P.ELB_F, P.HAND_F), L = (look.weaponLen || 54) * s, B = 16 * s;
+  const s = b.s, d = handDir(b, a, P.ELB_F, P.HAND_F), L = (look.weaponLen || 54) * s * (b.mining ? 0.55 : 1), B = 16 * s;
   capsule(g, d.hx - d.ux * B, d.hy - d.uy * B, d.hx + d.ux * L * 0.86, d.hy + d.uy * L * 0.86, 1.3 * s, 1.3 * s, '#7a5a3e', { dark: 0.35 });
   const tx = d.hx + d.ux * L, ty = d.hy + d.uy * L, nx = -d.uy, ny = d.ux, bx = d.hx + d.ux * L * 0.8, by = d.hy + d.uy * L * 0.8;
   g.fillStyle = '#cfd6de';
@@ -429,7 +429,7 @@ function drawSpear(g, b, look, a) {
   g.fillStyle = '#c9a45c'; g.beginPath(); g.arc(bx, by, 1.8 * s, 0, TAU); g.fill();
 }
 function drawHammerW(g, b, look, a) {
-  const s = b.s, d = handDir(b, a, P.ELB_F, P.HAND_F), L = (look.weaponLen || 34) * s;
+  const s = b.s, d = handDir(b, a, P.ELB_F, P.HAND_F), L = (look.weaponLen || 34) * s * (b.mining ? 0.6 : 1);
   capsule(g, d.hx - d.ux * 6 * s, d.hy - d.uy * 6 * s, d.hx + d.ux * L, d.hy + d.uy * L, 1.6 * s, 1.6 * s, '#6e523b', { dark: 0.35 });
   g.save(); g.translate(d.hx + d.ux * L, d.hy + d.uy * L); g.rotate(d.ang + Math.PI / 2);
   const gr = g.createLinearGradient(-9 * s, 0, 9 * s, 0); gr.addColorStop(0, '#5a5560'); gr.addColorStop(0.5, '#8a8590'); gr.addColorStop(1, '#4a4650');

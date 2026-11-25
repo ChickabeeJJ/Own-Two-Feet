@@ -50,7 +50,7 @@ export class Levels {
     xp = Math.max(1, Math.round(xp));
     sv.xp = (sv.xp || 0) + xp;
     sv.level = sv.level || 1;
-    if (x !== undefined && this.game.fx) this.game.fx.text(x + rand(-10, 10), y, `+${xp} XP${label ? ' · ' + label : ''}`, '#bff6ff', label ? 16 : 13);
+    if (x !== undefined && this.game.fx) this.game.fx.text(x + rand(-8, 8), y, `+${xp}`, '#9fd6e0', label ? 16 : 13);
     while (sv.level < MAX_LEVEL && sv.xp >= this.need(sv.level)) { sv.xp -= this.need(sv.level); this.levelUp(); }
     if (this.game.ui && this.game.ui.xpBar) this.game.ui.xpBar(sv.level, sv.xp / this.need(sv.level), true);
   }
