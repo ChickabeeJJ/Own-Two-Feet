@@ -511,8 +511,8 @@ export class UI {
   }
   xpBar(level, frac, bump) {
     const b = $('#xp'); if (!b) return;
-    const lv = $('#lvl'); if (lv.textContent !== String(level)) { if (this.lastShownLv) { b.classList.remove('up'); void b.offsetWidth; b.classList.add('up'); } this.lastShownLv = level; }
-    lv.textContent = level; b.title = `Level ${level} · ${Math.round(Math.max(0, Math.min(1, frac)) * 100)}% to the next`; $('#xp-fill').style.width = (Math.max(0, Math.min(1, frac)) * 100).toFixed(1) + '%';
+    const lv = $('#lvl'); if (lv.dataset.lv !== String(level)) { if (this.lastShownLv) { b.classList.remove('up'); void b.offsetWidth; b.classList.add('up'); } this.lastShownLv = level; }
+    lv.dataset.lv = level; lv.textContent = 'Lv. ' + level; b.title = `Level ${level} · ${Math.round(Math.max(0, Math.min(1, frac)) * 100)}% to the next`; $('#xp-fill').style.width = (Math.max(0, Math.min(1, frac)) * 100).toFixed(1) + '%';
     if (bump) { b.classList.remove('bump'); void b.offsetWidth; b.classList.add('bump'); }
   }
   levelCard(n, vessel, perk) {

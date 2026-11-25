@@ -4,6 +4,7 @@
 // trail huge tattered capes. Same physics rig for everyone. No outlines: shaded forms + rim light.
 import { setGrit, drawGrit } from './grit.js';
 import { P } from '../physics/body.js';
+import { IMG } from './images.js';
 import { capsule, hull, ballShade, softDisc, stitches, shade, mix, rgba, LIGHT, TAU } from './paint.js';
 
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -413,9 +414,44 @@ export function bladeGeom(b, look, a) {
   return { x0: hx, y0: hy, x1: hx + Math.cos(ang) * L, y1: hy + Math.sin(ang) * L, ang };
 }
 // the weapon in hand, by kind; infused weapons glow with their element
+// the painted weapons (assets/weapons/<id>.png lie flat, pointing right): the grip sits in the hand, the tip
+// lands where the weapon reaches. Blades take the colour of the edge chosen at the tailor.
+const GRIP = { w_blade: 0.24, w_spear: 0.26, w_hammer: 0.12, w_daggers: 0.3 };
+const tinted = new Map();
+function weaponImg(id, col) {
+  const im = IMG['weapons/' + id]; if (!im) return null;
+  if (!col) return im;
+  const key = id + col; let c = tinted.get(key);
+  if (!c) {
+    c = document.createElement('canvas'); c.width = im.width; c.height = im.height; const x = c.getContext('2d');
+    x.drawImage(im, 0, 0); x.globalCompositeOperation = 'source-atop'; x.globalAlpha = 0.42; x.fillStyle = col; x.fillRect(0, 0, c.width, c.height);
+    tinted.set(key, c);
+  }
+  return c;
+}
+function paintWeapon(g, im, hx, hy, ang, L, grip, f) {
+  const D = L / (1 - grip), H = D * im.height / im.width;
+  g.save(); g.translate(hx, hy); g.rotate(ang); if (f < 0) g.scale(1, -1);
+  g.drawImage(im, -grip * D, -H / 2, D, H);
+  g.restore();
+}
 export function drawBlade(g, b, look, a, o) {
   const w = look.weapon;
   if (look.infuse && o.glows) { const geo = bladeGeom(b, look, a); o.glows.push([lerp(geo.x0, geo.x1, 0.6), lerp(geo.y0, geo.y1, 0.6), 18 * b.s, look.infuse, 0.35]); }
+  const id = w || 'w_blade', im = typeof document !== 'undefined' && GRIP[id] ? weaponImg(id, id === 'w_blade' && look.blade && look.blade.col !== '#e8eef5' ? look.blade.col : null) : null;
+  if (im) {
+    const s = b.s, f = b.facing || 1;
+    if (id === 'w_daggers') {
+      for (const [e, h] of [[P.ELB_B, P.HAND_B], [P.ELB_F, P.HAND_F]]) { const d = handDir(b, a, e, h); paintWeapon(g, im, d.hx, d.hy, d.ang, (look.weaponLen || 19) * s, GRIP[id], f); }
+      return;
+    }
+    const d = handDir(b, a, P.ELB_F, P.HAND_F);
+    const len = id === 'w_blade' ? bladeGeom(b, look, a) : null;
+    const L = len ? Math.hypot(len.x1 - len.x0, len.y1 - len.y0) : (look.weaponLen || (id === 'w_spear' ? 54 : 34)) * s * (b.mining ? 0.55 : 1) * (id === 'w_hammer' ? 1.15 : 1);
+    paintWeapon(g, im, d.hx, d.hy, d.ang, L, GRIP[id], f);
+    if (id === 'w_blade' && o.glows && look.blade && look.blade.glow) o.glows.push([lerp(d.hx, d.hx + Math.cos(d.ang) * L, 0.6), lerp(d.hy, d.hy + Math.sin(d.ang) * L, 0.6), 16 * s, look.blade.glow, 0.14 + (o.bladeHot || 0) * 0.55]);
+    return;
+  }
   if (w === 'w_spear') return drawSpear(g, b, look, a);
   if (w === 'w_hammer') return drawHammerW(g, b, look, a);
   if (w === 'w_daggers') { drawDagger(g, b, look, a, P.ELB_B, P.HAND_B); return drawDagger(g, b, look, a, P.ELB_F, P.HAND_F); }

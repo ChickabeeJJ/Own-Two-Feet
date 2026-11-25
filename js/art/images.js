@@ -11,7 +11,11 @@ const ICONS = ['stone', 'deepstone', 'shadowstone', 'sandstone', 'snow', 'earth'
 const TREES = ['meadow', 'glass', 'hollow', 'ember', 'frost'].map(n => 'trees/' + n);
 const REQ = ['nest', 'satchel', 'ladder', 'platform', 'door', 'step', 'chest', 'bench', 'forge', 'loom', 'draught', 'flare', 'charge', 'lamp', 'pick_gilt', 'pick_crystal', 'charm_thread', 'charm_ember'].map(n => 'req/' + n);
 // painted cutscene plates (assets/cine/<name>.png): list a name here once its file exists and it replaces the built plate
-const CINE = [].map(n => 'cine/' + n);
+export const CINE_NAMES = ['sky', 'far', 'cath', 'near', 'w0', 'w1', 'w2', 'w3', 'w4'];
+const CINE = CINE_NAMES.map(n => 'cine/' + n);
+// the painted weapons, lying flat pointing right with the grip at the left (grip positions in sprites.json)
+export const WEAPON_IMG = ['w_blade', 'w_spear', 'w_hammer', 'w_daggers'];
+const WEAPONS_I = WEAPON_IMG.map(n => 'weapons/' + n);
 // the painted town sheet: buildings, props, signs, townsfolk; shop icons and UI frames
 const TOWN = ['house', 'smithy', 'store', 'inn', 'tailor', 'alchemist', 'waystone', 'well', 'board', 'stall', 'lamp', 'gate', 'yard',
   'sign_store', 'sign_smithy', 'sign_tailor', 'sign_alchemist', 'folk_merchant', 'folk_smith', 'folk_tailor', 'folk_alchemist', 'folk_innkeeper', 'folk_child'].map(n => 'town/' + n)
@@ -22,7 +26,7 @@ export const IMG = {};
 let base = 'assets/';
 export function setBase(b) { base = b; }
 export function loadImages() {
-  const all = [...TEX, ...PROPS, ...ICONS, ...FX, ...TREES, ...REQ, ...CINE, ...TOWN];
+  const all = [...TEX, ...PROPS, ...ICONS, ...FX, ...TREES, ...REQ, ...CINE, ...TOWN, ...WEAPONS_I];
   return Promise.all(all.map(name => new Promise(res => {
     const im = new Image();
     im.onload = () => { IMG[name] = im; res(); };

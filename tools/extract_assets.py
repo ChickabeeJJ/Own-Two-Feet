@@ -449,3 +449,173 @@ def town_sprites(p, outdir, scale=2):
         sw = Image.fromarray(img[y0 + iy:y1 - iy, x0 + ix:x1 - ix].clip(0, 255).astype(np.uint8), 'RGB').resize((64, 64), Image.LANCZOS)
         sw.save(f'{outdir}/tex/town_{name}.png', optimize=True)
     json.dump(meta, open(outdir + '/sprites.json', 'w'), indent=1)
+
+
+# ---------------------------------------------------------------- Art Requests II (painted by the user)
+# art/source/requests2_painted.jpg, 1536 x 1024: five Warden cards, four vista strips, five weapons.
+RQ2_CARDS = [718, 878, 1039, 1200, 1361]          # left edge of each Warden card (148 wide, y 143..372)
+RQ2_STRIPS = {'sky': (40, 152, 486, 198), 'far': (40, 218, 486, 264), 'cath': (40, 284, 486, 331), 'near': (40, 350, 486, 396)}
+RQ2_WEAPONS = {'w_blade': ((85, 708, 160, 798), 0.24), 'w_spear': ((220, 704, 296, 798), 0.3), 'w_hammer': ((358, 700, 446, 798), 0.12),
+               'w_daggers': ((513, 712, 556, 798), 0.3), 'w_sling': ((658, 716, 762, 798), None)}
+# the glass widow shares her tones with the shards behind her, so her outline is traced by hand (card px)
+RQ2_WIDOW = [(8, 97), (20, 86), (35, 77), (52, 70), (70, 66), (88, 69), (100, 74), (109, 82), (103, 88), (101, 100), (100, 112), (96, 128),
+             (93, 142), (96, 155), (100, 170), (104, 188), (110, 205), (114, 221), (48, 221), (52, 200), (56, 180), (60, 165), (64, 152),
+             (60, 140), (56, 128), (50, 112), (40, 104), (25, 99), (12, 98)]
+
+
+def _morph(m, op, k):
+    from PIL import ImageFilter
+    f = ImageFilter.MinFilter(k) if op == 'min' else ImageFilter.MaxFilter(k)
+    return np.asarray(Image.fromarray((m * 255).astype(np.uint8)).filter(f)) > 127
+
+
+def _fill_holes(m):
+    from collections import deque
+    h, w = m.shape; seen = np.zeros_like(m); q = deque()
+    for y in range(h):
+        for x in (0, w - 1):
+            if not m[y, x] and not seen[y, x]: seen[y, x] = True; q.append((y, x))
+    for x in range(w):
+        for y in (0, h - 1):
+            if not m[y, x] and not seen[y, x]: seen[y, x] = True; q.append((y, x))
+    while q:
+        y, x = q.popleft()
+        for ny, nx in ((y + 1, x), (y - 1, x), (y, x + 1), (y, x - 1)):
+            if 0 <= ny < h and 0 <= nx < w and not m[ny, nx] and not seen[ny, nx]: seen[ny, nx] = True; q.append((ny, nx))
+    return m | ~seen
+
+
+def _keep_big(m, frac):
+    from collections import deque
+    h, w = m.shape; lab = np.zeros((h, w), np.int32); sizes = []
+    for sy, sx in zip(*np.where(m)):
+        if lab[sy, sx]: continue
+        n = len(sizes) + 1; lab[sy, sx] = n; q = deque([(sy, sx)]); c = 0
+        while q:
+            y, x = q.popleft(); c += 1
+            for ny, nx in ((y + 1, x), (y - 1, x), (y, x + 1), (y, x - 1)):
+                if 0 <= ny < h and 0 <= nx < w and m[ny, nx] and not lab[ny, nx]: lab[ny, nx] = n; q.append((ny, nx))
+        sizes.append(c)
+    if not sizes: return m
+    big = max(sizes)
+    return np.isin(lab, [i + 1 for i, c in enumerate(sizes) if c >= big * frac])
+
+
+def _fit_bg(reg, mask):
+    """a smooth background (quadratic in x, cubic in y) fitted to the pixels believed to be background"""
+    h, w, _ = reg.shape; yy, xx = np.mgrid[0:h, 0:w]; X = xx / w; Y = yy / h
+    F = np.stack([np.ones_like(X), X, Y, X * X, Y * Y, X * Y, Y ** 3], -1)
+    out = np.zeros_like(reg)
+    for c in range(3):
+        coef, *_ = np.linalg.lstsq(F[mask], reg[..., c][mask], rcond=None); out[..., c] = F @ coef
+    return out
+
+
+def warden_figure(img, i):
+    """one Warden lifted off its card: background fitted and removed, thin ornaments (arches, rays, shard
+    edges) opened away, the figure's holes filled, a soft edge, and the bottom faded where the card cut it"""
+    from PIL import ImageFilter, ImageDraw
+    x = RQ2_CARDS[i]; reg = img[147:368, x + 4:x + 144]; h, w, _ = reg.shape
+    init = np.zeros((h, w), bool); init[:int(h * 0.18)] = True; init[:, :5] = True; init[:, -5:] = True
+    bg = _fit_bg(reg, init)
+    for _ in range(2):
+        fg = np.sqrt(((reg - bg) ** 2).sum(-1)) > 30
+        bg = _fit_bg(reg, ~_morph(fg.astype(np.float32), 'max', 5))
+    d = np.sqrt(((reg - bg) ** 2).sum(-1)); lum = reg.mean(-1) - bg.mean(-1)
+    m = d > 32
+    if i == 3: m = m | ((reg[..., 0] - reg[..., 2] > 45) & (lum > 14))    # the pyre knight's flames
+    k = 7 if i == 2 else 5
+    m = _morph(_morph(m.astype(np.float32), 'min', k).astype(np.float32), 'max', k)
+    m = _keep_big(m, 0.12 if i == 3 else 0.5)
+    if i == 1:
+        pm = Image.new('L', (w, h), 0); ImageDraw.Draw(pm).polygon(RQ2_WIDOW, fill=255); m = np.asarray(pm) > 127
+    m = _fill_holes(m)
+    m = _morph(m.astype(np.float32), 'max', 3)
+    a = np.asarray(Image.fromarray((m * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(0.9))).astype(np.float32) / 255
+    a = a * np.clip((h - 1 - np.arange(h)) / (h * 0.22), 0, 1)[:, None]
+    return reg, a
+
+
+def _strip(img, box, opaque):
+    """a vista strip; above its silhouettes made transparent by flooding from the top edge"""
+    from collections import deque
+    from PIL import ImageFilter
+    x0, y0, x1, y1 = box; reg = img[y0:y1, x0:x1].copy(); h, w, _ = reg.shape
+    a = np.ones((h, w), np.float32)
+    if not opaque:
+        top = np.median(reg[:3], axis=0)                        # the sky colour above each column
+        sky = np.sqrt(((reg - top[None]) ** 2).sum(-1)) < 24
+        seen = np.zeros((h, w), bool); q = deque()
+        for x in range(w):
+            if sky[0, x]: seen[0, x] = True; q.append((0, x))
+        while q:
+            y, x = q.popleft()
+            for ny, nx in ((y + 1, x), (y, x + 1), (y, x - 1)):
+                if 0 <= ny < h and 0 <= nx < w and sky[ny, nx] and not seen[ny, nx]: seen[ny, nx] = True; q.append((ny, nx))
+        a[seen] = 0
+        a = np.asarray(Image.fromarray((a * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(0.7))).astype(np.float32) / 255
+    return reg, a
+
+
+def rq2_sprites(p, outdir):
+    from PIL import ImageFilter
+    img = load(p)
+    meta = json.load(open(outdir + '/sprites.json'))
+    os.makedirs(outdir + '/cine', exist_ok=True)
+    # the five Wardens, figure only, 4x up with a smooth filter
+    for i in range(5):
+        reg, a = warden_figure(img, i)
+        im = Image.fromarray(np.dstack([reg, a * 255]).clip(0, 255).astype(np.uint8), 'RGBA')
+        im = im.resize((im.width * 4, im.height * 4), Image.LANCZOS)
+        im.save(f'{outdir}/cine/w{i}.png', optimize=True); meta[f'cine/w{i}'] = (im.width, im.height)
+    # the vista: each strip widened to a 1600 x 900 plate at its own band, its ground carried down to the bottom
+    PW, PH = 1600, 900
+    band = {'sky': 300, 'far': 420, 'cath': 500, 'near': PH}
+    for name, box in RQ2_STRIPS.items():
+        reg, a = _strip(img, box, name == 'sky')
+        sh = int(round(PW / reg.shape[1] * reg.shape[0]))
+        strip = Image.fromarray(np.dstack([reg, a * 255]).clip(0, 255).astype(np.uint8), 'RGBA').resize((PW, sh), Image.LANCZOS)
+        plate = Image.new('RGBA', (PW, PH), (0, 0, 0, 0))
+        top = band[name] - (sh if name == 'near' else 0)
+        sa = np.asarray(strip).astype(np.float32)
+        if name == 'sky':
+            # above: the strip's top colour deepening toward the zenith; below: its bottom colour
+            t = sa[0, :, :3].mean(0); b = sa[-1, :, :3].mean(0); arr = np.zeros((PH, PW, 4), np.float32); arr[..., 3] = 255
+            for y in range(PH):
+                if y < top: k = y / max(1, top); arr[y, :, :3] = t * (0.55 + 0.45 * k)
+                else: arr[y, :, :3] = b
+            plate = Image.fromarray(arr.clip(0, 255).astype(np.uint8), 'RGBA')
+        else:
+            # carry the ground down as a smooth wash of the strip's lowest colours (no streaks)
+            row = sa[-6:].mean(0); k = 121; pad = np.pad(row, ((k // 2, k // 2), (0, 0)), mode='edge')
+            cs = np.cumsum(pad, 0); row = (cs[k:] - cs[:-k]) / k; row = np.concatenate([row, row[-1:]], 0)[:PW]; row[:, 3] = 255
+            below = np.repeat(row[None], PH - (top + sh), axis=0) if top + sh < PH and name == 'far' else None
+            if name == 'near':   # the pale mist between the silhouettes fades upward (no hard top edge)
+                ramp = np.clip(np.arange(sh) / (sh * 0.8), 0, 1)[:, None] ** 1.5
+                light = sa[..., :3].mean(-1) > 80
+                sa[..., 3] = np.where(light, sa[..., 3] * ramp, sa[..., 3]); strip = Image.fromarray(sa.clip(0, 255).astype(np.uint8), 'RGBA')
+            if name == 'cath':   # the castle's foot fades into the misty ground of the layer behind
+                fa = np.clip((sh - 1 - np.arange(sh)) / (sh * 0.35), 0, 1)
+                sa[..., 3] *= fa[:, None]; strip = Image.fromarray(sa.clip(0, 255).astype(np.uint8), 'RGBA')
+            if below is not None: plate.alpha_composite(Image.fromarray(below.clip(0, 255).astype(np.uint8), 'RGBA'), (0, top + sh))
+        plate.alpha_composite(strip, (0, top))
+        plate.save(f'{outdir}/cine/{name}.png', optimize=True); meta[f'cine/{name}'] = (PW, PH)
+    # weapons: lifted off the panel, turned to lie flat pointing right (grip at the left)
+    wmeta = {}
+    os.makedirs(outdir + '/weapons', exist_ok=True)
+    for wid, (box, grip) in RQ2_WEAPONS.items():
+        x0, y0, x1, y1 = box
+        col, a = matte(img[y0:y1, x0:x1], thr=20)
+        a = keep_main(a)
+        im = Image.fromarray(np.dstack([col, a * 255]).clip(0, 255).astype(np.uint8), 'RGBA')
+        if grip is not None:
+            ys, xs = np.where(a > 0.3); pts = np.stack([xs, ys], 1).astype(np.float32); pts -= pts.mean(0)
+            v = np.linalg.eigh(pts.T @ pts)[1][:, -1]
+            if v[1] > 0: v = -v                                  # the axis that points up and to the right
+            ang = np.degrees(np.arctan2(-v[1], v[0]))            # its angle above the horizontal
+            im = im.rotate(-ang, resample=Image.BICUBIC, expand=True)
+        im = im.crop(im.getbbox()); im = im.resize((im.width * 3, im.height * 3), Image.LANCZOS)
+        im.save(f'{outdir}/weapons/{wid}.png', optimize=True); meta[f'weapons/{wid}'] = (im.width, im.height)
+        if grip is not None: wmeta[wid] = grip
+    meta['weapons/_grip'] = wmeta
+    json.dump(meta, open(outdir + '/sprites.json', 'w'), indent=1)

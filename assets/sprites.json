@@ -386,5 +386,67 @@
  "ui/touch": [
   92,
   94
- ]
+ ],
+ "cine/w0": [
+  560,
+  884
+ ],
+ "cine/w1": [
+  560,
+  884
+ ],
+ "cine/w2": [
+  560,
+  884
+ ],
+ "cine/w3": [
+  560,
+  884
+ ],
+ "cine/w4": [
+  560,
+  884
+ ],
+ "cine/sky": [
+  1600,
+  900
+ ],
+ "cine/far": [
+  1600,
+  900
+ ],
+ "cine/cath": [
+  1600,
+  900
+ ],
+ "cine/near": [
+  1600,
+  900
+ ],
+ "weapons/w_blade": [
+  324,
+  90
+ ],
+ "weapons/w_spear": [
+  342,
+  69
+ ],
+ "weapons/w_hammer": [
+  309,
+  204
+ ],
+ "weapons/w_daggers": [
+  222,
+  120
+ ],
+ "weapons/w_sling": [
+  294,
+  207
+ ],
+ "weapons/_grip": {
+  "w_blade": 0.24,
+  "w_spear": 0.3,
+  "w_hammer": 0.12,
+  "w_daggers": 0.3
+ }
 }

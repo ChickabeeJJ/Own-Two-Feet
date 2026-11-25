@@ -6,7 +6,7 @@
 // screen, a slice at a time, then only composited: parallax, push-ins, embers, crows and the falling seed
 // are drawn live on top. A painted plate in assets/cine/<name>.png replaces the built one when present.
 import { rng, canvas, rimLight, glow, vignette, rgbaJ, mixHex, Painter } from './brush.js';
-import { IMG } from './images.js';
+import { IMG, CINE_NAMES } from './images.js';
 import { TAU } from '../core/util.js';
 
 const PW = 1600, PH = 900;          // vista plates
@@ -261,7 +261,38 @@ function limb(f, a, b, wa, wb, col) {
   f.beginPath(); f.arc(Rn(b[0]), Rn(b[1]), Rn(wb * 1.1), 0, TAU); f.fillStyle = mixHex(col, '#000000', 0.2); f.fill(); f.strokeStyle = 'rgba(0,0,0,0.65)'; f.lineWidth = 2; f.stroke();
 }
 // draw the figure on its own canvas so it can be rim-lit, then composite
+// a painted Warden (assets/cine/w<i>.png, the figure alone) over the built backdrop: large and centred, its
+// base sinking into a band of ground mist so the place the card cut it off never shows
+const BACKDROP = [['#120a0c', '#5a2e1c'], ['#04101a', '#0e3a44'], ['#0a0614', '#2a1a44'], ['#120604', '#4a1608'], ['#0c1420', '#4a6070']];
+function* paintedPortrait(id, im) {
+  const info = WARDEN_INFO[id], [top, hor] = BACKDROP[id];
+  const c = canvas(FW, FH), g = c.getContext('2d');
+  backdrop(g, FW, FH, top, hor, info.col); yield;
+  const F = canvas(FW, FH), f = F.getContext('2d');
+  const h = Math.round(FH * 0.62), w = Math.round(im.width * h / im.height), x = Math.round(FW / 2 - w / 2), y = Math.round(FH * 0.85) - h;
+  if (id === 2) {   // the Unmade Heart's halo, drawn clean where the card's ring was
+    const cx = Math.round(FW / 2), cy = Math.round(y + h * 0.27), r = Math.round(h * 0.12);
+    f.strokeStyle = rgbaJ(info.col, 0.85); f.lineWidth = 3; f.beginPath(); f.arc(cx, cy, r, 0, TAU); f.stroke();
+    f.lineWidth = 2; f.lineCap = 'round'; f.beginPath(); f.moveTo(cx, cy - Math.round(r * 1.6)); f.lineTo(cx, cy + Math.round(r * 0.55)); f.stroke();
+    glow(f, cx, cy, h * 0.2, info.col, 0.35);
+  }
+  f.imageSmoothingQuality = 'high'; f.drawImage(im, x, y, w, h);
+  const rim = rimLight(F, 5, 3, mixHex(info.col, '#ffffff', 0.4), 0.6);
+  g.drawImage(F, 0, 0);
+  g.save(); g.globalCompositeOperation = 'lighter'; g.drawImage(rim, 0, 0); g.restore();
+  yield;
+  // the ground mist the figure stands in
+  const mist = g.createLinearGradient(0, FH * 0.72, 0, FH);
+  mist.addColorStop(0, rgbaJ(hor, 0)); mist.addColorStop(0.55, rgbaJ(mixHex(hor, '#000000', 0.3), 0.75)); mist.addColorStop(1, rgbaJ('#050306', 1));
+  g.fillStyle = mist; g.fillRect(0, Math.round(FH * 0.72), FW, FH);
+  vignette(g, FW, FH, 0.7);
+  return c;
+}
 function* portrait(id, fn) {
+  // wait a moment for the painted figure if it is on its way (images load in the background)
+  if (CINE_NAMES.includes('w' + id)) { const t0 = performance.now(); while (!IMG['cine/w' + id] && performance.now() - t0 < 5000) yield; }
+  const im = IMG['cine/w' + id];
+  if (im) return yield* paintedPortrait(id, im);
   const R = rng(100 + id * 17), info = WARDEN_INFO[id];
   const c = canvas(FW, FH), g = c.getContext('2d');
   const F = canvas(FW, FH), f = F.getContext('2d');
@@ -455,8 +486,9 @@ export class PrologueArt {
     this.crows = Array.from({ length: 9 }, () => ({ x: Math.random() * 0.3, y: 0.25 + Math.random() * 0.2, s: 0.05 + Math.random() * 0.04, ph: Math.random() * TAU, z: 0.6 + Math.random() * 0.6 }));
   }
   step(ms) { this.p.step(ms); }
-  // a painted plate in assets/cine/<name>.png wins over the built one
-  get(name) { return IMG['cine/' + name] || this.p.get(name); }
+  // a painted vista plate in assets/cine/<name>.png wins over the built one (Warden portraits are composed
+  // by paintedPortrait, so they always come from the painter)
+  get(name) { return (name[0] !== 'w' && IMG['cine/' + name]) || this.p.get(name); }
   ready(name) { return !!this.get(name); }
   // cover-fit an image into the screen with a zoom and pan
   cover(ctx, im, W, H, zoom, px = 0, py = 0, alpha = 1) {

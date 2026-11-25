@@ -597,12 +597,16 @@ body.modal #combo, body.modal #streak, body.bag-open #combo { opacity: 0; }
 /* level and experience */
 /* a thin line of experience just above the hotbar, the level in a small serif badge at its left */
 #xp { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(max(18px, env(safe-area-inset-bottom)) + 58px); width: min(52vw, 460px); display: flex; align-items: center; gap: 9px; pointer-events: auto; }
-#lvl { flex: 0 0 auto; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font: 500 15px/1 'Cormorant Garamond', serif; color: #f3ece0; background: radial-gradient(circle at 50% 35%, #2a2533, #15121b); box-shadow: 0 0 0 1px rgba(255,217,160,.55), 0 2px 8px rgba(0,0,0,.45); }
-#xp-bar { flex: 1 1 auto; height: 3px; border-radius: 2px; background: rgba(255,255,255,.1); overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,.35); }
-#xp-fill { height: 100%; width: 0; background: linear-gradient(90deg, #6fbcd2, #dff9ff); box-shadow: 0 0 6px rgba(159,243,255,.6); transition: width .5s var(--ease); }
+/* the level badge: a diamond outlined in gold with "Lv. N"; the bar: an arrow-ended line with a pale fill */
+#lvl { position: relative; flex: 0 0 auto; min-width: 46px; height: 34px; display: grid; place-items: center; font: 500 13px/1 'Cormorant Garamond', serif; letter-spacing: .02em; color: #f3ece0; z-index: 1; }
+#lvl::before { content: ''; position: absolute; left: 50%; top: 50%; width: 26px; height: 26px; transform: translate(-50%, -50%) rotate(45deg); background: radial-gradient(circle at 50% 40%, #2a2533, #15121b); box-shadow: 0 0 0 1px rgba(255,217,160,.75), 0 2px 8px rgba(0,0,0,.5); z-index: -1; }
+#xp-bar { flex: 1 1 auto; height: 10px; padding: 1px; margin-left: -6px; background: rgba(255,217,160,.55); clip-path: polygon(0 50%, 6px 0, calc(100% - 9px) 0, 100% 50%, calc(100% - 9px) 100%, 6px 100%); }
+#xp-track { width: 100%; height: 100%; background: rgba(22,19,28,.92); clip-path: polygon(0 50%, 5px 0, calc(100% - 8px) 0, 100% 50%, calc(100% - 8px) 100%, 5px 100%); overflow: hidden; }
+#xp-fill { height: 100%; width: 0; background: linear-gradient(90deg, #d9cfc2, #f6efe4); box-shadow: 0 0 6px rgba(255,240,220,.5); transition: width .5s var(--ease); }
 #xp.bump #xp-fill { animation: xpFlash .5s ease-out; }
 #xp.up #lvl { animation: lvlPop .6s var(--ease); }
-#xp.pick #lvl { animation: pickPulse 1.4s ease-in-out infinite; box-shadow: 0 0 0 1px rgba(191,246,255,.9), 0 2px 8px rgba(0,0,0,.45); }
+#xp.up #lvl::before { box-shadow: 0 0 0 1px #bff6ff, 0 0 14px rgba(191,246,255,.8); }
+#xp.pick #lvl::before { animation: pickPulse 1.4s ease-in-out infinite; box-shadow: 0 0 0 1px rgba(191,246,255,.9), 0 2px 8px rgba(0,0,0,.45); }
 @keyframes xpFlash { 0% { filter: brightness(2.2); } 100% { filter: none; } }
 @keyframes lvlPop { 0% { transform: scale(1); } 35% { transform: scale(1.35); color: #bff6ff; } 100% { transform: scale(1); } }
 body.touch #xp { bottom: calc(max(12px, env(safe-area-inset-bottom)) + 50px); width: min(46vw, 380px); }
