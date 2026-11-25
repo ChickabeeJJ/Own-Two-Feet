@@ -325,12 +325,12 @@ export class UI {
   }
   // ------------------------------------------------------------ teaching cards (first time only, kept in the Guide)
   // something new became relevant: it goes into the Guide (no pop-up), with a quiet note and a dot on the menu
-  teach(id) {
+  teach(id, quiet) {
     const C = CARDS[id], sv = this.sv; if (!C || !sv) return false;
     sv.cards = sv.cards || {}; sv.cardsNew = sv.cardsNew || {};
     if (sv.cards[id]) return false;
     sv.cards[id] = 1; sv.cardsNew[id] = 1;
-    this.toast(`New in the Guide: ${C.title}`);
+    if (!quiet) this.toast(`New in the Guide: ${C.title}`);
     this.guideDot();
     return true;
   }

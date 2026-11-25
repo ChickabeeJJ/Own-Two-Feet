@@ -171,49 +171,46 @@ export function drawWispSprite(ctx, x, y, t, col, o = {}) {
   ctx.globalAlpha = a;
   ctx.globalCompositeOperation = 'lighter';
   const rgb = hexRgb(col);
-  drawGlow(ctx, x, y, 50 + (o.windup ? (0.6 - o.windup) * 70 : 0), rgb, 0.4);
-  // trailing filaments
-  ctx.strokeStyle = rgba(col, 0.4); ctx.lineWidth = 1.6; ctx.lineCap = 'round';
-  for (let i = 0; i < 4; i++) {
-    const ph = t * 3 + i * 1.7;
-    ctx.beginPath(); ctx.moveTo(x + (i - 1.5) * 3, y + 10);
-    ctx.bezierCurveTo(x - (o.vx || 0) * 0.05 + Math.sin(ph) * 8, y + 22, x - (o.vx || 0) * 0.1 + Math.sin(ph + 1) * 12, y + 32, x - (o.vx || 0) * 0.12 + Math.sin(ph + 2) * 6, y + 42 + i * 3);
-    ctx.stroke();
-  }
+  drawGlow(ctx, x, y, 50 + (o.windup ? (0.6 - o.windup) * 70 : 0), [0.62, 0.95, 1], 0.4);
+  // a cold cyan flame: one closed teardrop whose tip licks back against its motion, a paler inner flame,
+  // and a pale hourglass core where the Hollow's mask would be; two sparks above it
+  const lean = Math.max(-1, Math.min(1, -(o.vx || 0) / 160)) * 6, fl = Math.sin(t * 9) * 1.5;
+  const flame = (k, c0, c1, alpha) => {
+    const w = 11 * k, h = 20 * k;
+    ctx.beginPath(); ctx.moveTo(Math.round(x + lean * k), Math.round(y - h - 6 * k + fl));
+    ctx.bezierCurveTo(x + w * 0.4 + lean * 0.6 * k, y - h * 0.55, x + w, y - h * 0.1, x + w, y + h * 0.18);
+    ctx.bezierCurveTo(x + w, y + h * 0.62, x + w * 0.45, y + h * 0.8, x, y + h * 0.8);
+    ctx.bezierCurveTo(x - w * 0.45, y + h * 0.8, x - w, y + h * 0.62, x - w, y + h * 0.18);
+    ctx.bezierCurveTo(x - w, y - h * 0.15, x - w * 0.2 + lean * 0.6 * k, y - h * 0.45, Math.round(x + lean * k), Math.round(y - h - 6 * k + fl));
+    ctx.closePath();
+    const gr = ctx.createLinearGradient(x, y - h, x, y + h); gr.addColorStop(0, rgba(c0, alpha * 0.7)); gr.addColorStop(1, rgba(c1, alpha));
+    ctx.fillStyle = gr; ctx.fill();
+  };
+  const cyan = o.flash > 0 ? '#ffffff' : '#9ff3ff';
+  flame(1, cyan, '#4fd2e0', 0.85);
+  flame(0.62, '#e8fdff', '#9ff3ff', 0.9);
   ctx.globalCompositeOperation = 'source-over';
-  // wings
-  const flap = Math.sin(t * 16) * 0.5 + 0.5;
-  for (const sd of [-1, 1]) {
-    ctx.save(); ctx.translate(x, y - 2); ctx.scale(sd, 1);
-    const wg = ctx.createLinearGradient(0, 0, 22, -10);
-    wg.addColorStop(0, rgba('#2a2436', 0.95)); wg.addColorStop(1, rgba(col, 0.35));
-    ctx.fillStyle = wg;
-    ctx.beginPath(); ctx.moveTo(2, -2); ctx.quadraticCurveTo(14, -18 - flap * 8, 24, -8 - flap * 6); ctx.quadraticCurveTo(18, 0, 4, 2); ctx.fill();
-    ctx.beginPath(); ctx.moveTo(2, 3); ctx.quadraticCurveTo(14, 12 + flap * 4, 16, 6); ctx.quadraticCurveTo(10, 3, 3, 4); ctx.fill();
-    ctx.fillStyle = rgba(col, 0.7); ctx.beginPath(); ctx.arc(15, -9 - flap * 5, 2, 0, TAU); ctx.fill();
-    ctx.restore();
-  }
-  // lantern body: ribbed paper glowing from within
-  const lg = ctx.createRadialGradient(x - 3, y - 4, 2, x, y, 15);
-  lg.addColorStop(0, o.flash > 0 ? '#ffffff' : '#fff3e0'); lg.addColorStop(0.45, col); lg.addColorStop(1, '#2a2436');
-  ctx.fillStyle = lg;
-  ctx.beginPath(); ctx.ellipse(x, y, 11, 14, 0, 0, TAU); ctx.fill();
-  ctx.strokeStyle = rgba('#2a2436', 0.45); ctx.lineWidth = 1;
-  for (const k of [-6, 0, 6]) { ctx.beginPath(); ctx.ellipse(x, y, Math.abs(11 - Math.abs(k) * 0.9) * (k ? 0.6 : 0.01) + 0.5, 14, 0, 0, TAU); ctx.stroke(); }
-  ctx.fillStyle = '#1e1a28'; ctx.fillRect(x - 5, y - 17, 10, 4); ctx.fillRect(x - 3, y + 13, 6, 3);
-  // mask
   ctx.fillStyle = '#f4f1ea';
-  ctx.beginPath(); ctx.ellipse(x, y - 1, 6.5, 7.5, 0, 0, TAU); ctx.fill();
-  if (o.windup) { ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = rgba(col, 0.6); ctx.beginPath(); ctx.ellipse(x, y - 1, 6.5, 7.5, 0, 0, TAU); ctx.fill(); }
+  ctx.beginPath(); ctx.ellipse(x, y - 2, 3.6, 4.2, 0, 0, TAU); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(x, y + 6, 3.2, 3.8, 0, 0, TAU); ctx.fill();
+  ctx.fillRect(Math.round(x - 1), Math.round(y + 1), 2, 3);
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.fillStyle = rgba('#bff6ff', 0.8 * (0.6 + 0.4 * Math.sin(t * 5)));
+  for (const [dx, dy] of [[-9, -30], [7, -36]]) { ctx.beginPath(); ctx.moveTo(x + dx, y + dy - 3); ctx.lineTo(x + dx + 1.2, y + dy); ctx.lineTo(x + dx, y + dy + 3); ctx.lineTo(x + dx - 1.2, y + dy); ctx.closePath(); ctx.fill(); }
+  ctx.globalCompositeOperation = 'source-over';
+  if (o.windup) { ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = rgba(col, 0.6); ctx.beginPath(); ctx.ellipse(x, y + 2, 7, 9, 0, 0, TAU); ctx.fill(); }
   ctx.restore();
 }
 
 // ---------------------------------------------------------------- ragdoll enemies
-export const HUSK_LOOK = (eye) => ({ grit: 'husk', body: '#2a2630', limb: '#2b2729', coat: '#2a2630', maskCol: '#bcae96', hoodCol: '#221e22', head: 'crescent', mat: 'cloth', eyes: eye, eyeStyle: 'slit', cape: { col: '#34302e', style: 'scarf', len: 6, wide: 3.4 }, cloakLong: '#302b2c', blade: null, marks: [], rim: '#8a7462', claws: '#e6dfd2', bootCol: '#1e1b22', belt: false, arms: 0.95 });
+// The Hollows, after the painted reference: big pale masks with one dark eye (a flame crest, a cone, a
+// hood, horns), dark stick limbs, short ponchos with deep jagged hems in muted brown and violet, a scarf.
+const HOLLOW_BASE = (eye) => ({ body: '#26212c', limb: '#241f29', coat: '#26212c', mat: 'cloth', eyes: eye, maskCol: '#ecdcc8', blade: null, marks: [], rim: '#8a7462', claws: '#e6dfd2', bootCol: '#1c1820', belt: false, collar: false, cloakShort: true, cloakTeeth: 6, arms: 0.9, legs: 0.92 });
+export const HUSK_LOOK = (eye) => ({ ...HOLLOW_BASE(eye), hmask: 'crest', cloakLong: '#7d5747', cape: { col: '#8a5e4e', style: 'scarf', len: 5, wide: 3.6 } });
 // a lancer carries a crude spear and charges; a slinger keeps its distance and lobs stones
-export const LANCER_LOOK = (eye) => ({ ...HUSK_LOOK(eye), head: 'horns', maskCol: '#cbb89a', cape: { col: '#4a3a34', style: 'scarf', len: 6, wide: 3 }, weapon: 'w_spear', weaponLen: 46, blade: { len: 46, w: 2.2, col: '#b8b0a8' } });
-export const SLINGER_LOOK = (eye) => ({ ...HUSK_LOOK(eye), head: 'hood', hoodCol: '#2e2a26', maskCol: '#bfae92', cloakLong: '#3a332c', weapon: 'w_sling', blade: { len: 14, w: 2, col: '#9a96a0' } });
-export const BRUTE_LOOK = (eye) => ({ grit: 'brute', plateCol: '#4e484c', body: '#33302f', limb: '#2b2829', coat: '#2b2829', head: 'horns', hornCol: '#1e1a1c', headK: 1.35, mat: 'cloth', eyes: eye, eyeStyle: 'slit', cape: null, cloakLong: '#2a2526', trim: '#8a7448', blade: null, marks: [], rim: '#8a7462', gaunt: true, gloves: '#3a3238', bulk: 1.25, arms: 1.15, bootCol: '#1e1b22', belt: false });
+export const LANCER_LOOK = (eye) => ({ ...HOLLOW_BASE(eye), hmask: 'cone', cloakLong: '#5a4a6a', cape: null, weapon: 'w_spear', weaponLen: 46, blade: { len: 46, w: 2.2, col: '#d8cfc2' } });
+export const SLINGER_LOOK = (eye) => ({ ...HOLLOW_BASE(eye), hmask: 'hood', hoodCol: '#5e4e78', cloakLong: '#5a4a6a', cape: { col: '#7d5747', style: 'scarf', len: 5, wide: 3.4 }, weapon: 'w_sling', blade: { len: 14, w: 2, col: '#9a96a0' } });
+export const BRUTE_LOOK = (eye) => ({ ...HOLLOW_BASE(eye), hmask: 'horns', headK: 1.3, cloakLong: '#6a4a44', cloakTeeth: 7, slab: '#9a8270', cape: null, bulk: 1.25, arms: 1.1, gaunt: true, gloves: '#2a242e' });
 
 export class Enemies {
   constructor(game) {

@@ -34,9 +34,9 @@ Returning players drop straight back where they were. Esc skips the opening.
 | Space, W | Jump. Tap again in the air for a double jump |
 | Shift, K | Dash |
 | Hold Ctrl or C | Crawl through one-block gaps |
-| J, left click | Strike, and it does what the moment asks: with a foe close it swings; facing a block it mines it (hold); facing open space with a block in hand, standing still, it places it. The touch button reads Strike, Mine or Place. A combo chain per weapon; blade and daggers sometimes lunge and stab. Hold to charge a heavy attack; strike just as a foe's blow lands to parry. Hold up to launch, down in the air to bounce |
-| Hold left click on a block | Break it (only blocks you can see; with an enemy close, a click strikes instead). Strike a trunk a few times and the tree topples for timber |
-| Right click | Place the chosen block: a ghost shows where it goes, red when it can't (with the reason on click). Click a block's face to build onto it, hold and drag to lay a line. Shift places a back wall |
+| J, left click | Strike: it always fights (blocks are only mined and placed in build mode). The blade swings like a Souls straight sword: a falling diagonal, a rising backhand, a thrust and a heavy finisher, each with a wind-up and a recovery a queued swing can flow out of; running gives a lunging slash, jumping a downward cut. Hold to charge (a two-handed overhead); strike as a blow lands to parry; hold up to launch, down in the air to bounce. The daggers sometimes lunge and stab |
+| B, then hold left click (or J) on a block | Build mode: break the block. Reach is a square of five whole blocks each way; out of reach, nothing is outlined. Strike a trunk a few times and the tree topples for timber |
+| Build mode: right click (or E) | Place the chosen block: a ghost shows where it goes, red when it can't (with the reason on click). Click a block's face to build onto it, hold and drag to lay a line. Shift places a back wall. Outside build mode, right click throws or drinks the item in hand |
 | 1-9, mouse wheel | Choose what's in hand (blocks, parts, flares, draughts) |
 | R | Use what's in hand (throw a flare or charge toward the pointer, drink a draught); right click works too |
 | B | Build mode for keyboard and gamepad (Strike mines, E places) |
@@ -94,7 +94,7 @@ The game is built to keep you fighting:
 
 - Experience from everything: kills (scaled by the enemy's level and your combo), surges, quests, commissions, puzzles, camps, chests, woken dolls, nests, new towns, wardens. The inn's Well Rested bonus adds half again.
 - **Level up:** a slow-motion ring and a card. Damage grows every level, a vessel every fourth level (up to ten), and every third level you choose one of three **perks**: Keen Edge, Heavy Hand, Swift Strike, Long Reach, Riposte, Iron Seam, Second Thread, Bloodthread, Overdrive, Fleet, Stormstep, Ember Soul, Lodestone, Scholar, Thread Ward.
-- **Zone levels:** the further from the first fire, the stronger the Hollows. Thread warns you when a zone outclasses you. The Character tab in the menu shows your level, experience, damage, vessels, the zone level here, perks to pick and the ones you have. A thin experience line sits just above the hotbar, the level in a round badge at its left.
+- **Zone levels:** the further from the first fire, the stronger the Hollows. Thread warns you when a zone outclasses you. The Character tab in the menu shows your level, experience, damage, vessels, the zone level here, perks to pick and the ones you have. A thin arrow-ended experience line sits just above the hotbar, the level in a diamond Lv. N badge at its left.
 
 ## Towns
 
@@ -115,7 +115,7 @@ Townsfolk walk the street and talk, and shopkeepers turn to you. Hollows never c
 
 Modelled on how big open-world games keep players oriented (first-time tutorial cards kept in an archive, a companion who explains, a tracked goal with an on-screen marker, clear gating messages):
 
-- **Teaching cards** (`js/ui/teach.js`): the first time Threads of Light, sealed gates, the way-marker, surges, towns, perks and crafting matter, a card with a drawn picture, a title and two lines pauses the game. The menu's **Guide** tab keeps every card you've seen.
+- **The Guide** (`js/ui/teach.js`, menu tab): nothing pops up mid-play. The first time Threads of Light, sealed gates, the way-marker, build mode, parry, mending, surges, towns, perks or crafting matter, an entry is written into the Guide with a quiet note and a dot on the menu button. The Guide is a small two-page book: entries by section on the left, the open entry with its picture, two lines and the controls on the right.
 - **Threads made obvious:** the goal reads "Threads of Light 3/10 · they open the gate" and names the nearest source and its distance; a sealed gate says exactly what it needs and what you carry.
 - **Compass strip:** a thin strip across the top shows the gate, the nearest Thread of Light, the tracked quest, the nearest shrine and town, each with its distance.
 - **Always a next step:** the diamond marker (and its screen-edge arrow) always has a target: the tracked quest, else the story goal, else the nearest Thread of Light.
@@ -206,7 +206,7 @@ In the world, sheet sprites are colour graded per biome (`gradedImg` in `js/art/
 
 **Town art.** `town_sprites` in `tools/extract_assets.py` cuts the painted town sheet into `assets/town/` (buildings, props, signs, townsfolk), `assets/ui/` (shop icons, slot frames, crafting ring, panel, touch ring) and seamless town tiles in `assets/tex/town_*`. Buildings stand on the street at their own proportions, townsfolk walk as their sprites, and the hotbar, touch buttons, crafting ring, menu panel and teaching cards wear the painted frames.
 
-**Requests II.** `art/sheets/requests2.png` lists what to paint next: the four vista layers and five Warden portraits (1600 x 900), rig parts for each Hollow, weapons, infusion glows, the double-jump ring, the rift tear, the level bar and the card frame.
+**Requests II (painted).** The user's painted answer (`art/source/requests2_painted.jpg`) is cut by `rq2_sprites`: the five Wardens lifted off their cards (background fitted and removed, ornaments opened away, the Glass Widow traced by hand, the cut-off bottom faded) and set into the prologue over their backdrops, sunk into ground mist; the four vista strips as parallax plates; the weapons, drawn in hand. The Hollows are redrawn in code after its character previews: big pale masks with a single dark eye (a flame crest, a cone, a hood, horns), short ponchos with deep jagged hems, the brute's slab, a cyan flame for the wisp; `tools/scenarios.mjs hollowrig` checks every kind through idle, walk, attack, hurt, stagger and death. The request sheet `art/sheets/requests2.png` listed: the four vista layers and five Warden portraits (1600 x 900), rig parts for each Hollow, weapons, infusion glows, the double-jump ring, the rift tear, the level bar and the card frame.
 
 The blade in the stone has its painted light beam removed (`clean_bladestone`) and gets a soft additive shaft with drifting motes drawn in code instead; it stands on a level shelf.
 

@@ -901,6 +901,40 @@ export default ({ page, sleep, key, shot, evalg }) => ({
       console.log('town', bi, r);
     }
   },
+  // the Hollows as rigged figures: each kind idles, walks, attacks, is hit, staggered and killed; every part
+  // stays attached (head within reach of the neck, no NaN), and standing feet are on the floor
+  async hollowrig() {
+    await sleep(1200);
+    await evalg(() => { const g = window.__game; g.story.skipBirth(); if (g.story.skipTutorial) g.story.skipTutorial(); g.save.hasBlade = true; g.player.actor.blade = true; g.enemies.calm = 999; for (const e of g.actors) if (e.team === 'enemy') e.removed = true; g.cam.zoomT = 1.6; });
+    await sleep(1500);
+    const bad = [];
+    let f = 0;
+    for (const kind of ['husk', 'lancer', 'slinger', 'brute']) {
+      await evalg((kind) => { const g = window.__game, p = g.player; for (const e of g.actors) if (e.team === 'enemy') e.removed = true;
+        const e = g.enemies.spawn(kind, p.x + 110, p.y, 0); e.ai.cd = 99; e.hp = e.maxHp = 9999; window.__rig = e; }, kind);
+      for (const phase of ['idle', 'walk', 'attack', 'hurt', 'stagger', 'die']) {
+        await evalg((phase) => { const g = window.__game, e = window.__rig, p = g.player;
+          if (phase === 'walk') { e.ai.state = 'chase'; e.ai.cd = 99; }
+          if (phase === 'attack') { e.ai.cd = 0; e.ai.state = 'chase'; }
+          if (phase === 'hurt') g.enemies.hurt(e, 5, { x: e.c.x, y: e.c.y - 40, dx: -1, dy: -0.3, from: p, poise: 1 });
+          if (phase === 'stagger') g.enemies.stagger(e, 1.2);
+          if (phase === 'die') { e.hp = 1; g.enemies.hurt(e, 50, { x: e.c.x, y: e.c.y - 40, dx: -1, dy: -0.4, from: p, poise: 99 }); }
+        }, phase);
+        for (let k = 0; k < 3; k++) {
+          await sleep(280);
+          const r = await evalg(() => { const e = window.__rig, b = e.body, W = window.__game.world;
+            const nan = [...b.x, ...b.y].some(v => !isFinite(v));
+            const neck = Math.hypot(b.x[0] - b.x[1], b.y[0] - b.y[1]) / e.scale;
+            const fy = Math.max(b.y[10], b.y[13]); let gy = null; for (const dx of [-e.c.w / 2, 0, e.c.w / 2]) { const q = W.groundBelow(e.c.x + dx, e.c.y - 40, 200); if (q !== null && (gy === null || q < gy)) gy = q; }
+            return { nan, neck: Math.round(neck), mode: e.mode, ground: e.c.ground, foot: gy === null ? null : Math.round(fy - gy) }; });
+          if (r.nan || r.neck > 16 || (phase === 'idle' && r.ground && r.foot !== null && (r.foot < -14 || r.foot > 6))) bad.push({ kind, phase, ...r });
+          if (k === 1) await shot('film-' + String(f++).padStart(2, '0'));
+        }
+      }
+    }
+    console.log('hollowrig', JSON.stringify({ bad }));
+    if (bad.length) console.log('PROBLEMS: hollowrig', JSON.stringify(bad.slice(0, 6)));
+  },
   async persist() {
     await sleep(1200);
     const before = await evalg(() => { const g = window.__game; g.story.skipBirth(); g.save.hasBlade = true; g.player.actor.blade = true; g.enemies.calm = 999;

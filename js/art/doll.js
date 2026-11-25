@@ -132,10 +132,13 @@ function drawDollInner(ctx, b, look, a, o) {
   const hr = 11.4 * s * (look.headK || 1);
   ctx.save();
   ctx.translate(hx, hy); ctx.rotate(ha); ctx.translate(0, -1.5 * s);
-  headBack(ctx, look, hr, s, f, tint);
-  sphere(ctx, hr, skin, look.mat, rim, f, s);
-  headMid(ctx, look, hr, s, f, tint, o);
-  headFront(ctx, look, hr, s, f, o.time || 0, o.glows, hx, hy, ha, tint);
+  if (look.hmask) hollowHead(ctx, look, hr, s, f, tint);
+  else {
+    headBack(ctx, look, hr, s, f, tint);
+    sphere(ctx, hr, skin, look.mat, rim, f, s);
+    headMid(ctx, look, hr, s, f, tint, o);
+    headFront(ctx, look, hr, s, f, o.time || 0, o.glows, hx, hy, ha, tint);
+  }
   ctx.restore();
 
   // ---------- blade, then the near arm
@@ -151,8 +154,67 @@ function drawDollInner(ctx, b, look, a, o) {
   capsule(ctx, cx, cy, X(P.ELB_F), Y(P.ELB_F), 3.5 * ar, 2.9 * ar, sleeve, M);
   capsule(ctx, X(P.ELB_F), Y(P.ELB_F), X(P.HAND_F), Y(P.HAND_F), 2.9 * ar, 2.5 * ar, sleeve, M);
   handBall(ctx, X(P.ELB_F), Y(P.ELB_F), X(P.HAND_F), Y(P.HAND_F), 3.0 * ar * (look.gaunt ? 1.4 : 1), look.gloves ? tint(look.gloves) : skin, M, look.claws);
+  if (look.slab) drawSlab(ctx, X(P.ELB_F), Y(P.ELB_F), X(P.HAND_F), Y(P.HAND_F), s * bulk, f, tint(look.slab));
   if (look.tape) { ctx.strokeStyle = '#e8c35a'; ctx.lineWidth = 1.5 * s; ctx.beginPath(); ctx.moveTo(X(P.NECK) - nx * 3 * s, Y(P.NECK) - ny * 3 * s); ctx.quadraticCurveTo(cx + nx * 5 * s, cy + ny * 5 * s, bx + nx * 3 * s, by + ny * 3 * s); ctx.stroke(); }
   ctx.restore();
+}
+
+// ---------------------------------------------------------------- Hollow masks
+// The Hollows wear big pale masks with a single dark eye, drawn from clean closed shapes: a smooth closed
+// spline through a few points (mirrored by facing), one outline width, round joins. Kinds: a flame crest
+// (husk), a tall cone (lancer), a deep hood with the mask in its shadow (slinger), curved horns (brute).
+function smoothClosed(g, pts) {
+  const n = pts.length, mid = (a, b) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+  const m0 = mid(pts[n - 1], pts[0]);
+  g.beginPath(); g.moveTo(m0[0], m0[1]);
+  for (let i = 0; i < n; i++) { const p = pts[i], m = mid(p, pts[(i + 1) % n]); g.quadraticCurveTo(p[0], p[1], m[0], m[1]); }
+  g.closePath();
+}
+function polyClosed(g, pts) { g.beginPath(); pts.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y))); g.closePath(); }
+function hollowHead(g, look, r, s, f, tint) {
+  const R = r * 1.12, kind = look.hmask, mc = tint(look.maskCol || '#ecdcc8'), out = rgba('#14101a', 0.55), lw = Math.max(1, 1.1 * s);
+  const F = (pts) => pts.map(([x, y]) => [x * R * f, y * R]);
+  const fillMask = (draw, col = mc) => {
+    draw(); const gr = g.createLinearGradient(-R * f, -R, R * f, R);
+    gr.addColorStop(0, shade(col, 0.06)); gr.addColorStop(1, shade(col, -0.2));
+    g.fillStyle = gr; g.fill(); g.lineJoin = 'round'; g.lineWidth = lw; g.strokeStyle = out; g.stroke();
+  };
+  const crest = (tips) => { for (const [bx0, bx1, tx, ty] of tips) fillMask(() => smoothClosed(g, F([[bx0, -0.55], [(bx0 + tx) / 2 - 0.12, (ty - 0.55) / 2], [tx, ty], [(bx1 + tx) / 2 + 0.05, (ty - 0.6) / 2 + 0.1], [bx1, -0.5], [(bx0 + bx1) / 2, -0.35]]))); };
+  if (kind === 'hood') {
+    const hc = tint(look.hoodCol || '#5e4e78');
+    fillMask(() => smoothClosed(g, F([[-1.15, -1.45], [0.25, -1.35], [1.1, -0.55], [1.15, 0.75], [-0.1, 1.2], [-1.2, 0.45]])), hc);
+  }
+  if (kind === 'crest') crest([[-0.75, -0.25, -1.05, -1.75], [-0.4, 0.1, -0.35, -1.95], [-0.05, 0.45, 0.25, -1.6]]);
+  if (kind === 'horns') for (const sd of [-1, 1]) fillMask(() => smoothClosed(g, F([[sd * 0.3, -0.7], [sd * 0.75, -0.95], [sd * 0.95, -1.5], [sd * 0.78, -2.0], [sd * 0.62, -1.45], [sd * 0.45, -1.05], [sd * 0.18, -0.85]])));
+  // the mask itself
+  const k = kind === 'hood' ? 0.78 : 1, ox = kind === 'hood' ? 0.22 : 0;
+  const base = kind === 'cone'
+    ? [[-0.35, -1.95], [0.95, 0.35], [0.55, 0.95], [-0.6, 0.85], [-0.88, 0.05]]
+    : [[0, -1], [0.85, -0.55], [1.02, 0.1], [0.58, 0.9], [-0.35, 0.98], [-0.97, 0.2], [-0.72, -0.76]];
+  const pts = F(base.map(([x, y]) => [ox + x * k, y * k + (kind === 'hood' ? 0.12 : 0)]));
+  fillMask(() => (kind === 'cone' ? polyClosed(g, pts) : smoothClosed(g, pts)));
+  if (kind === 'hood') {
+    // the hood's shadow over the top of the mask
+    g.save(); smoothClosed(g, pts); g.clip();
+    const sh = g.createLinearGradient(0, -R, 0, R * 0.4); sh.addColorStop(0, rgba('#120e18', 0.75)); sh.addColorStop(1, rgba('#120e18', 0));
+    g.fillStyle = sh; g.fillRect(-R * 2, -R * 2, R * 4, R * 3); g.restore();
+  }
+  // one dark eye on the facing side, a pinpoint of the Hollow's colour in it
+  const ex = (ox + 0.42 * k) * R * f, ey = (kind === 'cone' ? 0.1 : 0.02) * R + (kind === 'hood' ? 0.1 * R : 0);
+  g.fillStyle = '#0c0a10'; g.beginPath(); g.ellipse(ex, ey, 0.15 * R * k, 0.25 * R * k, 0, 0, TAU); g.fill();
+  if (look.eyes) { g.fillStyle = look.eyes; g.beginPath(); g.arc(ex + 0.04 * R * f, ey - 0.07 * R, Math.max(0.8, 0.045 * R), 0, TAU); g.fill(); }
+}
+// the brute's slab: a great flat shield of hide and board carried on the near forearm
+function drawSlab(g, ex, ey, hx, hy, s, f, col) {
+  const a = Math.atan2(hy - ey, hx - ex), cx = (ex + hx) / 2 + Math.cos(a) * 3 * s, cy = (ey + hy) / 2 + Math.sin(a) * 3 * s;
+  g.save(); g.translate(cx, cy); g.rotate(-0.25 * f);
+  const w = 15 * s, h = 22 * s;
+  const pts = [[-w * 0.85, -h], [w * 0.7, -h * 0.9], [w, h * 0.35], [w * 0.15, h], [-w, h * 0.55]].map(([x, y]) => [x * f, y]);
+  polyClosed(g, pts);
+  const gr = g.createLinearGradient(-w * f, -h, w * f, h); gr.addColorStop(0, shade(col, 0.1)); gr.addColorStop(1, shade(col, -0.28));
+  g.fillStyle = gr; g.fill(); g.lineJoin = 'round'; g.lineWidth = Math.max(1, 1.2 * s); g.strokeStyle = rgba('#14101a', 0.55); g.stroke();
+  g.strokeStyle = rgba('#ffffff', 0.18); g.beginPath(); g.moveTo(pts[0][0], pts[0][1]); g.lineTo(pts[1][0], pts[1][1]); g.stroke();
+  g.restore();
 }
 
 function sphere(g, r, col, mat, rim, f, s) {
@@ -308,7 +370,7 @@ function drawLongCloak(g, b, a, cx, cy, px, py, tx, ty, nx, ny, s, f, col, o, lo
   // hangs from the shoulders to the knees (or the ground), hem tattered, trimmed for wardens
   const kneeY = Math.max(b.ipy(P.KNEE_F, a), b.ipy(P.KNEE_B, a));
   const footY = Math.max(b.ipy(P.FOOT_F, a), b.ipy(P.FOOT_B, a));
-  const bottom = look.cloakToGround ? footY - 2 * s : lerp(kneeY, footY, 0.35);
+  const bottom = look.cloakToGround ? footY - 2 * s : look.cloakShort ? lerp(py, kneeY, 0.85) : lerp(kneeY, footY, 0.35);
   const sway = Math.max(-1, Math.min(1, -(o.vx || 0) / 260)) * 8 * s;
   const top = [cx + tx * 3 * s, cy + ty * 3 * s];
   const wTop = 9 * s, wBot = 15 * s;
@@ -321,7 +383,8 @@ function drawLongCloak(g, b, a, cx, cy, px, py, tx, ty, nx, ny, s, f, col, o, lo
   g.quadraticCurveTo(top[0], top[1] + ty * 3 * s - 4 * s, top[0] + nx * wTop, top[1] + ny * wTop);
   g.quadraticCurveTo(px + nx * 12 * s, py, bxm + nx * wBot + sway, bottom);
   const n = 6;
-  for (let i = 1; i <= n; i++) { const u = i / n; g.lineTo(lerp(bxm + nx * wBot + sway, bxm - nx * wBot + sway * 1.4, u), bottom - (i % 2 ? 4 * s : 0) + Math.sin(u * 7 + (o.time || 0) * 2) * 1.2 * s); }
+  const teeth = (look.cloakTeeth || 4) * s;
+  for (let i = 1; i <= n; i++) { const u = i / n; g.lineTo(lerp(bxm + nx * wBot + sway, bxm - nx * wBot + sway * 1.4, u), bottom - (i % 2 ? teeth : 0) + Math.sin(u * 7 + (o.time || 0) * 2) * 1.2 * s); }
   g.quadraticCurveTo(px - nx * 12 * s, py, top[0] - nx * wTop, top[1] - ny * wTop);
   g.closePath(); g.fill();
   g.strokeStyle = rgba('#000000', 0.14); g.lineWidth = 1.1 * s;
