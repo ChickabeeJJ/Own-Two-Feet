@@ -557,6 +557,21 @@ def _strip(img, box, opaque):
     return reg, a
 
 
+def upscale_clean(im, size):
+    """a cleaner enlargement for flat painted shapes: median-filter the JPEG noise away, enlarge in two
+    smooth steps, settle the flat colours with a light median, then sharpen the edges back up"""
+    from PIL import ImageFilter
+    rgb, al = im.convert('RGB'), im.getchannel('A')
+    rgb = rgb.filter(ImageFilter.MedianFilter(3))
+    mid = (size[0] // 2 + im.width, size[1] // 2 + im.height)
+    rgb = rgb.resize(mid, Image.BICUBIC).resize((size[0] * 2, size[1] * 2), Image.LANCZOS)
+    rgb = rgb.filter(ImageFilter.MedianFilter(5)).filter(ImageFilter.UnsharpMask(radius=3, percent=90, threshold=2))
+    rgb = rgb.resize(size, Image.LANCZOS)
+    al = al.resize(size, Image.BICUBIC).filter(ImageFilter.GaussianBlur(0.6))
+    out = rgb.convert('RGBA'); out.putalpha(al)
+    return out
+
+
 def rq2_sprites(p, outdir):
     from PIL import ImageFilter
     img = load(p)
@@ -574,7 +589,7 @@ def rq2_sprites(p, outdir):
     for name, box in RQ2_STRIPS.items():
         reg, a = _strip(img, box, name == 'sky')
         sh = int(round(PW / reg.shape[1] * reg.shape[0]))
-        strip = Image.fromarray(np.dstack([reg, a * 255]).clip(0, 255).astype(np.uint8), 'RGBA').resize((PW, sh), Image.LANCZOS)
+        strip = upscale_clean(Image.fromarray(np.dstack([reg, a * 255]).clip(0, 255).astype(np.uint8), 'RGBA'), (PW, sh))
         plate = Image.new('RGBA', (PW, PH), (0, 0, 0, 0))
         top = band[name] - (sh if name == 'near' else 0)
         sa = np.asarray(strip).astype(np.float32)
@@ -585,15 +600,34 @@ def rq2_sprites(p, outdir):
                 if y < top: k = y / max(1, top); arr[y, :, :3] = t * (0.55 + 0.45 * k)
                 else: arr[y, :, :3] = b
             plate = Image.fromarray(arr.clip(0, 255).astype(np.uint8), 'RGBA')
+            # the strip's foot fades into the plain sky below it (no seam)
+            sa[..., 3] *= np.clip((sh - 1 - np.arange(sh)) / (sh * 0.3), 0, 1)[:, None]
+            strip = Image.fromarray(sa.clip(0, 255).astype(np.uint8), 'RGBA')
         else:
             # carry the ground down as a smooth wash of the strip's lowest colours (no streaks)
             row = sa[-6:].mean(0); k = 121; pad = np.pad(row, ((k // 2, k // 2), (0, 0)), mode='edge')
             cs = np.cumsum(pad, 0); row = (cs[k:] - cs[:-k]) / k; row = np.concatenate([row, row[-1:]], 0)[:PW]; row[:, 3] = 255
             below = np.repeat(row[None], PH - (top + sh), axis=0) if top + sh < PH and name == 'far' else None
+            if name == 'far':    # the haze above the peaks fades out, so the strip has no top edge
+                sa[..., 3] *= np.clip(np.arange(sh) / (sh * 0.32), 0, 1)[:, None] ** 1.3
+                strip = Image.fromarray(sa.clip(0, 255).astype(np.uint8), 'RGBA')
             if name == 'near':   # the pale mist between the silhouettes fades upward (no hard top edge)
                 ramp = np.clip(np.arange(sh) / (sh * 0.8), 0, 1)[:, None] ** 1.5
                 light = sa[..., :3].mean(-1) > 80
                 sa[..., 3] = np.where(light, sa[..., 3] * ramp, sa[..., 3]); strip = Image.fromarray(sa.clip(0, 255).astype(np.uint8), 'RGBA')
+            if name == 'cath':
+                # the castle is a pale flat silhouette: rebuild its outline as a crisp threshold of its
+                # brightness (antialiased), and settle its colours into a few clean steps
+                L = sa[..., :3].mean(-1)
+                Lb = np.asarray(Image.fromarray(L.clip(0, 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(1.4))).astype(np.float32)
+                crisp = np.clip((Lb - 128) / 14, 0, 1)
+                sa[..., 3] = crisp * 255     # only the castle itself; the mountains behind carry the ground
+                inside = crisp > 0.5
+                base = np.median(sa[..., :3][inside], axis=0) if inside.any() else np.array([215, 205, 200], np.float32)
+                ys = np.linspace(0, 1, sa.shape[0])[:, None, None]
+                flat = base[None, None, :] * (1.06 - 0.16 * ys)          # a touch lighter at the top, misty at the foot
+                sa[..., :3] = np.where(crisp[..., None] > 0.02, flat, sa[..., :3])
+                strip = Image.fromarray(sa.clip(0, 255).astype(np.uint8), 'RGBA')
             if name == 'cath':   # the castle's foot fades into the misty ground of the layer behind
                 fa = np.clip((sh - 1 - np.arange(sh)) / (sh * 0.35), 0, 1)
                 sa[..., 3] *= fa[:, None]; strip = Image.fromarray(sa.clip(0, 255).astype(np.uint8), 'RGBA')

@@ -139,11 +139,14 @@ export class UI {
   }
   objective(text, hint, dist) {
     const o = $('#objective');
-    const key = text + '|' + hint;
+    // the text updates freely (distances tick as you move); the diamond pulses only when the goal itself
+    // changes, not when a number in it does
+    const key = (text + '|' + (hint || '')).replace(/\d+/g, '#');
+    const te = o.querySelector('.ob-text'), he = o.querySelector('.ob-hint');
+    if (te.textContent !== text) te.textContent = text;
+    if (he.dataset.h !== (hint || '')) { he.dataset.h = hint || ''; he.innerHTML = hint || ''; }
     if (o.dataset.k !== key) {
       o.dataset.k = key;
-      o.querySelector('.ob-text').textContent = text;
-      o.querySelector('.ob-hint').innerHTML = hint || '';
       o.classList.remove('hidden', 'pulse'); void o.offsetWidth; o.classList.add('pulse');
     }
     const d = o.querySelector('.ob-dist');
@@ -375,7 +378,7 @@ export class UI {
     }
     const C = CARDS[this.guideOpen];
     delete fresh[this.guideOpen]; this.guideDot();
-    const cv = document.createElement('canvas'); cv.width = 400; cv.height = 180; cv.className = 'gb-pic'; drawCardPic(cv, C.pic);
+    const cv = document.createElement('canvas'); cv.width = 800; cv.height = 360; cv.className = 'gb-pic'; drawCardPic(cv, C.pic, this.game.player && this.game.player.actor.look);
     right.appendChild(cv);
     right.appendChild(el('div', 'gb-title', esc(C.title)));
     for (const l of C.lines) right.appendChild(el('p', 'gb-line', esc(l)));
@@ -512,7 +515,7 @@ export class UI {
   xpBar(level, frac, bump) {
     const b = $('#xp'); if (!b) return;
     const lv = $('#lvl'); if (lv.dataset.lv !== String(level)) { if (this.lastShownLv) { b.classList.remove('up'); void b.offsetWidth; b.classList.add('up'); } this.lastShownLv = level; }
-    lv.dataset.lv = level; lv.textContent = 'Lv. ' + level; b.title = `Level ${level} · ${Math.round(Math.max(0, Math.min(1, frac)) * 100)}% to the next`; $('#xp-fill').style.width = (Math.max(0, Math.min(1, frac)) * 100).toFixed(1) + '%';
+    lv.dataset.lv = level; lv.textContent = level; b.title = `Level ${level} · ${Math.round(Math.max(0, Math.min(1, frac)) * 100)}% to the next`; $('#xp-fill').style.width = (Math.max(0, Math.min(1, frac)) * 100).toFixed(1) + '%';
     if (bump) { b.classList.remove('bump'); void b.offsetWidth; b.classList.add('bump'); }
   }
   levelCard(n, vessel, perk) {
@@ -894,6 +897,8 @@ export class UI {
       box.appendChild(s);
     });
     this.hotbarDirty = false; this.lastSel = sv.sel;
+    // the experience line under the hotbar is as wide as the hotbar
+    requestAnimationFrame(() => { const w = box.offsetWidth; if (w) document.documentElement.style.setProperty('--hbw', Math.max(180, w) + 'px'); });
   }
   emote() {
     const g = this.game, a = g.player.actor;

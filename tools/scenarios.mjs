@@ -589,10 +589,6 @@ export default ({ page, sleep, key, shot, evalg }) => ({
     await page.waitForFunction(() => window.__game.story.shot === 1, { timeout: 30000 });
     console.log('vista ready after ms', Date.now() - t0);
     await sleep(2200); await shot('op-1-vista');
-    for (let i = 0; i < 5; i++) {
-      await page.waitForFunction((i) => window.__game.story.shot === 2 && window.__game.story.wi === i, i, { timeout: 30000 });
-      await sleep(700); await shot('op-2-warden' + i);
-    }
     await page.waitForFunction(() => window.__game.story.stage >= 0, { timeout: 30000 });
     console.log('prologue ms', Date.now() - t0);
     await sleep(900); await shot('op-3-fall');
@@ -934,6 +930,21 @@ export default ({ page, sleep, key, shot, evalg }) => ({
     }
     console.log('hollowrig', JSON.stringify({ bad }));
     if (bad.length) console.log('PROBLEMS: hollowrig', JSON.stringify(bad.slice(0, 6)));
+  },
+  // every Guide entry's picture, one screenshot each
+  async guidepics() {
+    await sleep(1200);
+    await evalg(() => { const g = window.__game; g.story.skipBirth(); if (g.story.skipTutorial) g.story.skipTutorial(); g.enemies.calm = 999; for (const k of ['lights', 'gate', 'marker', 'build', 'craft', 'parry', 'mend', 'surge', 'town', 'perk']) g.ui.teach(k, true); });
+    await sleep(1500);
+    await evalg(() => window.__game.ui.openMenu('guide')); await sleep(500);
+    const n = await evalg(() => document.querySelectorAll('.gb-item').length);
+    for (let i = 0; i < n; i++) {
+      await evalg((i) => document.querySelectorAll('.gb-item')[i].click(), i); await sleep(250);
+      const box = await evalg(() => { const r = document.querySelector('.gb-pic').getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height }; });
+      await page.screenshot({ path: `/tmp/otf-shots/gpic-${i}.png`, clip: { x: box.x, y: box.y, width: box.w, height: box.h } });
+    }
+    await shot('gbook');
+    console.log('guide pictures', n);
   },
   async persist() {
     await sleep(1200);

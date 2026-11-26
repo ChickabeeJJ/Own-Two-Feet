@@ -172,12 +172,12 @@ function smoothClosed(g, pts) {
 }
 function polyClosed(g, pts) { g.beginPath(); pts.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y))); g.closePath(); }
 function hollowHead(g, look, r, s, f, tint) {
-  const R = r * 1.12, kind = look.hmask, mc = tint(look.maskCol || '#ecdcc8'), out = rgba('#14101a', 0.55), lw = Math.max(1, 1.1 * s);
+  const R = r * 1.12, kind = look.hmask, mc = tint(look.maskCol || '#ecdcc8');
   const F = (pts) => pts.map(([x, y]) => [x * R * f, y * R]);
   const fillMask = (draw, col = mc) => {
     draw(); const gr = g.createLinearGradient(-R * f, -R, R * f, R);
     gr.addColorStop(0, shade(col, 0.06)); gr.addColorStop(1, shade(col, -0.2));
-    g.fillStyle = gr; g.fill(); g.lineJoin = 'round'; g.lineWidth = lw; g.strokeStyle = out; g.stroke();
+    g.fillStyle = gr; g.fill();
   };
   const crest = (tips) => { for (const [bx0, bx1, tx, ty] of tips) fillMask(() => smoothClosed(g, F([[bx0, -0.55], [(bx0 + tx) / 2 - 0.12, (ty - 0.55) / 2], [tx, ty], [(bx1 + tx) / 2 + 0.05, (ty - 0.6) / 2 + 0.1], [bx1, -0.5], [(bx0 + bx1) / 2, -0.35]]))); };
   if (kind === 'hood') {

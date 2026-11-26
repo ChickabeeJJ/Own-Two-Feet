@@ -190,7 +190,6 @@ export class FX {
         ctx.font = `italic 600 ${sz}px 'Cormorant Garamond', serif`;
         if ('letterSpacing' in ctx) ctx.letterSpacing = '0.06em';
         const x = Math.round(t.x), y = Math.round(t.y);
-        ctx.lineJoin = 'round'; ctx.lineWidth = 2.5; ctx.strokeStyle = 'rgba(12,10,16,0.45)'; ctx.strokeText(t.str, x, y);
         ctx.fillStyle = mix(t.col, '#efe6d6', 0.35); ctx.fillText(t.str, x, y);
       }
     }

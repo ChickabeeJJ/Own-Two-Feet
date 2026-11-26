@@ -7,6 +7,7 @@ import { itemName } from './items.js';
 import { shrineKind } from './npcs.js';
 import { COSMETICS, Save } from './progress.js';
 import { rgba, TAU, clamp, hash2 } from '../core/util.js';
+import { drawGlow } from '../world/light.js';
 
 // step types: craft (id n), place (id n), have (id n), deliver (id n, to a keeper kind), kill n, wake n,
 // stitch n, solve n (any puzzle), camp n, talk (keeper kind)
@@ -237,19 +238,23 @@ export class Quests {
     const m = 46 * g.pxRatio, on = sx > m && sx < g.W - m && sy > m && sy < g.H - m;
     const dist = Math.round(Math.abs(T_.x - g.player.x) / TILE);
     ctx.save();
-    ctx.fillStyle = rgba('#ffd9a0', 0.92); ctx.strokeStyle = rgba('#241a12', 0.5); ctx.lineWidth = 1.5 * g.pxRatio;
+    // bright and a little larger than before, with a soft glow, so it reads at a glance
+    ctx.fillStyle = '#ffcf6a'; ctx.strokeStyle = rgba('#241a12', 0.8); ctx.lineWidth = 2 * g.pxRatio;
+    const halo = (x, y, r) => { ctx.save(); ctx.globalCompositeOperation = 'lighter'; drawGlow(ctx, x, y, r, [1, 0.86, 0.6], 0.55); ctx.restore(); };
     if (on) {
-      const y = sy - 30 * g.pxRatio + Math.sin(g.time * 3) * 4 * g.pxRatio, r = 7 * g.pxRatio;
+      const y = sy - 30 * g.pxRatio + Math.sin(g.time * 3) * 4 * g.pxRatio, r = 9.5 * g.pxRatio;
+      halo(sx, y, 30 * g.pxRatio);
       ctx.beginPath(); ctx.moveTo(sx, y - r); ctx.lineTo(sx + r, y); ctx.lineTo(sx, y + r); ctx.lineTo(sx - r, y); ctx.closePath(); ctx.fill(); ctx.stroke();
     } else {
       const cx = g.W / 2, cy = g.H / 2, ang = Math.atan2(sy - cy, sx - cx);
       const ex = clamp(sx, m, g.W - m), ey = clamp(sy, m + 40 * g.pxRatio, g.H - m - 40 * g.pxRatio);
       ctx.translate(ex, ey); ctx.rotate(ang);
-      const r = 11 * g.pxRatio;
+      const r = 14.5 * g.pxRatio;
+      halo(0, 0, 34 * g.pxRatio);
       ctx.beginPath(); ctx.moveTo(r, 0); ctx.lineTo(-r * 0.6, -r * 0.8); ctx.lineTo(-r * 0.2, 0); ctx.lineTo(-r * 0.6, r * 0.8); ctx.closePath(); ctx.fill(); ctx.stroke();
       ctx.rotate(-ang);
-      ctx.font = `700 ${10 * g.pxRatio}px Manrope, sans-serif`; ctx.textAlign = 'center'; ctx.fillStyle = rgba('#ffd9a0', 0.9);
-      ctx.fillText(dist + ' m', -Math.cos(ang) * 26 * g.pxRatio, -Math.sin(ang) * 26 * g.pxRatio + 4 * g.pxRatio);
+      ctx.font = `800 ${11.5 * g.pxRatio}px Manrope, sans-serif`; ctx.textAlign = 'center'; ctx.fillStyle = '#ffd27a'; ctx.shadowColor = 'rgba(20,14,10,.85)'; ctx.shadowBlur = 4 * g.pxRatio;
+      ctx.fillText(dist + ' m', -Math.cos(ang) * 32 * g.pxRatio, -Math.sin(ang) * 32 * g.pxRatio + 4 * g.pxRatio);
     }
     ctx.restore();
   }

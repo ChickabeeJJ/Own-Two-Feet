@@ -134,7 +134,8 @@ export class Story {
     const P = this.pArt || (this.pArt = new PrologueArt());
     P.step(this.shot === 0 ? 14 : 8);
     if (this.shot === 0 && t > 2.6 && ['sky', 'far', 'cath', 'near'].every(n => P.ready(n))) { this.shot = 1; this.s1 = t; ui.fade(0, 0.8); ui.lore(PROLOGUE[1]); }
-    if (this.shot === 1 && t - this.s1 > 4.2 && P.ready('w0')) { this.shot = 2; this.wi = 0; this.wt = t; ui.lore(PROLOGUE[2]); Audio.play('roar', { vol: 0.25, pitch: 0.5 }); }
+    // the vista holds, then the fall: the Wardens are met in the world, not shown up front
+    if (this.shot === 1 && t - this.s1 > 5.6) this.endPrologue();
     if (this.shot === 2 && t - this.wt > 1.35) {
       if (this.wi >= 4) this.endPrologue();
       else if (P.ready('w' + (this.wi + 1))) { this.wi++; this.wt = t; Audio.play('slam', { vol: 0.25, pitch: 0.5 + this.wi * 0.1 }); }

@@ -481,10 +481,12 @@ export class PrologueArt {
   constructor() {
     this.p = new Painter();
     this.p.add('sky', paintSky()); this.p.add('far', paintFar()); this.p.add('cath', paintCathedral()); this.p.add('near', paintNear());
-    WARDEN_PAINT.forEach((fn, i) => this.p.add('w' + i, portrait(i, fn)));
+    // (the Warden portraits are no longer part of the opening; portrait() and WARDEN_PAINT stay for the sheets)
     this.embers = Array.from({ length: 90 }, (_, i) => ({ x: Math.random(), s: 0.04 + Math.random() * 0.08, o: Math.random(), r: 0.6 + Math.random() * 1.8 }));
     this.crows = Array.from({ length: 9 }, () => ({ x: Math.random() * 0.3, y: 0.25 + Math.random() * 0.2, s: 0.05 + Math.random() * 0.04, ph: Math.random() * TAU, z: 0.6 + Math.random() * 0.6 }));
   }
+  // the asset sheets still show the Warden portraits
+  addPortraits() { WARDEN_PAINT.forEach((fn, i) => this.p.add('w' + i, portrait(i, fn))); }
   step(ms) { this.p.step(ms); }
   // a painted vista plate in assets/cine/<name>.png wins over the built one (Warden portraits are composed
   // by paintedPortrait, so they always come from the painter)

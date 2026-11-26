@@ -2,6 +2,15 @@
 // a title, two lines, "Got it"), kept in the Guide archive in the menu; and a compass strip across the top
 // that always shows what is near and where to go next, each point with its distance.
 import { TAU } from '../core/util.js';
+import { Body, P } from '../physics/body.js';
+import { Animator } from '../physics/pose.js';
+import { Cape, drawShadow } from '../physics/skin.js';
+import { drawDoll } from '../art/doll.js';
+import { HUSK_LOOK } from '../game/enemies.js';
+import { drawChest, drawStitch } from '../game/content.js';
+import { drawThreadSprite } from '../game/thread.js';
+import { IMG, texPattern } from '../art/images.js';
+import { drawGlow } from '../world/light.js';
 
 // each card: a title, two short lines, and a picture drawn in clean shapes
 export const CARDS = {
@@ -17,82 +26,137 @@ export const CARDS = {
   perk: { sec: 'Basics', title: 'Levels and perks', lines: ['Everything you do gives experience: the line above your hotbar.', 'Every third level, choose a perk in the menu under Character.'], pic: 'perk', keys: 'Esc, then Character', touch: 'Menu, then Character' },
 };
 
-function pic(c, kind) {
-  const g = c.getContext('2d'), W = c.width, H = c.height, cx = W / 2, cy = H / 2;
-  const R = Math.round;
+// ------------------------------------------------------------ pictures, made from the game's own art
+// Each entry's picture is a small scene built from the real sprites and the posed doll and Hollows, on a
+// dusk backdrop with a strip of textured ground: nothing drawn as loose lines.
+const fakeWorld = {
+  get(tx, ty) { return ty >= 0 ? 3 : 0; }, wall() { return 0; }, solid(tx, ty) { return ty >= 0; },
+  groundBelow(x, y, max) { return y <= 0 && y + max >= 0 ? 0 : y > 0 ? Math.ceil(y / 32) * 32 : null; },
+};
+function posed(look, scale, spec) {
+  const b = new Body({ scale, x: 0, y: -41 * scale, facing: spec.facing || 1 });
+  const an = new Animator(b), dt = 1 / 120, standH = (19 + 18) * 0.93 * scale + 3.6 * scale;
+  const cape = look.cape ? new Cape(7, (look.cape.len || 7) * scale) : null;
+  for (let i = 0, n = spec.ticks || 160; i < n; i++) {
+    const st = Object.assign({ mode: 'ground', x: 0, gy: 0, py: -standH, vx: 0, vy: 0, runMax: 300 }, spec.st);
+    if (spec.attack) st.attack = { kind: spec.attack, t: spec.at };
+    an.update(dt, st, fakeWorld); b.step(dt, fakeWorld);
+    if (cape) cape.step(dt, (b.x[P.NECK] + b.x[P.CHEST]) / 2 - 2 * scale, (b.y[P.NECK] + b.y[P.CHEST]) / 2, -6, 1);
+  }
+  return { b, cape };
+}
+function figure(g, look, x, gy, scale, spec = {}) {
+  const { b, cape } = posed(look, scale, spec);
+  g.save(); g.translate(x, gy);
+  drawShadow(g, b.x[P.PELVIS], 0, 18 * scale, 0.8);
+  drawDoll(g, b, look, 1, { cape, blade: spec.blade !== false && !!look.blade, glows: [], time: 1.3 });
+  g.restore();
+}
+function spr(g, name, cx, bottom, h) {
+  const im = IMG[name]; if (!im) return false;
+  const w = im.width * h / im.height; g.drawImage(im, Math.round(cx - w / 2), Math.round(bottom - h), Math.round(w), Math.round(h)); return true;
+}
+function pic(c, kind, look) {
+  const g = c.getContext('2d'), W = 400, H = 180, GY = 148, R = Math.round, t = 1.2;
+  g.setTransform(c.width / W, 0, 0, c.height / H, 0, 0);
   g.clearRect(0, 0, W, H);
-  const glow = (x, y, r, col, a) => { const gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, `rgba(${col},${a})`); gr.addColorStop(1, `rgba(${col},0)`); g.fillStyle = gr; g.beginPath(); g.arc(x, y, r, 0, TAU); g.fill(); };
-  const mote = (x, y, s = 1) => { glow(x, y, 22 * s, '191,246,255', 0.7); g.fillStyle = '#ffffff'; g.beginPath(); g.arc(R(x), R(y), R(4 * s), 0, TAU); g.fill(); };
-  const line = (pts, col, w = 2) => { g.strokeStyle = col; g.lineWidth = w; g.lineCap = g.lineJoin = 'round'; g.beginPath(); pts.forEach(([x, y], i) => (i ? g.lineTo(R(x), R(y)) : g.moveTo(R(x), R(y)))); g.stroke(); };
-  const shape = (pts, fill, stroke) => { g.beginPath(); pts.forEach(([x, y], i) => (i ? g.lineTo(R(x), R(y)) : g.moveTo(R(x), R(y)))); g.closePath(); g.fillStyle = fill; g.fill(); if (stroke) { g.strokeStyle = stroke; g.lineWidth = 2; g.lineJoin = 'round'; g.stroke(); } };
-  const diamond = (x, y, r, col) => shape([[x, y - r], [x + r, y], [x, y + r], [x - r, y]], col, 'rgba(36,26,18,.6)');
-  const ground = () => { g.fillStyle = '#2a2430'; g.fillRect(0, R(H * 0.78), W, H); line([[0, H * 0.78], [W, H * 0.78]], 'rgba(255,240,220,.18)', 2); };
-  // the four sources of light, each a small clean pictogram
-  const doll = (x, y) => { g.fillStyle = '#efe6d6'; g.beginPath(); g.ellipse(R(x), R(y - 6), 16, 6, 0, 0, TAU); g.fill(); g.beginPath(); g.arc(R(x + 18), R(y - 9), 6, 0, TAU); g.fill(); };
-  const stitch = (x, y) => { line([[x - 10, y - 30], [x + 10, y - 10]], '#ffd9a0', 3); line([[x + 10, y - 30], [x - 10, y - 10]], '#ffd9a0', 3); glow(x, y - 20, 18, '255,217,160', 0.4); };
-  const nest = (x, y) => { shape([[x - 20, y], [x - 12, y - 16], [x, y - 22], [x + 12, y - 16], [x + 20, y]], '#3a2e36', 'rgba(0,0,0,.5)'); glow(x, y - 10, 12, '255,106,74', 0.8); };
-  const chest = (x, y) => { shape([[x - 16, y], [x - 16, y - 18], [x + 16, y - 18], [x + 16, y]], '#7a5a3e', 'rgba(0,0,0,.5)'); line([[x - 16, y - 12], [x + 16, y - 12]], '#d9a441', 2); };
+  // the backdrop: dusk sky, a soft light, a strip of the meadow's own ground
+  const sky = g.createLinearGradient(0, 0, 0, GY); sky.addColorStop(0, '#1b1726'); sky.addColorStop(1, '#3a2f3e');
+  g.fillStyle = sky; g.fillRect(0, 0, W, GY);
+  drawGlow(g, W / 2, GY - 40, 170, [1, 0.82, 0.66], 0.16);
+  const ground = (name = 'meadow_groundA') => { const pt = texPattern(g, name, 0.5); g.fillStyle = pt || '#3a3328'; g.save(); g.translate(0, GY); g.fillRect(0, 0, W, H - GY); g.restore();
+    const lip = g.createLinearGradient(0, GY, 0, GY + 10); lip.addColorStop(0, 'rgba(255,240,220,.18)'); lip.addColorStop(1, 'rgba(255,240,220,0)'); g.fillStyle = lip; g.fillRect(0, GY, W, 10);
+    const fade = g.createLinearGradient(0, GY, 0, H); fade.addColorStop(0, 'rgba(10,8,14,0)'); fade.addColorStop(1, 'rgba(10,8,14,.55)'); g.fillStyle = fade; g.fillRect(0, GY, W, H - GY); };
+  const mote = (x, y, r = 1) => { drawGlow(g, x, y, 22 * r, [0.75, 0.96, 1], 0.5); g.fillStyle = '#ffffff'; g.beginPath(); g.arc(R(x), R(y), 2.2 * r, 0, TAU); g.fill(); };
+  const diamond = (x, y, r, col) => { g.beginPath(); g.moveTo(R(x), R(y - r)); g.lineTo(R(x + r), R(y)); g.lineTo(R(x), R(y + r)); g.lineTo(R(x - r), R(y)); g.closePath(); g.fillStyle = col; g.fill(); };
+  const label = (txt, x, y, size = 13) => { g.fillStyle = 'rgba(243,236,224,.85)'; g.font = `500 ${size}px 'Cormorant Garamond', serif`; g.textAlign = 'center'; g.fillText(txt, R(x), R(y)); };
+  const doll = look || {};
   if (kind === 'lights') {
     ground();
-    const xs = [W * 0.17, W * 0.39, W * 0.61, W * 0.83], gy = H * 0.78;
-    [doll, stitch, nest, chest].forEach((f, i) => { f(xs[i], gy); line([[xs[i], gy - 34], [cx, H * 0.24]], 'rgba(191,246,255,.25)', 1.5); });
-    mote(cx, H * 0.22, 1.3);
+    figure(g, doll, 62, GY, 0.8, { st: { mode: 'sleep' }, ticks: 240, blade: false });
+    drawStitch(g, 150, GY - 34, t);
+    spr(g, 'req/nest', 238, GY + 4, 46);
+    drawChest(g, 330, GY, 0, t);
+    // her light rising from each source to Thread: a trail of motes, fading as they climb
+    for (const sx of [62, 150, 238, 330]) for (let k = 1; k <= 5; k++) { const u = k / 6, x = sx + (200 - sx) * u, y = (GY - 30) + (40 - (GY - 30)) * u - Math.sin(u * Math.PI) * 18; drawGlow(g, x, y, 7, [0.75, 0.96, 1], 0.35 * (1 - u * 0.4)); }
+    drawThreadSprite(g, 200, 38, t);
   } else if (kind === 'gate') {
-    ground();
-    const gy = H * 0.78;
-    shape([[cx - 50, gy], [cx - 50, gy - 90], [cx - 30, gy - 110], [cx + 30, gy - 110], [cx + 50, gy - 90], [cx + 50, gy]], '#3a3442', 'rgba(0,0,0,.5)');
-    for (let i = -2; i <= 2; i++) line([[cx + i * 16, gy - 100], [cx + i * 16, gy]], 'rgba(255,217,160,.7)', 2);
-    g.fillStyle = '#f3ece0'; g.font = '600 18px "Cormorant Garamond", serif'; g.textAlign = 'center'; g.fillText('3 / 10', cx, gy - 120);
-    mote(cx - 120, gy - 50); mote(cx + 120, gy - 64, 0.8);
+    ground('meadow_stone');
+    for (const x of [140, 260]) { const pt = texPattern(g, 'build_stone', 0.5); g.fillStyle = pt || '#5a5560'; g.fillRect(x - 16, GY - 110, 32, 110); g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(x + 8, GY - 110, 8, 110); }
+    spr(g, 'props/banner', 200, GY - 4, 92);
+    g.save(); g.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < 5; i++) { const y = GY - 96 + i * 20; g.strokeStyle = 'rgba(255,217,160,.55)'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(156, y); g.quadraticCurveTo(200, y + 8, 244, y); g.stroke(); }
+    g.restore();
+    label('3 / 10', 200, 26, 18); mote(176, 21, 0.7); 
   } else if (kind === 'marker') {
     ground();
-    diamond(cx + 70, H * 0.42, 10, '#ffd9a0');
-    g.fillStyle = 'rgba(255,217,160,.8)'; g.font = '700 11px Manrope, sans-serif'; g.textAlign = 'center'; g.fillText('24 m', cx + 70, H * 0.42 + 26);
-    shape([[W - 18, cy], [W - 34, cy - 12], [W - 30, cy], [W - 34, cy + 12]], '#ffd9a0');
-    g.fillStyle = 'rgba(20,17,26,.8)'; g.fillRect(R(W * 0.2), 12, R(W * 0.6), 18);
-    for (const [u, col] of [[0.3, '#ffd9a0'], [0.55, '#bff6ff'], [0.72, '#e8b070']]) diamond(W * (0.2 + 0.6 * u), 21, 5, col);
-    g.fillStyle = '#efe6d6'; g.beginPath(); g.arc(R(cx - 60), R(H * 0.78 - 26), 8, 0, TAU); g.fill();
+    figure(g, doll, 110, GY, 0.85, { st: { mode: 'ground' }, ticks: 60 });
+    drawThreadSprite(g, 150, 70, t);
+    const mx = 300, my = GY - 52; drawGlow(g, mx, my, 26, [1, 0.85, 0.63], 0.5);
+    diamond(mx, my, 9, '#ffd9a0'); g.fillStyle = 'rgba(255,217,160,.95)'; g.font = "700 10px Manrope, sans-serif"; g.textAlign = 'center'; g.fillText('24 m', mx, my + 22);
+    // the compass strip along the top
+    g.fillStyle = 'rgba(255,240,220,.28)'; g.fillRect(90, 18, 220, 1);
+    for (const [x, col] of [[150, '#e8b070'], [230, '#bff6ff'], [280, '#ffb36b']]) diamond(x, 18, 4, col);
+  } else if (kind === 'build') {
+    ground('meadow_stone');
+    const pt = texPattern(g, 'meadow_groundA', 0.5);
+    for (let i = 0; i < 3; i++) { g.fillStyle = pt || '#6a5a48'; g.fillRect(230 + i * 32, GY - 32 * (i + 1), 32, 32 * (i + 1)); }
+    figure(g, doll, 120, GY, 0.85, { st: { mode: 'ground' }, ticks: 60, attack: 'mine', at: 0.5 });
+    g.strokeStyle = 'rgba(255,255,255,.85)'; g.lineWidth = 2; g.beginPath(); g.roundRect(231, GY - 31, 30, 30, 5); g.stroke();
+    const pk = IMG['icons/b_planks']; if (pk) { g.globalAlpha = 0.6; g.drawImage(pk, 198, GY - 64, 32, 32); g.globalAlpha = 1; }
+    g.strokeStyle = 'rgba(191,246,255,.85)'; g.lineWidth = 1.5; g.beginPath(); g.roundRect(199, GY - 63, 30, 30, 5); g.stroke();
+  } else if (kind === 'craft') {
+    ground();
+    spr(g, 'req/bench', 80, GY + 2, 50);
+    const cx = 230, cy = 82, r = 52;
+    const ring = IMG['ui/ring']; if (ring) { const k = 2 * r / Math.max(ring.width, ring.height); g.drawImage(ring, cx - ring.width * k / 2, cy - ring.height * k / 2, ring.width * k, ring.height * k); }
+    const pk = IMG['icons/b_planks']; if (pk) g.drawImage(pk, cx - 18, cy - 18, 36, 36);
+    [['icons/b_wood', -2.4], ['icons/b_stone', -0.7], ['icons/glimmer', 0.9]].forEach(([n, a]) => { const im = IMG[n]; if (im) g.drawImage(im, cx + Math.cos(a) * 92 - 12, cy + Math.sin(a) * 48 - 12, 24, 24); });
+  } else if (kind === 'parry') {
+    ground();
+    figure(g, doll, 150, GY, 0.95, { st: { mode: 'ground' }, ticks: 60, attack: 'ss1', at: 0.5 });
+    figure(g, HUSK_LOOK('#ff6a4a'), 250, GY, 0.95, { st: { mode: 'ground' }, ticks: 60, facing: -1, attack: 'side', at: 0.45 });
+    drawGlow(g, 200, GY - 62, 40, [1, 0.92, 0.7], 0.8);
+    g.fillStyle = '#ffffff'; g.beginPath(); g.arc(200, GY - 62, 3, 0, TAU); g.fill();
+  } else if (kind === 'mend') {
+    ground();
+    figure(g, doll, 120, GY, 0.9, { st: { mode: 'ground' }, ticks: 60 });
+    drawGlow(g, 120, GY - 50, 50, [1, 0.72, 0.8], 0.35);
+    for (let i = 0; i < 5; i++) { const n = i < 3 ? 'icons/vessel' : 'icons/vessel_empty', im = IMG[n]; if (im) g.drawImage(im, 210 + i * 30, 40, 24, 24 * im.height / im.width); }
+    g.fillStyle = 'rgba(255,255,255,.12)'; g.fillRect(210, 82, 144, 4); g.fillStyle = '#ffd9e4'; g.fillRect(210, 82, 108, 4);
   } else if (kind === 'surge') {
     ground();
-    const gy = H * 0.78;
-    g.fillStyle = 'rgba(159,243,255,.85)'; g.beginPath(); g.moveTo(cx, gy - 110); g.quadraticCurveTo(cx + 22, gy - 60, cx, gy - 10); g.quadraticCurveTo(cx - 22, gy - 60, cx, gy - 110); g.closePath(); g.fill();
-    glow(cx, gy - 60, 70, '159,243,255', 0.35);
-    for (const d of [-1, 1]) for (let k = 1; k <= 2; k++) { const x = cx + d * (40 + k * 34); g.fillStyle = '#1c1820'; g.beginPath(); g.arc(R(x), R(gy - 40), 9, 0, TAU); g.fill(); g.fillRect(R(x - 7), R(gy - 32), 14, 30); }
-  } else if (kind === 'town') {
-    ground();
-    const gy = H * 0.78;
-    for (const [x, w, h] of [[cx - 90, 70, 60], [cx, 90, 80], [cx + 92, 64, 56]]) {
-      shape([[x - w / 2, gy], [x - w / 2, gy - h], [x + w / 2, gy - h], [x + w / 2, gy]], '#e6dccb', 'rgba(0,0,0,.35)');
-      shape([[x - w / 2 - 8, gy - h], [x, gy - h - 30], [x + w / 2 + 8, gy - h]], '#a44a3c', 'rgba(0,0,0,.35)');
-      g.fillStyle = '#ffd08a'; g.fillRect(R(x - 8), R(gy - h * 0.6), 16, 16); g.fillStyle = '#3a2c2a'; g.fillRect(R(x - 6), R(gy - 22), 12, 22);
+    const cx = 200, top = GY - 110, Hh = 104;
+    drawGlow(g, cx, top + Hh / 2, 90, [1, 0.35, 0.3], 0.4);
+    for (const [col, k] of [['#ff7a5a', 1.18], ['#12060a', 0.95]]) for (const sd of [-1, 1]) {
+      g.beginPath(); g.moveTo(cx, top);
+      for (let i = 1; i <= 12; i++) { const u = i / 12; g.lineTo(cx + sd * Math.sin(u * Math.PI) * 18 * k, top + u * Hh); }
+      g.lineTo(cx, top + Hh); g.closePath(); g.fillStyle = col; g.fill();
     }
+    figure(g, HUSK_LOOK('#ff6a4a'), 140, GY, 0.8, { st: { mode: 'ground', vx: -80 }, ticks: 60, facing: -1 });
+    figure(g, HUSK_LOOK('#ff6a4a'), 262, GY, 0.8, { st: { mode: 'ground', vx: 80 }, ticks: 60 });
+  } else if (kind === 'town') {
+    ground('town_cobble');
+    spr(g, 'town/well', 70, GY + 2, 54);
+    spr(g, 'town/inn', 200, GY + 2, 118);
+    spr(g, 'town/lamp', 320, GY + 2, 70);
   } else if (kind === 'perk') {
-    g.fillStyle = '#15121b'; g.strokeStyle = 'rgba(255,217,160,.7)'; g.lineWidth = 2; g.beginPath(); g.arc(R(W * 0.22), R(cy), 20, 0, TAU); g.fill(); g.stroke();
-    g.fillStyle = '#f3ece0'; g.font = '500 22px "Cormorant Garamond", serif'; g.textAlign = 'center'; g.fillText('3', R(W * 0.22), R(cy + 7));
-    g.fillStyle = 'rgba(255,255,255,.12)'; g.fillRect(R(W * 0.3), R(cy - 2), R(W * 0.55), 4);
-    g.fillStyle = '#9fd6e0'; g.fillRect(R(W * 0.3), R(cy - 2), R(W * 0.36), 4);
-    for (let i = 0; i < 3; i++) { const x = W * (0.38 + i * 0.2), y = cy + 46; shape([[x - 22, y - 16], [x + 22, y - 16], [x + 22, y + 16], [x - 22, y + 16]], i === 1 ? 'rgba(191,246,255,.18)' : 'rgba(255,255,255,.06)', i === 1 ? 'rgba(191,246,255,.8)' : 'rgba(255,240,220,.3)'); }
-  } else if (kind === 'build') {
-    const s0 = 30, x0 = R(cx - s0 * 3), y0 = R(H * 0.78 - s0 * 2);
-    for (let i = 0; i < 6; i++) for (let j = 0; j < 2; j++) shape([[x0 + i * s0, y0 + j * s0], [x0 + i * s0 + s0, y0 + j * s0], [x0 + i * s0 + s0, y0 + j * s0 + s0], [x0 + i * s0, y0 + j * s0 + s0]], j ? '#5a4a3e' : '#7a6a5a', 'rgba(0,0,0,.35)');
-    g.strokeStyle = 'rgba(255,255,255,.85)'; g.lineWidth = 2; g.strokeRect(x0 + 3 * s0 + 1, y0 + 1, s0 - 2, s0 - 2);
-    g.globalAlpha = 0.55; shape([[x0 + 4 * s0, y0 - s0], [x0 + 5 * s0, y0 - s0], [x0 + 5 * s0, y0], [x0 + 4 * s0, y0]], '#9b7653', 'rgba(191,246,255,.9)'); g.globalAlpha = 1;
-  } else if (kind === 'parry') {
-    line([[cx - 90, cy + 40], [cx + 10, cy - 30]], '#d8dde6', 5); line([[cx + 90, cy + 40], [cx - 10, cy - 30]], '#4a4450', 5);
-    glow(cx, cy - 22, 46, '255,230,170', 0.8); g.fillStyle = '#fff'; g.beginPath(); g.arc(R(cx), R(cy - 22), 4, 0, TAU); g.fill();
-    for (let i = 0; i < 6; i++) { const a = i / 6 * TAU; line([[cx + Math.cos(a) * 12, cy - 22 + Math.sin(a) * 12], [cx + Math.cos(a) * 26, cy - 22 + Math.sin(a) * 26]], 'rgba(255,230,170,.8)', 2); }
-  } else if (kind === 'mend') {
-    for (let i = 0; i < 5; i++) { const x = cx - 80 + i * 40, y = cy; shape([[x, y - 18], [x + 11, y - 4], [x, y + 18], [x - 11, y - 4]], i < 3 ? '#bff6ff' : 'rgba(255,255,255,.12)', 'rgba(36,26,18,.5)'); }
-    glow(cx + 40, cy, 34, '191,246,255', 0.5);
-    g.fillStyle = 'rgba(255,255,255,.12)'; g.fillRect(R(cx - 100), R(cy + 40), 200, 5); g.fillStyle = '#ffd9e4'; g.fillRect(R(cx - 100), R(cy + 40), 150, 5);
-  } else if (kind === 'craft') {
-    g.strokeStyle = 'rgba(255,217,160,.75)'; g.lineWidth = 2; g.beginPath(); g.arc(R(cx), R(cy), 46, 0, TAU); g.stroke();
-    shape([[cx - 18, cy + 18], [cx - 18, cy - 4], [cx, cy - 14], [cx + 18, cy - 4], [cx + 18, cy + 18]], '#9b7653', 'rgba(0,0,0,.4)');
-    for (const [a, col] of [[-2.5, '#8f8a96'], [-0.6, '#7a5a3e'], [1.3, '#d9a441']]) { const x = cx + Math.cos(a) * 84, y = cy + Math.sin(a) * 50; shape([[x - 10, y - 10], [x + 10, y - 10], [x + 10, y + 10], [x - 10, y + 10]], col, 'rgba(0,0,0,.4)'); line([[x - Math.cos(a) * 16, y - Math.sin(a) * 10], [cx + Math.cos(a) * 52, cy + Math.sin(a) * 30]], 'rgba(255,240,220,.3)', 1.5); }
+    const cx = 92, cy = 62;
+    g.save(); g.translate(cx, cy); g.rotate(Math.PI / 4); g.fillStyle = '#1b1722'; g.fillRect(-15, -15, 30, 30); g.strokeStyle = 'rgba(191,246,255,.9)'; g.lineWidth = 1.5; g.strokeRect(-15, -15, 30, 30); g.restore();
+    label('Lv. 3', cx, cy + 5, 14);
+    g.fillStyle = 'rgba(255,217,160,.55)'; g.fillRect(118, 59, 210, 7); g.fillStyle = '#16131c'; g.fillRect(119, 60, 208, 5); g.fillStyle = '#efe6d6'; g.fillRect(119, 60, 140, 5);
+    [['icons/r_surge', 120], ['icons/r_vessel', 200], ['icons/r_djump', 280]].forEach(([n, x], i) => {
+      g.fillStyle = i === 1 ? 'rgba(191,246,255,.12)' : 'rgba(255,255,255,.05)'; g.strokeStyle = i === 1 ? 'rgba(191,246,255,.8)' : 'rgba(255,240,220,.25)'; g.lineWidth = 1.5;
+      g.beginPath(); g.roundRect(x - 30, 96, 60, 60, 8); g.fill(); g.stroke();
+      const im = IMG[n]; if (im) g.drawImage(im, x - 18, 108, 36, 36);
+    });
   }
+  // a quiet vignette over everything
+  const v = g.createRadialGradient(W / 2, H / 2, H * 0.4, W / 2, H / 2, W * 0.62); v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,0,0,.45)');
+  g.fillStyle = v; g.fillRect(0, 0, W, H);
 }
 
-export function drawCardPic(c, kind) { try { pic(c, kind); } catch (e) {} }
+export function drawCardPic(c, kind, look) { try { pic(c, kind, look); } catch (e) { console.warn('guide picture', kind, e); } }
 
 // compass strip: points of interest placed by their offset from you, a few hundred metres either side
 export function compassHTML(pois, range) {

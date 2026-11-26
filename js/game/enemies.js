@@ -99,8 +99,8 @@ export class Wisp {
     this.game = game; this.id = 'w' + Math.random().toString(36).slice(2, 8);
     this.team = 'enemy'; this.kind = 'wisp'; this.scale = 1;
     this.c = { x, y, vx: 0, vy: 0, w: 24, h: 24 };
-    this.hp = 18 + tier * 8; this.maxHp = this.hp;
-    this.hitR = 14; this.mode = 'ctrl'; this.flash = 0; this.cd = rand(1.5, 2.5); this.t = rand(0, 10);
+    this.hp = 12 + tier * 5; this.maxHp = this.hp;   // one or two cuts
+    this.hitR = 14; this.mode = 'ctrl'; this.flash = 0; this.cd = rand(2.5, 3.5); this.t = rand(0, 10);
     this.col = col || '#c4b5ff'; this.glows = []; this.removed = false; this.deadT = 0; this.tier = tier;
     this.windup = 0;
   }
@@ -127,16 +127,17 @@ export class Wisp {
     const under = p && p.c.y > (g.world.surface(Math.floor(p.c.x / TILE)) + 4) * TILE;
     if (p && Math.abs(p.c.x - c.x) < 700) {
       const side = sign(c.x - p.c.x) || 1;
-      tx = p.c.x + side * 210 + Math.sin(this.t) * 40; ty = p.c.y - 150 + Math.cos(this.t * 1.3) * 30;
+      // hovering low and close enough to reach with a jump
+      tx = p.c.x + side * 170 + Math.sin(this.t) * 30; ty = p.c.y - 105 + Math.cos(this.t * 1.3) * 18;
       this.cd -= dt;
-      if (this.cd < 0.9 && !this.windup) { this.windup = 0.9; Audio.play('shard', { pitch: 0.7, vol: 0.5 }); }
+      if (this.cd < 1.2 && !this.windup) { this.windup = 1.2; Audio.play('shard', { pitch: 0.7, vol: 0.5 }); }
       if (this.windup) {
         this.windup -= dt;
         if (this.windup <= 0) {
-          this.windup = 0; this.cd = rand(3.2, 4.4) * (under ? 1.6 : 1) - this.tier * 0.2;
+          this.windup = 0; this.cd = rand(4.8, 6.4) * (under ? 1.6 : 1) - this.tier * 0.2;
           const dx = p.c.x - c.x, dy = p.cy - c.y, d = Math.hypot(dx, dy) || 1;
-          const sp = 230 + this.tier * 25;
-          g.projectiles.push(new Proj(g, { x: c.x, y: c.y, vx: dx / d * sp, vy: dy / d * sp, r: 7, col: this.col, life: 4 }));
+          const sp = 170 + this.tier * 18;
+          g.projectiles.push(new Proj(g, { x: c.x, y: c.y, vx: dx / d * sp, vy: dy / d * sp, r: 7, col: '#ff5a7a', life: 4 }));
           Audio.play('shoot');
         }
       }
@@ -171,7 +172,7 @@ export function drawWispSprite(ctx, x, y, t, col, o = {}) {
   ctx.globalAlpha = a;
   ctx.globalCompositeOperation = 'lighter';
   const rgb = hexRgb(col);
-  drawGlow(ctx, x, y, 50 + (o.windup ? (0.6 - o.windup) * 70 : 0), [0.62, 0.95, 1], 0.4);
+  drawGlow(ctx, x, y, 46 + (o.windup ? (1.2 - o.windup) * 50 : 0), [1, 0.25, 0.4], 0.32 + (o.windup ? 0.25 : 0));
   // a cold cyan flame: one closed teardrop whose tip licks back against its motion, a paler inner flame,
   // and a pale hourglass core where the Hollow's mask would be; two sparks above it
   const lean = Math.max(-1, Math.min(1, -(o.vx || 0) / 160)) * 6, fl = Math.sin(t * 9) * 1.5;
@@ -186,19 +187,22 @@ export function drawWispSprite(ctx, x, y, t, col, o = {}) {
     const gr = ctx.createLinearGradient(x, y - h, x, y + h); gr.addColorStop(0, rgba(c0, alpha * 0.7)); gr.addColorStop(1, rgba(c1, alpha));
     ctx.fillStyle = gr; ctx.fill();
   };
-  const cyan = o.flash > 0 ? '#ffffff' : '#9ff3ff';
-  flame(1, cyan, '#4fd2e0', 0.85);
-  flame(0.62, '#e8fdff', '#9ff3ff', 0.9);
+  // a Hollow flame: dark violet at the heart, burning crimson at the edges (nothing like Thread's cold light)
+  const hot = o.flash > 0 ? '#ffffff' : '#ff4a6a';
   ctx.globalCompositeOperation = 'source-over';
-  ctx.fillStyle = '#f4f1ea';
-  ctx.beginPath(); ctx.ellipse(x, y - 2, 3.6, 4.2, 0, 0, TAU); ctx.fill();
-  ctx.beginPath(); ctx.ellipse(x, y + 6, 3.2, 3.8, 0, 0, TAU); ctx.fill();
-  ctx.fillRect(Math.round(x - 1), Math.round(y + 1), 2, 3);
+  flame(1, hot, '#3a1030', 0.95);
+  flame(0.66, '#2a0e2a', '#120610', 0.95);
+  // a pale mask with two narrowed red eyes
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.fillStyle = '#ecdcc8';
+  ctx.beginPath(); ctx.moveTo(x, y - 9); ctx.quadraticCurveTo(x + 8, y - 8, x + 7, y + 1); ctx.quadraticCurveTo(x + 5, y + 8, x, y + 9); ctx.quadraticCurveTo(x - 5, y + 8, x - 7, y + 1); ctx.quadraticCurveTo(x - 8, y - 8, x, y - 9); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#ff3a5a';
+  for (const sd of [-1, 1]) { ctx.beginPath(); ctx.moveTo(x + sd * 1.2, y - 1); ctx.lineTo(x + sd * 5.2, y - 3.4); ctx.lineTo(x + sd * 4.6, y - 0.6); ctx.closePath(); ctx.fill(); }
   ctx.globalCompositeOperation = 'lighter';
-  ctx.fillStyle = rgba('#bff6ff', 0.8 * (0.6 + 0.4 * Math.sin(t * 5)));
+  ctx.fillStyle = rgba('#ff6a7a', 0.7 * (0.6 + 0.4 * Math.sin(t * 5)));
   for (const [dx, dy] of [[-9, -30], [7, -36]]) { ctx.beginPath(); ctx.moveTo(x + dx, y + dy - 3); ctx.lineTo(x + dx + 1.2, y + dy); ctx.lineTo(x + dx, y + dy + 3); ctx.lineTo(x + dx - 1.2, y + dy); ctx.closePath(); ctx.fill(); }
   ctx.globalCompositeOperation = 'source-over';
-  if (o.windup) { ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = rgba(col, 0.6); ctx.beginPath(); ctx.ellipse(x, y + 2, 7, 9, 0, 0, TAU); ctx.fill(); }
+  if (o.windup) { ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = rgba('#ff5a7a', 0.5 * (1 - o.windup / 1.2)); ctx.beginPath(); ctx.ellipse(x, y + 2, 12, 16, 0, 0, TAU); ctx.fill(); }
   ctx.restore();
 }
 
@@ -281,7 +285,9 @@ export class Enemies {
     if (y === null) return;
     const B = g.biomeAt(x);
     const r = Math.random();
-    const wispK = B.id === 'glass' || B.id === 'hollow' ? 0.22 : 0.12;
+    // flyers are a spice, not the meal: rarer, and never more than one hanging over you at a time
+    const wispNear = g.actors.some(a => a.kind === 'wisp' && a.mode !== 'dead' && !a.removed && Math.abs(a.c.x - g.player.x) < 1000);
+    const wispK = wispNear ? 0 : B.id === 'glass' || B.id === 'hollow' ? 0.08 : 0.05;
     const zl = g.levels ? g.levels.zoneLevel(x) : 1;
     if (r < wispK) this.spawnWisp(x, y * TILE - 140, tier, B.accent);
     else if (r < wispK + (tier >= 1 || g.time > 120 ? 0.14 : 0.05)) this.spawn('brute', x, y * TILE, tier, B.accent, { lvl: zl });

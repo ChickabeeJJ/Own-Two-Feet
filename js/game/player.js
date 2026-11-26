@@ -115,6 +115,9 @@ export class Player {
       if (m.wheel) this.select((this.sv.sel + (m.wheel > 0 ? 1 : -1) + Math.max(1, this.sv.hotbar.length)) % Math.max(1, this.sv.hotbar.length));
       if (Input.pressed('build')) { this.buildMode = !this.buildMode; g.ui && g.ui.toast(this.buildMode ? 'Build mode: Strike to mine, E to place' : 'Build mode off'); }
     }
+    // the doll sits only while the satchel is really open: however the satchel closed (a menu, a cutscene,
+    // travel, a fall), it stands up again rather than gliding about in a seated pose
+    if (a.sitting && !(g.ui && g.ui.bag && g.ui.bag.open_ && g.ui.modal === 'bag')) a.sitting = false;
     a.update(dt);
     // surge: dashing through foes cuts them
     if ((this.sv.abil.surge || (this.sv.equip && this.sv.equip.charm === 'g_charm_ember') || this.perk('stormstep')) && a.c.dashT > 0) {
@@ -809,7 +812,7 @@ export class Player {
     if (sel !== undefined && (c.ptx !== c.tx || c.pty !== c.ty || !mining) && (this.sv.inv[sel] || 0) > 0) {
       const px = c.ptx * TILE, py = c.pty * TILE;
       ctx.globalAlpha = c.canPlace ? 0.55 + Math.sin(g.time * 6) * 0.08 : 0.22;
-      try { g.wr.drawTile(ctx, c.ptx, c.pty, sel, px, py); } catch (e) {}
+      try { g.wr.drawTile(ctx, c.ptx, c.pty, sel === T.LOG ? T.WOOD : sel, px, py); } catch (e) {}   // the ghost is what will actually be placed
       ctx.globalAlpha = 1;
       ctx.lineWidth = 1.5;
       ctx.strokeStyle = c.canPlace ? rgba('#bff6ff', 0.75) : rgba('#ff8f7a', 0.6);

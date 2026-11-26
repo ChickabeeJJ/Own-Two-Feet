@@ -335,7 +335,7 @@ function requests2() {
     label(g, x + w / 2, y + h - 34, name, size + (note ? ' · ' + note : ''));
   };
   const note = (x, y, lines) => { g.fillStyle = 'rgba(243,236,224,.55)'; g.font = 'italic 500 19px Cormorant'; g.textAlign = 'left'; lines.forEach((t, i) => g.fillText(t, x, y + i * 24)); };
-  const P = new PrologueArt(); P.p.finish();
+  const P = new PrologueArt(); P.addPortraits(); P.p.finish();
   const plate = (name) => (cx, cy, w, h) => { const im = P.p.get(name); if (!im) return; const k = Math.min(w / im.width, h / im.height); g.drawImage(im, cx - im.width * k / 2, cy - im.height * k / 2, im.width * k, im.height * k); };
   section(g, 60, 196, 'Cutscene: vista layers (1600 x 900 each, saved as assets/cine/<name>.png)');
   note(60, 226, ['Four layers that slide at different speeds: sky is opaque, the other three are transparent above their shapes. Keep the low sun at the left third and the rose window on the centre line.']);

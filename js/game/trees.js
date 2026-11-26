@@ -47,7 +47,7 @@ export class Trees {
     if (g.wr.treeLean) g.wr.treeLean.set(tx, (g.wr.treeLean.get(tx) || 0) + dir * 0.09);
     if (n >= need) this.fell(tx, S, dir);
   }
-  fell(tx, S, dir) {
+  fell(tx, S, dir, unsupported) {
     const g = this.game, Wd = g.world, p = g.player;
     this.hits.delete(tx);
     let logs = 0;
@@ -67,6 +67,16 @@ export class Trees {
   }
   update(dt) {
     const g = this.game;
+    // a tree whose footing is dug away (or never there: a block mined from under it) topples by itself
+    if ((this.footT = (this.footT || 0) - dt) <= 0 && g.player && g.wr && g.wr.treeSprite) {
+      this.footT = 0.25;
+      const ptx = Math.floor(g.player.x / TILE), Wd = g.world;
+      for (let tx = ptx - 40; tx <= ptx + 40; tx++) {
+        const S = g.wr.treeSprite(tx);
+        if (!S || Wd.solid(tx, S.tr.base)) continue;
+        this.fell(tx, S, (tx * 7919) % 2 ? 1 : -1, true);
+      }
+    }
     for (const f of this.falling) {
       if (!f.landed) {
         // a slow start, then gravity takes the crown

@@ -208,10 +208,8 @@ export class Surges {
     ctx.globalCompositeOperation = 'lighter';
     ctx.strokeStyle = rgba('#ffd2b0', 0.7); ctx.lineWidth = 1.5;
     for (const side of [-1, 1]) { edge(side, 1.05); ctx.stroke(); }
-    // embers rising off it and a crack in the ground beneath
+    // embers rising off it
     if ((g.tick % 3) === 0) g.fx.spawn({ x: cx + rand(-W0, W0), y: s.y - 10 - rand(0, H), vx: rand(-20, 20), vy: -rand(40, 110), life: rand(0.6, 1.2), size: rand(1.5, 3), size1: 0.4, col: '#ffd2b0', col1: '#ff4a3a', add: true });
-    ctx.strokeStyle = rgba('#ff6a4a', 0.8 * open); ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.moveTo(cx - 50 * open, s.y - 1); for (let i = 0; i <= 10; i++) ctx.lineTo(cx - 50 * open + i * 10 * open, s.y - 1 - Math.abs(Math.sin(i * 3.3)) * 3); ctx.stroke();
     ctx.restore();
   }
 }
