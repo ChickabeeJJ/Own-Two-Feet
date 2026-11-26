@@ -356,13 +356,13 @@ export default ({ page, sleep, key, shot, evalg }) => ({
       out.daily = sv.daily && sv.daily.list.map(d => d.text);
       out.trackedText = Q.trackedText();
       // sites: find and solve a brazier puzzle
-      const bx = g.content.sites('brazier', 20, 600)[0]; out.brazierAt = bx;
+      const bx = g.content.sites('brazier', 20, 3000)[0] ?? g.content.sites('brazier', -3000, -20)[0]; out.brazierAt = bx;
       p.respawnAt(bx * 32 + 16, g.world.surface(bx) * 32); await wait(900);
       const site = S.list.get('brazier' + bx);
       for (const b of site.items) S.light(site, b);
       await wait(200); out.brazierSolved = site.solved; S.openChest(site); out.chestOpened = site.chest.open;
       // a camp: spawn, clear, chest
-      const cx = g.content.sites('camp', 130, 900)[0]; out.campAt = cx;
+      const cx = g.content.sites('camp', 130, 3000)[0] ?? g.content.sites('camp', -3000, -130)[0]; out.campAt = cx;
       g.enemies.calm = 0;
       p.respawnAt(cx * 32 + 16 - 400, g.world.surface(cx - 12) * 32); await wait(1200);
       const camp = S.list.get('camp' + cx); out.campSpawned = camp && camp.spawned; out.elite = camp && camp.elite && camp.elite.eliteName;
