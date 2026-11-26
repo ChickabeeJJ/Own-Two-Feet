@@ -26,33 +26,11 @@ export const TOWN_NAMES = { meadow: 'Hearthmere', glass: 'Glassford', hollow: 'L
 export function stampTownTiles(cx, base, put, wall) {
   // the cobbled street, the whole width, and the ground under it
   for (let x = cx - 52; x <= cx + 52; x++) put(x, base, T.ROAD, undefined, true);
+  // the buildings themselves are the painted fronts (towns.drawBuilding): here only the room they stand in
+  // is kept open (no back walls, roofs or frames of tiles behind the art) and each one's station is set down
   for (const B of BUILDINGS) {
     const x0 = cx + B.x, x1 = x0 + B.w - 1, top = base - B.h;
-    for (let x = x0; x <= x1; x++) {
-      for (let y = top; y < base; y++) {
-        const post = x === x0 || x === x1 || (B.w > 8 && (x - x0) % 4 === 0);
-        const beam = y === top || (B.h >= 8 && y === base - 5);
-        const win = !post && !beam && (y === base - 3 || y === base - 4) && (x - x0) % 3 === 1;
-        put(x, y, post || beam ? T.TIMBER : win ? T.GLASS : B.wall, wall, true);
-        put(x, y, T.AIR, undefined, true);
-      }
-    }
-    // a gabled roof of solid tiles with an overhang: you can run along the rooftops
-    for (let r = 0; ; r++) {
-      const a = x0 - 1 + r, b = x1 + 1 - r;
-      if (a > b) break;
-      for (let x = a; x <= b; x++) put(x, top - 1 - r, T.ROOF, undefined, true);
-      if (r > 3) break;
-    }
+    for (let x = x0; x <= x1; x++) for (let y = top - 4; y < base; y++) { put(x, y, T.AIR); put(x, y, 0, wall); }
     if (B.station) put(x0 + (B.sx || 2), base - 1, B.station, undefined, true);
-    // the inn has an upper floor and a ladder to it
-    if (B.upper) { for (let x = x0 + 1; x < x1 - 1; x++) put(x, base - 5, T.PLATFORM, undefined, true); for (let y = base - 5; y < base; y++) put(x1 - 1, y, T.LADDER, undefined, true); }
-  }
-  // gate arches at both ends: pillars behind you, a lintel overhead
-  for (const s of [-1, 1]) {
-    const gx = cx + s * 50;
-    for (let y = base - 7; y < base; y++) { put(gx - 2, y, T.RUIN, wall, true); put(gx + 2, y, T.RUIN, wall, true); put(gx - 2, y, T.AIR, undefined, true); put(gx + 2, y, T.AIR, undefined, true); }
-    for (let x = gx - 3; x <= gx + 3; x++) put(x, base - 8, T.RUIN, undefined, true);
-    put(gx, base - 9, T.RUIN, undefined, true);
   }
 }
