@@ -397,6 +397,7 @@ export class UI {
   toggleMenu() { if (this.modal === 'menu') this.closeMenu(); else this.openMenu(); }
   openMenu(tab) {
     if (this.dlg) this.closeDialog();
+    if (this.bag && this.bag.open_) this.bag.close();   // never leave the satchel half-open under the menu
     this.tailorMode = tab === 'look' && this.game.player && this.nearTailor();
     this.modal = 'menu';
     document.body.classList.add('menu-open', 'modal');
